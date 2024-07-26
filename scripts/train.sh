@@ -1,5 +1,7 @@
 # example to run:
 #       bash train.sh PERACT_BC 0,1 12345 ${exp_name}
+#       bash train.sh PERACT_BC 0,1,2,3 12345 abc
+#       bash scripts/train.sh PERACT_BC 0,1,2,3 12345 test
 
 # set the method name
 method=${1} # PERACT_BC or BIMANUAL_PERACT
@@ -16,12 +18,14 @@ port=${3:-"12345"}
 use_wandb=True
 
 # cur_dir=$(pwd)
-train_demo_path="/mnt/disk_1/tengbo/bimanual_data/train"
+# train_demo_path="/mnt/disk_1/tengbo/bimanual_data/train"
+train_demo_path="/home/zjyang/download/peract/squashfs-root-train"
 
 # we set experiment name as method+date. you could specify it as you like.
 addition_info="$(date +%Y%m%d)"
 exp_name=${4:-"${method}_${addition_info}"}
-logdir="/mnt/disk_1/tengbo/peract_bimanual/log"
+# logdir="/mnt/disk_1/tengbo/peract_bimanual/log"
+logdir="/home/zjyang/program/peract_bimanual/log"
 
 
 # create a tmux window for training
@@ -35,7 +39,7 @@ tmux new-session -d -s ${exp_name}
 #######
 # override hyper-params in config.yaml
 #######
-batch_size=2
+batch_size=1 # 2
 # task_name=${"multi_${addition_info}"}
 
 
@@ -55,7 +59,7 @@ episode_length=4
 #########
 
 tmux select-pane -t 0 
-tmux send-keys "conda activate per2; 
+tmux send-keys "conda activate peract; 
 CUDA_VISIBLE_DEVICES=${train_gpu} python train.py method=$method \
         rlbench.task_name=${exp_name} \
         framework.logdir=${logdir} \

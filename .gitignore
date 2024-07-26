@@ -1,3 +1,11 @@
+# 新加的
+third_part/
+outputs/
+log1/
+log2/
+log/
+log3/
+
 wandb/
 log/
 .mp4

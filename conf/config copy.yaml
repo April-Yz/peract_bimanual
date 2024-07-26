@@ -5,11 +5,12 @@ ddp:
 
 rlbench:
     task_name: "multi"
-    tasks: [open_drawer,slide_block_to_color_target]
-    demos: 100
+    # tasks: [open_drawer,slide_block_to_color_target]
+    tasks: [coordinated_push_box]
+    demos: 1 # 100
     # demo_path: /my/demo/path
     demo_path: /home/zjyang/download/peract/squashfs-root-train
-    episode_length: 25
+    episode_length: 2 # 25
     cameras: ["over_shoulder_left", "over_shoulder_right", "overhead", "wrist_right", "wrist_left", "front"]
     # camera_resolution: [128, 128]
     camera_resolution: [256,256]
@@ -17,7 +18,7 @@ rlbench:
     include_lang_goal_in_obs: True
 
 replay:
-    batch_size: 8
+    batch_size: 4 # 8
     timesteps: 1
     prioritisation: False
     task_uniform: True # uniform sampling of tasks for multi-task buffers
@@ -28,13 +29,13 @@ replay:
 
 framework:
     log_freq: 100
-    save_freq: 1000 # 10000
+    save_freq: 100 # 10000
     train_envs: 1
     replay_ratio: ${replay.batch_size}
     transitions_before_train: 200
     tensorboard_logging: True
     csv_logging: True
-    training_iterations: 1000 #100000
+    training_iterations: 100 # 100000
     gpu: 0
     env_gpu: 0
     logdir: '/home/zjyang/program/peract_bimanual/log/arm_test' # '/tmp/arm_test/'
@@ -50,7 +51,7 @@ framework:
     use_wandb: True
     wandb_project: "peract_bimanual"
     wandb_group: ${rlbench.task_name}_${method.name}
-    seed: 0
+    seed: '0'  # 0
     wandb_name: ${framework.seed}
 
 defaults:
