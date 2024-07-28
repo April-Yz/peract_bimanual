@@ -1,5 +1,6 @@
 """
 System configuration for peract 
+系统配置 
 """
 import os
 import logging

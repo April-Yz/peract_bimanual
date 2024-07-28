@@ -41,7 +41,7 @@ def create_agent(cfg: DictConfig) -> Agent:
 
         return LeaderFollowerAgent(leader_agent, follower_agent)
     
-    elif agent_type == "independent":
+    elif agent_type == "independent": # 独立的
         checkpoint_name_prefix = cfg.framework.checkpoint_name_prefix
         cfg.method.robot_name = "right"
         cfg.framework.checkpoint_name_prefix = f"{checkpoint_name_prefix}_{method_name.lower()}_right"
@@ -97,5 +97,10 @@ def agent_fn_by_name(method_name: str) -> Agent:
     elif method_name == "PERACT_RL":
         raise NotImplementedError("PERACT_RL not yet supported for eval.py")
 
+    ## !!YZJ ManiGaussian_BC2
+    elif method_name.startswith("ManiGaussian_BC2"):
+        from agents import manigaussian_bc2
+
+        return manigaussian_bc2.launch_utils.create_agent    
     else:
         raise ValueError("Method %s does not exists." % method_name)

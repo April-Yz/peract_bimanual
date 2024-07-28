@@ -98,9 +98,12 @@ def main(cfg: DictConfig) -> None:
         mp.spawn(
             run_seed_fn.run_seed,
             args=(
+                # 0, rank
                 cfg,
                 obs_config,
+                # y7.26新增 cfg.rlbench.cameras,
                 seed,
+                # y7.26新增 world_size,
                 world_size,
             ),
             nprocs=world_size,

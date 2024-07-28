@@ -26,8 +26,11 @@ def run_seed(
     rank,
     cfg: DictConfig,
     obs_config: ObservationConfig,
+    # y7.26cams,
+    # y7.26multi_task,
     seed,
     world_size,
+    # yzj7.26 fabric: L.Fabric = None,
 ) -> None:
     
 
@@ -76,7 +79,6 @@ def run_seed(
             cfg.method.demo_augmentation_every_n,
             cams,
         )
-
 
     elif cfg.method.name == "VIT_BC_LANG":
         from agents.baselines import vit_bc_lang
@@ -181,6 +183,45 @@ def run_seed(
     elif cfg.method.name == "PERACT_RL":
         raise NotImplementedError("PERACT_RL is not supported yet")
 
+    elif cfg.method.name.startswith("ManiGaussian_BC2"):
+        ## 7.16yzj 
+        #replay_buffer = replay_utils.create_replay(cfg, replay_path)
+        #replay_utils.fill_multi_task_replay(cfg, obs_config, rank, replay_buffer, tasks)
+        
+        from agents import manigaussian_bc2
+        # 和双臂的一样（除了导入的c2farm_lingunet_bc）
+        # !!双臂这边只需要cfg和replay_path就行
+        replay_buffer = manigaussian_bc2.launch_utils.create_replay(
+            cfg.replay.batch_size,
+            cfg.replay.timesteps,
+            cfg.replay.prioritisation,
+            cfg.replay.task_uniform,
+            replay_path if cfg.replay.use_disk else None,
+            cams, cfg.method.voxel_sizes,
+            cfg.rlbench.camera_resolution,
+            cfg=cfg)
+
+        manigaussian_bc2.launch_utils.fill_multi_task_replay(
+            cfg, 
+            obs_config, 
+            0,  # 双臂是rank
+            replay_buffer, 
+            tasks, 
+            cfg.rlbench.demos,
+            cfg.method.demo_augmentation, 
+            cfg.method.demo_augmentation_every_n,
+            cams, 
+            cfg.rlbench.scene_bounds,
+            cfg.method.voxel_sizes, 
+            cfg.method.bounds_offset,
+            cfg.method.rotation_resolution, 
+            cfg.method.crop_augmentation,
+            keypoint_method=cfg.method.keypoint_method,
+            #暂时不用分布式 fabric=fabric,  
+        )
+
+        agent = manigaussian_bc2.launch_utils.create_agent(cfg)
+# --------------------------------传参改动结束----------------------------------------------
     else:
         raise ValueError("Method %s does not exists." % cfg.method.name)
 
@@ -193,6 +234,10 @@ def run_seed(
     weightsdir = os.path.join(cwd, "seed%d" % seed, "weights")
     logdir = os.path.join(cwd, "seed%d" % seed)
 
+    # yzj打印项目路径
+    # cprint(f'Project path: {weightsdir}', 'cyan')
+
+    # yzj训练器
     train_runner = OfflineTrainRunner(
         agent=agent,
         wrapped_replay_buffer=wrapped_replay,
@@ -211,13 +256,18 @@ def run_seed(
         rank=rank,
         world_size=world_size,
         cfg=cfg
+        # fabric=fabric       # yzj分布式训练
     )
 
+    #yzj本来多的?处理多进程用的应该不用管
     train_runner._on_thread_start = partial(peract_config.config_logging, cfg.framework.logging_level)
     
     train_runner.start()
 
+    # 删除训练运行器和agent
     del train_runner
     del agent
+    # 收集垃圾
     gc.collect()
+    # 清空cuda缓存
     torch.cuda.empty_cache()

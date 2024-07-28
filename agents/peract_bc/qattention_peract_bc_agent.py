@@ -314,7 +314,9 @@ class QAttentionPerActBCAgent(Agent):
             for param in self._q.parameters():
                 param.requires_grad = False
 
+            #----------------------多的--------------------------------    
             # load CLIP for encoding language goals during evaluation
+            # yzj(和隔壁不同)在评估期间加载CLIP模型，用于编码语言目标
             model, _ = load_clip("RN50", jit=False)
             self._clip_rn50 = build_model(model.state_dict())
             self._clip_rn50 = self._clip_rn50.float().to(device)
@@ -325,6 +327,7 @@ class QAttentionPerActBCAgent(Agent):
             self._q.to(device)
 
     def _extract_crop(self, pixel_action, observation):
+        # !!新增 多的 从观察结果中提取特定区域（crop）
         # Pixel action will now be (B, 2)
         # observation = stack_on_channel(observation)
         h = observation.shape[-1]
@@ -340,6 +343,7 @@ class QAttentionPerActBCAgent(Agent):
         return crop
 
     def _preprocess_inputs(self, replay_sample):
+        # 少了深度信息
         obs = []
         pcds = []
         self._crop_summary = []
