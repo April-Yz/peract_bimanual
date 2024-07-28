@@ -1,7 +1,7 @@
 # example to run:
 #       bash train.sh PERACT_BC 0,1 12345 ${exp_name}
 #       bash train.sh PERACT_BC 0,1,2,3 12345 abc
-#       bash scripts/train.sh PERACT_BC 0,1,2,3 12345 test
+#       bash scripts/train.sh PERACT_BC 0,1,2,3 12345 abcd
 
 # set the method name
 method=${1} # PERACT_BC or BIMANUAL_PERACT
@@ -59,7 +59,8 @@ episode_length=4
 #########
 
 tmux select-pane -t 0 
-tmux send-keys "conda activate peract; 
+# peract rlbench
+tmux send-keys "conda activate rlbench; 
 CUDA_VISIBLE_DEVICES=${train_gpu} python train.py method=$method \
         rlbench.task_name=${exp_name} \
         framework.logdir=${logdir} \

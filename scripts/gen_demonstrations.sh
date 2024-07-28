@@ -7,21 +7,28 @@
 task=${1}
 
 cd third_part/RLBench/tools
+# xvfb-run -a python dataset_generator.py --tasks=${task} \
+#                             --save_path="../../../data1/test_data" \
+#                             --image_size=128,128 \
+#                             --renderer=opengl \
+#                             --episodes_per_task=25 \
+#                             --processes=1 \
+#                             --all_variations=True
 
-xvfb-run -a python nerf_dataset_generator.py --tasks=${task} \
+xvfb-run -a python nerf_dataset_generator_bimanual.py --tasks=${task} \
                             --save_path="../../../data/train_data" \
-                            --image_size=128,128 \
-                            --renderer=opengl \
-                            --episodes_per_task=20 \
-                            --processes=1 \
+                            --image_size=128x128 \
+                            # --renderer=opengl \
+                            --episodes_per_task=10 \    #20
+                            # --processes=1 \
                             --all_variations=True
 
-xvfb-run -a python dataset_generator_bimanual.py --tasks=${task} \
-                            --save_path="../../../data/test_data" # \
-                            # --image_size=128,128 \
-                            # --renderer=opengl \
-                            # --episodes_per_task=25 \
-                            # --processes=1 \
-                            # --all_variations=True
+# xvfb-run -a python dataset_generator_bimanual.py --tasks=${task} \
+#                             --save_path="../../../data/test_data"  \
+#                             --image_size=128x128 \
+#                             # --renderer=opengl \
+#                             --episodes_per_task=10 \   # 25 \
+#                             # --processes=1 \
+#                             --all_variations=True
 
 cd ..
