@@ -19,17 +19,17 @@ cd third_part/RLBench/tools
 xvfb-run -a python nerf_dataset_generator_bimanual.py --tasks=${task} \
                             --save_path="../../../data/train_data" \
                             --image_size=128x128 \
-                            # --renderer=opengl \
-                            # --episodes_per_task=10 \    #20
-                            # --processes=1 \
-                            # --all_variations=True
+                            --episodes_per_task=20 \
+                            --all_variations=True
+                            # --processes=1 \      
+                            # --renderer=opengl \                     
 
+# 开始爆错，实在不行加一个is_nerf,在修改的地方加if 但是文件好像没问题..
 # xvfb-run -a python dataset_generator_bimanual.py --tasks=${task} \
 #                             --save_path="../../../data/test_data"  \
-#                             --image_size=128x128 # \
-#                             # --renderer=opengl \
-#                             # --episodes_per_task=10 \   # 25 \
+#                             --image_size=128x128 \
+#                             --episodes_per_task=1 # 25 \
+#                             --all_variations=True
 #                             # --processes=1 \
-#                             # --all_variations=True
-
+#                             # --renderer=opengl \
 cd ..

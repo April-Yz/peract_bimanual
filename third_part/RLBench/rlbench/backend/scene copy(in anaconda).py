@@ -167,7 +167,7 @@ class Scene(object):
                 if attempts >= max_attempts:
                     raise e
 
-        # Let objects come to rest 让物体静止
+        # Let objects come to rest
         [self.pyrep.step() for _ in range(STEPS_BEFORE_EPISODE_START)]
         self._has_init_episode = True
         return descriptions
@@ -213,6 +213,7 @@ class Scene(object):
 
 
     def get_observation(self) -> Observation:
+        # logging.info("54 get_observation 54") 
 
         observation_data = {}
         perception_data = {}
@@ -251,6 +252,7 @@ class Scene(object):
                 mask = mask_fn(sensor.capture_rgb())
             return mask
 
+        # logging.info("55 get_observation 55") 
         for camera_name, camera_config in self._obs_config.camera_configs.items():            
 
             rgb_data, depth_data, pcd_data = get_rgb_depth(self.camera_sensors[camera_name], camera_config.rgb, camera_config.depth, camera_config.point_cloud,
@@ -265,11 +267,12 @@ class Scene(object):
                 
             perception_data.update({f'{camera_name}_rgb': rgb_data, f'{camera_name}_depth': depth_data, f'{camera_name}_point_cloud': pcd_data,
                                      f'{camera_name}_mask': mask_data})
-    
 
+        # logging.info("56 end for 56") 
 
 
         def get_proprioception(arm: Arm, gripper: Gripper):
+            # 获得本体感觉
             tip = arm.get_tip()
 
             if self._obs_config.joint_velocities:
@@ -326,6 +329,8 @@ class Scene(object):
             else:
                 gripper_joint_positions = None
 
+            # logging.info("57 get_observation 22") 
+
 
             if self._obs_config.record_ignore_collisions:
                 if self._ignore_collisions_for_current_waypoint:
@@ -334,6 +339,8 @@ class Scene(object):
                     ignore_collisions = np.array(0.0)
             else:
                 ignore_collisions = None
+
+            # logging.info("57 end get_proprioception 57") 
 
             return {"joint_velocities": joint_velocities, 
             "joint_positions": joint_positions,
@@ -363,12 +370,17 @@ class Scene(object):
         })
 
         if self.robot.is_bimanual:
+            # !!
+            # logging.info("1Scene get_obs difine obs = BimanualObservation(**observation_data)") 
             obs = BimanualObservation(**observation_data)
+            # print(obs)
+            # logging.info("2Scene get_obs difine obs = BimanualObservation(**observation_data)") 
         else:
             obs = UnimanualObservation(**observation_data)
 
         obs = self.task.decorate_observation(obs)
 
+        # logging.info("58 end get_observation 58") 
         return obs
 
     def step(self):
@@ -446,6 +458,7 @@ class Scene(object):
     def execute_waypoints_bimanual(self, do_record) -> bool:
         right_waypoints = self.task.right_waypoints
         left_waypoints = self.task.left_waypoints
+        # logging.info("31 get demo start 22")    
 
         for i, right_point in enumerate(right_waypoints.copy()):
             ext = right_point.get_ext()
@@ -456,6 +469,7 @@ class Scene(object):
                     right_waypoints.insert(i, right_point)
 
 
+        # logging.info("32 get demo start 22")    
         for i, left_point in enumerate(left_waypoints.copy()):
             ext = left_point.get_ext()
             if 'repeat' in ext:
@@ -471,12 +485,12 @@ class Scene(object):
             left_waypoints.append(left_waypoints[-1])
 
         
+        # logging.info("33 get demo start 22")    
         while True:
             success = False
             self._ignore_collisions_for_current_waypoint = False
             # ..fixme:: some waypoints might be skipped due to zip -> add dummy waypoints
             for i, (right_point, left_point) in enumerate(zip(right_waypoints, left_waypoints)):
-                # 忽略当前航点的碰撞
                 self._ignore_collisions_for_current_waypoint = right_point._ignore_collisions or left_point._ignore_collisions
                 right_point.start_of_path()
                 left_point.start_of_path()
@@ -485,12 +499,12 @@ class Scene(object):
                     logging.error("skipping waypoints!")
                     continue
         
+                # logging.info("34 get demo start 22")    
                 grasped_objects = self.robot.right_gripper.get_grasped_objects() + self.robot.left_gripper.get_grasped_objects()
                 colliding_shapes = []
                 for s in self.pyrep.get_objects_in_tree(object_type=ObjectType.SHAPE):
                     if s in grasped_objects:
                         continue
-                    # !!为什么注释掉？
                     #if s in self._robot_shapes:
                     #    continue
                     if not s.is_collidable():
@@ -499,6 +513,8 @@ class Scene(object):
                         colliding_shapes.append(s)
                     elif self.robot.left_arm.check_arm_collision(s):
                         colliding_shapes.append(s)
+                
+                # logging.info("35 get demo start 22")    
                 
                 logging.debug("got list of colliding objects: %s", ", ".join([s.get_name()  for s in colliding_shapes]))
                 
@@ -514,6 +530,7 @@ class Scene(object):
 
                 right_ext = right_point.get_ext()
                 left_ext = left_point.get_ext()
+                # logging.info("36 get demo start 22") 
 
                 right_path.visualize()
                 left_path.visualize()
@@ -536,12 +553,16 @@ class Scene(object):
                             self._handle_extensions_strings(ext.strip(), do_record)
                         left_done = True
 
+                    # logging.info("37 get demo start 22") 
                     self.step()
-                    # 获取已执行的关节位置动作
+                    # logging.info("38 get demo start 22") 
                     self._right_execute_demo_joint_position_action = right_path.get_executed_joint_position_action()
                     self._left_execute_demo_joint_position_action = left_path.get_executed_joint_position_action()
+                    # logging.info("39 -------chucuo----do_record()------- 22") 
                     do_record()
+                    # logging.info("40 get demo start 22") 
                     success, term = self.task.success()
+                    # logging.info("41 get demo start 22") 
 
             if not self.task.should_repeat_waypoints() or success:
                 return success
@@ -550,9 +571,9 @@ class Scene(object):
     def get_demo(self, record: bool = True,
                  callable_each_step: Callable[[Observation], None] = None,
                  randomly_place: bool = True) -> Demo:
-        """Returns a demo (list of observations)
-        返回一个演示（观察结果列表）"""
+        """Returns a demo (list of observations)"""
 
+        # logging.info("21 before get demo start 21")
         if not self._has_init_task:
             self.init_task()
         if not self._has_init_episode:
@@ -560,26 +581,31 @@ class Scene(object):
                               randomly_place=randomly_place)
         self._has_init_episode = False
 
+        # logging.info("22 get demo start 22")
         demo = []
 
         def do_record():
+            # !! 
+            # logging.info("从39跳回来------------- _demo_record_step(demo, record, callable_each_step) 运行开始---------")
             self._demo_record_step(demo, record, callable_each_step)
 
+        # logging.info("23 get demo start 22")
         if record:
-            self.pyrep.step()  # Need this here or get_force doesn't work... 这里需要这个，否则get_force不起作用
+            # logging.info("24 -------chucuodeweizhi----------- 22")
+            self.pyrep.step()  # Need this here or get_force doesn't work...
             demo.append(self.get_observation())
 
         success = False
         if self.robot.is_bimanual:
+            # logging.info("25 get demo start 22")
             success = self.execute_waypoints_bimanual(do_record)
         else:
             success = self.execute_waypoints_unimanual(do_record)
             
 
+        # logging.info("26 get demo start 22")    
         # Some tasks may need additional physics steps
         # (e.g. ball rowling to goal)
-        #某些任务可能需要额外的物理步骤
-        #（例如，罗琳球射门）
         if not success:
             for _ in range(10):
                 self.pyrep.step()
@@ -589,6 +615,7 @@ class Scene(object):
                 if success:
                     break
 
+        # logging.info("27 get demo start 22")    
         success, term = self.task.success()
         if not success:
             raise DemoError('Demo was completed, but was not successful.',
@@ -657,13 +684,19 @@ class Scene(object):
 
     def _demo_record_step(self, demo_list, record, func):
         if record:
+            # logging.info("50 _demo_record_stept 22") 
             demo_list.append(self.get_observation())
+            # logging.info("51 _demo_record_step 22") 
         if func is not None:
+            # logging.info("52-----func(self.get_observation())----出错，其中---get_obs 没错；---fun 有问题") 
+            # logging.info("func(self.get_observation()) _demo_record_step(self, demo_list, record, func)")
+            # self.get_observation()
+            # logging.info("5555try")  
             #-！！!!----------------修改上面原来的代码-----------------
             # func(self.get_observation())
             func(scene=self, obs=self.get_observation())
             # ----------------------------------
-            # func(self.get_observation())
+            logging.info("53-----func(self.get_observation())-----is ok")  
 
     def _set_camera_properties(self) -> None:
         def _set_rgb_props(rgb_cam: VisionSensor,

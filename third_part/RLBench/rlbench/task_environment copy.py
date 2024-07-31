@@ -32,7 +32,6 @@ class TaskEnvironment(object):
                  obs_config: ObservationConfig,
                  static_positions: bool = False,
                  attach_grasped_objects: bool = True,
-                 #  !!新的
                  shaped_rewards: bool = False
                  ):
         self._pyrep = pyrep
@@ -54,7 +53,7 @@ class TaskEnvironment(object):
         self._pyrep.start()
 
         if self._robot.is_bimanual:
-             #..fixme !! 大多数都是这里出现的
+             #..fixme
             logging.warning("not sure how _robot_shapes are used is used.")
             self._robot_shapes = self._robot.right_arm.get_objects_in_tree(object_type=ObjectType.SHAPE) + self._robot.left_arm.get_objects_in_tree(object_type=ObjectType.SHAPE)
         else:
@@ -103,10 +102,10 @@ class TaskEnvironment(object):
         return self._scene.get_observation()
 
     def step(self, action) -> (Observation, int, bool):
-        # returns observation, reward, done, info  观察， 奖励， 完成， 信息
+        # returns observation, reward, done, info
         if not self._reset_called:
             raise RuntimeError(
-                "Call 'reset' before calling 'step' on a task.") # "在对任务调用“step”之前调用“reset”。"
+                "Call 'reset' before calling 'step' on a task.")
         self._action_mode.action(self._scene, action)
         success, terminate = self._task.success()
         reward = float(success)
@@ -120,8 +119,8 @@ class TaskEnvironment(object):
 
     def get_demos(self, amount: int, live_demos: bool = False,
                   image_paths: bool = False,
-                #   !! 指定了callable_each_step变量所存储的可调用对象的参数类型和返回类型。参数的类型是Observation  None返回类型为None  = None 初始值
                   callable_each_step: Callable[[Observation], None] = None,
+                  # 表示 callable_each_step 参数是一个可调用对象，它接受一个 Observation 类型的参数并返回 None。如果没有提供，它默认为 None。
                   max_attempts: int = _MAX_DEMO_ATTEMPTS,
                   random_selection: bool = True,
                   from_episode_number: int = 0
@@ -149,15 +148,12 @@ class TaskEnvironment(object):
                 amount, callable_each_step, max_attempts)
             self._robot.arm.set_control_loop_enabled(ctr_loop)
         elif self._robot.is_bimanual:
-            # logging.info("11**try self._robot.is_bimanual **11")
             ctr_loop_right = self._robot.right_arm.joints[0].is_control_loop_enabled()
             ctr_loop_left = self._robot.left_arm.joints[0].is_control_loop_enabled()
             self._robot.right_arm.set_control_loop_enabled(True)
             self._robot.left_arm.set_control_loop_enabled(True)
-            # logging.info("12**try self._robot.is_bimanual **12")
             demos = self._get_live_demos(
                 amount, callable_each_step, max_attempts)
-            # logging.info("13**try self._robot.is_bimanual **13")
             self._robot.right_arm.set_control_loop_enabled(ctr_loop_right)
             self._robot.left_arm.set_control_loop_enabled(ctr_loop_left)
 
@@ -170,13 +166,14 @@ class TaskEnvironment(object):
         demos = []
         for i in range(amount):
             attempts = max_attempts
-            # logging.info("111**start try live demo **111")
+            # logging.info("111**start try live demo %s**111", attempts)
             while attempts > 0:
                 random_seed = np.random.get_state()
                 self.reset()
                 # logging.info("112**try try live demo **112")
+                # logging.info("%scallable_each_step是什么",callable_each_step)
                 try:
-                    # logging.info("113 demo start 113")
+                    # logging.info("113 before demo start 113")
                     demo = self._scene.get_demo(
                         callable_each_step=callable_each_step)
                     # logging.info("114 demo finish 114")
@@ -185,10 +182,9 @@ class TaskEnvironment(object):
                     break
                 except Exception as e:
                     attempts -= 1
-                    logging.warning('Bad demo. ' + str(e) + ' Attempts left: ' + str(attempts))
+                    logging.warning('Bad demo.1 ' + str(e) + ' Attempts left: ' + str(attempts))
             if attempts <= 0:
                 raise RuntimeError(
-                    # !!problem
                     'Could not collect demos. Maybe a problem with the task?')
         return demos
 

@@ -181,12 +181,14 @@ def run_all_variations(task_name, headless, save_path, episodes_per_task, image_
                     task_recorder.record_task_description(descriptions)
 
                     logging.info("// Task: %s Variation %s Demo %s", task_env.get_name(), variation, ex_idx)
+                    logging.info("1**try nerf data generation1")
 
                     # !! TODO: for now we do the explicit looping. 现在我们做显式循环。
                     demo, = task_env.get_demos(amount=1, live_demos=True,
                                                #!!新参数
                                                callable_each_step=task_recorder.take_snap
                                                )
+                    logging.info("2**try nerf data generation demo completed")
                 #  NoWaypointsError, DemoError,
                 except (BoundaryError, WaypointError, InvalidActionError, TaskEnvironmentError) as e:
                     logging.warning("Exception %s", e)
@@ -205,6 +207,7 @@ def run_all_variations(task_name, headless, save_path, episodes_per_task, image_
 
                 episode_path = os.path.join(episodes_path, EPISODE_FOLDER % ex_idx)
                
+                logging.info("3** save try nerf data generation1")
                 save_demo(demo, episode_path, variation)
 
                 with open(os.path.join( episode_path, VARIATION_DESCRIPTIONS), 'wb') as f:
@@ -239,7 +242,8 @@ def get_bimanual_tasks():
 @filepath_option("--save_path", default="/tmp/rlbench_data/",  help="Where to save the demos.")
 @choice_option('--tasks', type=click.Choice(get_bimanual_tasks()), multiple=True, help='The tasks to collect. If empty, all tasks are collected.')
 @click.option("--episodes_per_task", default=10, help="The number of episodes to collect per task.", prompt="Number of episodes")
-@click.option("--all_variations", is_flag=True, default=True, help="Include all variations when sampling epsiodes")
+# @click.option("--all_variations", is_flag=True, default=True, help="Include all variations when sampling epsiodes")
+@click.option("--all_variations", default=True, help="Include all variations when sampling epsiodes")
 #@click.option("--variations", default=-1, help="Number of variations to collect per task. -1 for all.")
 @click.option("--headless/--no-headless", default=True, is_flag=True, help='Hide the simulator window')
 #@click.option("--color-robot/--no-color-robot", default=False, is_flag=True, help='Colorize')

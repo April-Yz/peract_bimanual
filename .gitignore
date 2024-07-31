@@ -15,6 +15,7 @@ third_part/RLBench/tutorials/tutorial_images/
 
 third_party/
 outputs/
+log/
 log1/
 log2/
 log/

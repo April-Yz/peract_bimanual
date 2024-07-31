@@ -57,6 +57,7 @@ class UnimanualObservationData:
     ignore_collisions: np.ndarray
 
 @dataclass
+# 单手观察
 class UnimanualObservation(UnimanualObservationData, Observation):
     
     
@@ -66,8 +67,9 @@ class UnimanualObservation(UnimanualObservationData, Observation):
 
     def get_low_dim_data(self) -> np.ndarray:
         """Gets a 1D array of all the low-dimensional obseervations.
-
         :return: 1D array of observations.
+        获取所有低维障碍的一维数组。
+        :return:观测值的一维数组。
         """
         low_dim_data = [] if self.gripper_open is None else [[self.gripper_open]]
         for data in [self.joint_velocities, self.joint_positions,
@@ -94,13 +96,14 @@ class BimanualObservation(Observation):
 
         :return: 1D array of observations.
         """
+        # 这些为什么注释掉了，for换成了一个 夹持器接头位置
         low_dim_data = [] if robot.gripper_open is None else [[robot.gripper_open]]
-        #for data in [robot.joint_velocities, robot.joint_positions,
-        #             robot.joint_forces,
-        #             robot.gripper_pose, robot.gripper_joint_positions,
-        #             robot.gripper_touch_forces, self.task_low_dim_state]:
+        for data in [robot.joint_velocities, robot.joint_positions,
+                    robot.joint_forces,
+                    robot.gripper_pose, robot.gripper_joint_positions,
+                    robot.gripper_touch_forces, self.task_low_dim_state]:
 
-        for data in [robot.gripper_joint_positions]:
+        # for data in [robot.gripper_joint_positions]:
             if data is not None:
                 low_dim_data.append(data)
         return np.concatenate(low_dim_data) if len(low_dim_data) > 0 else np.array([])
