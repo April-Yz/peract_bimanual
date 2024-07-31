@@ -26,11 +26,11 @@ def run_seed(
     rank,
     cfg: DictConfig,
     obs_config: ObservationConfig,
-    # y7.26cams,
-    # y7.26multi_task,
+    cams, # y7.26
+    multi_task, # y7.26
     seed,
     world_size,
-    # yzj7.26 fabric: L.Fabric = None,
+    fabric: L.Fabric = None, # yzj7.26 
 ) -> None:
     
 
