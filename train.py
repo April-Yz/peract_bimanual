@@ -95,53 +95,20 @@ def main(cfg: DictConfig) -> None:
         logging.info("Starting seed %d." % seed)
 
         world_size = cfg.ddp.num_devices
-
-        if cfg.method.use_fabric:
-            # we use fabric DDP 我们使用织物 DDP
-            fabric = L.Fabric(devices=world_size, strategy='ddp')
-            fabric.launch()
-        # mp.spawn(
-            run_seed_fn.run_seed(
-            # ,
-            # args=(
-                0, # rank
+        mp.spawn(
+            run_seed_fn.run_seed,
+            args=(
+                # 0, rank
                 cfg,
                 obs_config,
-                cfg.rlbench.camer   as, # y7.26新增 
+                # y7.26新增 cfg.rlbench.cameras,
                 seed,
-                world_size,  
-                fabric, # y7.26新增 
-            ) #,
-            # nprocs=world_size,
-            # join=True,
-        # )
-        else:
-            # use pytorch DDP 
-            # "DDP"指的是"Distributed Data Parallel"，即分布式数据并行
-            import torch.multiprocessing as mp
-            mp.set_sharing_strategy('file_system')
-            from torch.multiprocessing import set_start_method, get_start_method
-
-            try:
-                if get_start_method() != 'spawn':
-                    set_start_method('spawn', force=True)
-            except RuntimeError:
-                # 无法将启动方法设置为生成
-                print("Could not set start method to spawn")
-                pass
-            mp.spawn(run_seed_fn.run_seed,
-                    args=(cfg,
-                        obs_config,
-                        cfg.rlbench.cameras,
-                        multi_task,
-                        seed,
-                        world_size,
-                        None,   # fabric
-                        ),
-                    nprocs=world_size,
-                    join=True)
-
-
+                # y7.26新增 fabric, 
+                world_size,
+            ),
+            nprocs=world_size,
+            join=True,
+        )
 
     end_time = datetime.now()
     duration = (end_time - start_time)

@@ -26,11 +26,11 @@ def run_seed(
     rank,
     cfg: DictConfig,
     obs_config: ObservationConfig,
-    cams, # y7.26
-    multi_task, # y7.26
+    # cams, # y7.26
+    # multi_task, # y7.26
     seed,
     world_size,
-    fabric: L.Fabric = None, # yzj7.26 
+    # fabric: L.Fabric = None, # yzj7.26 
 ) -> None:
     
 
@@ -46,6 +46,7 @@ def run_seed(
         cfg.replay.path, task_folder, cfg.method.name, "seed%d" % seed
     )
 
+    # 创建agent agent_type = leader_follower领头跟随 /or/ independent 独立 /or/ bimanual 双手  /or/ unimanual 单手
     agent = agent_factory.create_agent(cfg)
 
     if not agent:
@@ -167,7 +168,6 @@ def run_seed(
             keypoint_method=cfg.method.keypoint_method,
         )
 
-
     elif cfg.method.name.startswith("BIMANUAL_PERACT") or cfg.method.name.startswith("RVT") or cfg.method.name.startswith("PERACT_BC"):
 
         replay_buffer = replay_utils.create_replay(cfg, replay_path)
@@ -183,11 +183,14 @@ def run_seed(
     elif cfg.method.name == "PERACT_RL":
         raise NotImplementedError("PERACT_RL is not supported yet")
 
+    #-----------------------------------------------------------------------------------------------------------------------
+    # 发现1：method.name==agent中的文件夹名
     elif cfg.method.name.startswith("ManiGaussian_BC2"):
-        ## 7.16yzj 
+        ## 7.16yzj 上面是PERACT_BC做法，下面是ManiGaussian_BC做法的改动
         #replay_buffer = replay_utils.create_replay(cfg, replay_path)
         #replay_utils.fill_multi_task_replay(cfg, obs_config, rank, replay_buffer, tasks)
-        
+        import logging
+        logging.info("run_seed_fn.py: create_replay")
         from agents import manigaussian_bc2
         # 和双臂的一样（除了导入的c2farm_lingunet_bc）
         # !!双臂这边只需要cfg和replay_path就行
