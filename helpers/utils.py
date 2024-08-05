@@ -336,6 +336,106 @@ def split_list(lst, n):
     for i in range(0, len(lst), n):
         yield lst[i : i + n]
 
+# 新增extract_obs mani----（修改的是helper中的observation_utils）---------------------------
+def extract_obs(obs: Observation,
+                cameras,
+                t: int = 0,
+                prev_action=None,
+                channels_last: bool = False,
+                episode_length: int = 10,
+                # robot_name: str = "", 双臂新增的
+                next_obs: Observation = None, # mani多的
+                ):
+                # 从Observation对象中提取观察数据，用于机器学习模型
+    obs.joint_velocities = None
+    grip_mat = obs.gripper_matrix
+    grip_pose = obs.gripper_pose
+    joint_pos = obs.joint_positions
+    obs.gripper_pose = None
+    obs.gripper_matrix = None
+    obs.wrist_camera_matrix = None
+    obs.joint_positions = None
+
+    if obs.gripper_joint_positions is not None:
+        obs.gripper_joint_positions = np.clip(
+            obs.gripper_joint_positions, 0., 0.04)
+    
+
+    if obs.nerf_multi_view_rgb is not None:
+        nerf_multi_view_rgb = obs.nerf_multi_view_rgb
+    else:
+        nerf_multi_view_rgb = None
+
+    if obs.nerf_multi_view_depth is not None:
+        nerf_multi_view_depth = obs.nerf_multi_view_depth
+    else:
+        nerf_multi_view_depth = None
+
+    if obs.nerf_multi_view_camera is not None:
+        nerf_multi_view_camera = obs.nerf_multi_view_camera
+    else:
+        nerf_multi_view_camera = None
+
+
+    obs_dict = vars(obs)
+    obs_dict = {k: v for k, v in obs_dict.items() if v is not None}
+    robot_state = np.array([
+        obs.gripper_open,
+        *obs.gripper_joint_positions])
+    # remove low-level proprioception variables that are not needed
+    obs_dict = {k: v for k, v in obs_dict.items()
+                if k not in REMOVE_KEYS}
+
+    if not channels_last:
+        # swap channels from last dim to 1st dim
+        obs_dict = {k: np.transpose(
+            v, [2, 0, 1]) if v.ndim == 3 else np.expand_dims(v, 0)
+                    for k, v in obs_dict.items() if type(v) == np.ndarray or type(v) == list}
+    else:
+        # add extra dim to depth data
+        obs_dict = {k: v if v.ndim == 3 else np.expand_dims(v, -1)
+                    for k, v in obs_dict.items()}
+    obs_dict['low_dim_state'] = np.array(robot_state, dtype=np.float32)
+    # binary variable indicating if collisions are allowed or not while planning paths to reach poses
+    # 二进制变量，指示在规划到达姿势的路径时是否允许碰撞
+    obs_dict['ignore_collisions'] = np.array([obs.ignore_collisions], dtype=np.float32)
+    for (k, v) in [(k, v) for k, v in obs_dict.items() if 'point_cloud' in k]:
+        obs_dict[k] = v.astype(np.float32)
+
+    for camera_name in cameras:
+        obs_dict['%s_camera_extrinsics' % camera_name] = obs.misc['%s_camera_extrinsics' % camera_name]
+        obs_dict['%s_camera_intrinsics' % camera_name] = obs.misc['%s_camera_intrinsics' % camera_name]
+
+    # add timestep to low_dim_state
+    time = (1. - (t / float(episode_length - 1))) * 2. - 1.
+    obs_dict['low_dim_state'] = np.concatenate(
+        [obs_dict['low_dim_state'], [time]]).astype(np.float32)
+
+    obs.gripper_matrix = grip_mat
+    obs.joint_positions = joint_pos
+    obs.gripper_pose = grip_pose
+
+    obs_dict['nerf_multi_view_rgb'] = nerf_multi_view_rgb
+    obs_dict['nerf_multi_view_depth'] = nerf_multi_view_depth
+    obs_dict['nerf_multi_view_camera'] = nerf_multi_view_camera
+
+    # for next frame prediction
+    if next_obs is not None:
+        if next_obs.nerf_multi_view_rgb is not None:
+            obs_dict['nerf_next_multi_view_rgb'] = next_obs.nerf_multi_view_rgb
+            obs_dict['nerf_next_multi_view_depth'] = next_obs.nerf_multi_view_depth
+            obs_dict['nerf_next_multi_view_camera'] = next_obs.nerf_multi_view_camera
+        else:
+            obs_dict['nerf_next_multi_view_rgb'] = None
+            obs_dict['nerf_next_multi_view_depth'] = None
+            obs_dict['nerf_next_multi_view_camera'] = None
+
+    # if next_obs is None, we do not add the next frame prediction
+
+    return obs_dict
+# 新增extract_obs mani-------------------------------
+
+
 
 def get_device(gpu):
     if gpu is not None and gpu >= 0 and torch.cuda.is_available():

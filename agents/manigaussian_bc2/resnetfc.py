@@ -2,7 +2,7 @@ from torch import nn
 import torch
 
 import torch.autograd.profiler as profiler
-import agents.manigaussian_bc.utils as utils
+import agents.manigaussian_bc2.utils as utils
 from termcolor import colored
 from .attention import Visual3DLangTransformer
 

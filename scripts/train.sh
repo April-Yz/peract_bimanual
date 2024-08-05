@@ -19,13 +19,14 @@ use_wandb=True
 
 # cur_dir=$(pwd)
 # train_demo_path="/mnt/disk_1/tengbo/bimanual_data/train"
-train_demo_path="/home/zjyang/download/peract/squashfs-root-train"
+# "/home/zjyang/download/peract/squashfs-root-train"
+train_demo_path="home/zjyang/peract_bimanual/data1/train"
 
 # we set experiment name as method+date. you could specify it as you like.
 addition_info="$(date +%Y%m%d)"
 exp_name=${4:-"${method}_${addition_info}"}
 # logdir="/mnt/disk_1/tengbo/peract_bimanual/log"
-logdir="/home/zjyang/program/peract_bimanual/log"
+logdir="/home/zjyang/program/peract_bimanual/log-mani"
 
 
 # create a tmux window for training
@@ -48,8 +49,8 @@ batch_size=1 # 2
 # tasks=[coordinated_push_box]
 # 13 tasks in total, without (e)put_item_in_drawer now
 # tasks=[bimanual_pick_laptop,bimanual_pick_plate,bimanual_straighten_rope,coordinated_lift_ball,coordinated_lift_tray,coordinated_push_box,coordinated_put_bottle_in_fridge,dual_push_buttons,handover_item,bimanual_sweep_to_dustpan,coordinated_take_tray_out_of_oven,handover_item_easy]
-tasks=[bimanual_pick_laptop,bimanual_pick_plate,bimanual_straighten_rope,coordinated_lift_ball,coordinated_lift_tray,coordinated_push_box,coordinated_put_bottle_in_fridge,dual_push_buttons,handover_item,bimanual_sweep_to_dustpan,handover_item_easy]
-# tasks=[coordinated_push_box,coordinated_lift_ball]
+# 原单臂tasks=[bimanual_pick_laptop,bimanual_pick_plate,bimanual_straighten_rope,coordinated_lift_ball,coordinated_lift_tray,coordinated_push_box,coordinated_put_bottle_in_fridge,dual_push_buttons,handover_item,bimanual_sweep_to_dustpan,handover_item_easy]
+tasks=[coordinated_push_box,bimanual_push_single_button]
 # demo=100
 # episode_length=25
 # for debug

@@ -1,0 +1,139 @@
+hydra:
+  run:
+    dir: ${framework.logdir}/${rlbench.task_name}/${method.name}
+  sweep:
+    dir: multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.num}
+  hydra_logging:
+    version: 1
+    formatters:
+      simple:
+        format: '[%(asctime)s][HYDRA] %(message)s'
+    handlers:
+      console:
+        class: logging.StreamHandler
+        formatter: simple
+        stream: ext://sys.stdout
+    root:
+      level: INFO
+      handlers:
+      - console
+    loggers:
+      logging_example:
+        level: DEBUG
+    disable_existing_loggers: false
+  job_logging:
+    version: 1
+    formatters:
+      simple:
+        format: '[%(asctime)s][%(name)s][%(levelname)s] - %(message)s'
+    handlers:
+      console:
+        class: logging.StreamHandler
+        formatter: simple
+        stream: ext://sys.stdout
+      file:
+        class: logging.FileHandler
+        formatter: simple
+        filename: ${hydra.job.name}.log
+    root:
+      level: INFO
+      handlers:
+      - console
+      - file
+    disable_existing_loggers: false
+  sweeper:
+    _target_: hydra._internal.core_plugins.basic_sweeper.BasicSweeper
+    max_batch_size: null
+  launcher:
+    _target_: hydra._internal.core_plugins.basic_launcher.BasicLauncher
+  help:
+    app_name: ${hydra.job.name}
+    header: '${hydra.help.app_name} is powered by Hydra.
+
+      '
+    footer: 'Powered by Hydra (https://hydra.cc)
+
+      Use --hydra-help to view Hydra specific help
+
+      '
+    template: '${hydra.help.header}
+
+      == Configuration groups ==
+
+      Compose your configuration from those groups (group=option)
+
+
+      $APP_CONFIG_GROUPS
+
+
+      == Config ==
+
+      Override anything in the config (foo.bar=value)
+
+
+      $CONFIG
+
+
+      ${hydra.help.footer}
+
+      '
+  hydra_help:
+    hydra_help: ???
+    template: 'Hydra (${hydra.runtime.version})
+
+      See https://hydra.cc for more info.
+
+
+      == Flags ==
+
+      $FLAGS_HELP
+
+
+      == Configuration groups ==
+
+      Compose your configuration from those groups (For example, append hydra/job_logging=disabled
+      to command line)
+
+
+      $HYDRA_CONFIG_GROUPS
+
+
+      Use ''--cfg hydra'' to Show the Hydra config.
+
+      '
+  output_subdir: .hydra
+  overrides:
+    hydra: []
+    task:
+    - method=PERACT_BC
+    - rlbench.task_name=mani
+    - framework.logdir=/home/zjyang/program/peract_bimanual/log-mani
+    - rlbench.demo_path=home/zjyang/peract_bimanual/data1/train
+    - framework.start_seed=0
+    - framework.use_wandb=True
+    - framework.wandb_group=mani
+    - framework.wandb_name=mani
+    - ddp.num_devices=4
+    - replay.batch_size=1
+    - ddp.master_port=12345
+    - rlbench.tasks=[coordinated_push_box,bimanual_push_single_button]
+    - rlbench.demos=1
+    - rlbench.episode_length=4
+  job:
+    name: train
+    override_dirname: ddp.master_port=12345,ddp.num_devices=4,framework.logdir=/home/zjyang/program/peract_bimanual/log-mani,framework.start_seed=0,framework.use_wandb=True,framework.wandb_group=mani,framework.wandb_name=mani,method=PERACT_BC,replay.batch_size=1,rlbench.demo_path=home/zjyang/peract_bimanual/data1/train,rlbench.demos=1,rlbench.episode_length=4,rlbench.task_name=mani,rlbench.tasks=[coordinated_push_box,bimanual_push_single_button]
+    id: ???
+    num: ???
+    config_name: config
+    env_set: {}
+    env_copy: []
+    config:
+      override_dirname:
+        kv_sep: '='
+        item_sep: ','
+        exclude_keys: []
+  runtime:
+    version: 1.0.5
+    cwd: /home/zjyang/program/peract_bimanual
+  verbose: false

@@ -46,7 +46,7 @@ def run_seed(
         cfg.replay.path, task_folder, cfg.method.name, "seed%d" % seed
     )
 
-    # 创建agent agent_type = leader_follower领头跟随 /or/ independent 独立 /or/ bimanual 双手  /or/ unimanual 单手
+    # !!这行是不是能去掉？创建agent agent_type = leader_follower领头跟随 /or/ independent 独立 /or/ bimanual 双手  /or/ unimanual 单手
     agent = agent_factory.create_agent(cfg)
 
     if not agent:

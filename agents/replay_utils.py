@@ -80,6 +80,14 @@ def create_bimanual_replay(
     observation_elements.append(
         ObservationElement("right_low_dim_state", (LOW_DIM_SIZE,), np.float32)
     )
+    # ---------------------------------------
+    # for store_element in observation_elements:
+    #     if store_element.name == "right_low_dim_state":
+    #         print("replay_utils.py:create_bimanual_replay-----------------------")
+    #         print("store_element.name=",store_element.name)
+    #         print("store_element=",store_element)
+    #         print("store_element.shape=",store_element.shape)
+    #----------------------------------------
     observation_elements.append(
         ObservationElement("left_low_dim_state", (LOW_DIM_SIZE,), np.float32)
     )
@@ -98,6 +106,10 @@ def create_bimanual_replay(
                 np.float32,
             )
         )
+        # depth Mani新增---------------------------------------
+        observation_elements.append(
+            ObservationElement('%s_depth' % cname, (1, image_size[1],image_size[0]), np.float32))
+        # depth Mani新增---------------------------------------
         observation_elements.append(
             ObservationElement("%s_point_cloud" % cname, (3, image_size[1], image_size[0]), np.float16)
         )  # see pyrep/objects/vision_sensor.py on how pointclouds are extracted from depth frames
@@ -469,6 +481,7 @@ def _add_keypoints_to_replay(
         terminal = k == len(episode_keypoints) - 1
         reward = float(terminal) * REWARD_SCALE if terminal else 0
 
+        #-------------------------------------------------------
         obs_dict = observation_utils.extract_obs(
             obs,
             t=k,
@@ -514,7 +527,7 @@ def _add_keypoints_to_replay(
         replay.add(action, reward, terminal, timeout, **others)
         obs = obs_tp1
 
-    # final step
+    # final step----------------------------------------------
     obs_dict_tp1 = observation_utils.extract_obs(
         obs_tp1,
         t=k + 1,

@@ -214,6 +214,139 @@ class Conv3DBlock(nn.Module):
         x = self.activation(x) if self.activation is not None else x
         return x
 
+# -------------------------------nerf---------------------------------
+class Conv1DBlock(nn.Module):
+    
+    def __init__(self, in_channels, out_channels,
+                 kernel_sizes: Union[int, list]=1, strides=1,
+                 norm=None, activation=None, padding_mode='replicate',
+                 padding=None):
+        super(Conv1DBlock, self).__init__()
+        padding = kernel_sizes // 2 if padding is None else padding
+        self.conv1d = nn.Conv1d(
+            in_channels, out_channels, kernel_sizes, strides, padding=padding,
+            padding_mode=padding_mode)
+
+        if activation is None:
+            nn.init.xavier_uniform_(self.conv1d.weight,
+                                    gain=nn.init.calculate_gain('linear'))
+            nn.init.zeros_(self.conv1d.bias)
+        elif activation == 'tanh':
+            nn.init.xavier_uniform_(self.conv1d.weight,
+                                    gain=nn.init.calculate_gain('tanh'))
+            nn.init.zeros_(self.conv1d.bias)
+        elif activation == 'lrelu':
+            nn.init.kaiming_uniform_(self.conv1d.weight, a=LRELU_SLOPE,
+                                     nonlinearity='leaky_relu')
+            nn.init.zeros_(self.conv1d.bias)
+        elif activation == 'relu':
+            nn.init.kaiming_uniform_(self.conv1d.weight, nonlinearity='relu')
+            nn.init.zeros_(self.conv1d.bias)
+        else:
+            raise ValueError()
+
+        self.activation = None
+        self.norm = None
+        if norm is not None:
+            raise NotImplementedError('Norm not implemented.')
+        if activation is not None:
+            self.activation = act_layer(activation)
+        self.out_channels = out_channels
+
+    def forward(self, x):
+        # x: [1, d, n]
+        x = self.conv1d(x)
+        x = self.norm(x) if self.norm is not None else x
+        x = self.activation(x) if self.activation is not None else x
+        return x
+
+class InPlaceABN(nn.Module):
+    def __init__(self, out_channels, activation='leaky_relu'):
+        super(InPlaceABN, self).__init__()
+        self.bn = nn.BatchNorm3d(out_channels)
+        if activation == 'leaky_relu':
+            self.act = nn.LeakyReLU(inplace=True)
+        elif activation == 'relu':
+            self.act = nn.ReLU(inplace=True)
+        else:
+            raise ValueError()
+    
+    def forward(self, x):
+        return self.act(self.bn(x))
+
+class ConvBnReLU3D(nn.Module):
+    def __init__(self, in_channels, out_channels,
+                 kernel_size=3, stride=1, pad=1,
+                 norm_act=InPlaceABN):
+        super(ConvBnReLU3D, self).__init__()
+        self.conv = nn.Conv3d(in_channels, out_channels,
+                              kernel_size, stride=stride, padding=pad, bias=False)
+        self.bn = norm_act(out_channels)
+
+
+    def forward(self, x):
+        return self.bn(self.conv(x))
+
+class MultiLayer3DEncoderShallow(nn.Module):
+    '''
+    Point Cloud Voxel Encoder
+    [B,10,100,100,100] -> [B,128,100,100,100]
+    '''
+    def __init__(self, in_channels=10, out_channels=64, norm_act=InPlaceABN):
+        super(MultiLayer3DEncoderShallow, self).__init__()
+        self.out_channels = out_channels
+        CHANNELS = [8, 16, 32, 64] # 0.58M
+        # CHANNELS = [64, 128, 256, 512] # 18.60M
+        # CHANNELS = [32, 64, 128, 256] # 4.65M (32+64+128=224)
+        self.conv0 = ConvBnReLU3D(in_channels, CHANNELS[0], norm_act=norm_act)
+
+        self.conv1 = ConvBnReLU3D(CHANNELS[0], CHANNELS[1], stride=2, norm_act=norm_act)
+        self.conv2 = ConvBnReLU3D(CHANNELS[1], CHANNELS[1], norm_act=norm_act)
+
+        self.conv3 = ConvBnReLU3D(CHANNELS[1], CHANNELS[2], stride=2, norm_act=norm_act)
+        self.conv4 = ConvBnReLU3D(CHANNELS[2], CHANNELS[2], norm_act=norm_act)
+
+        self.conv5 = ConvBnReLU3D(CHANNELS[2], CHANNELS[3], stride=2, norm_act=norm_act)
+        self.conv6 = ConvBnReLU3D(CHANNELS[3], CHANNELS[3], norm_act=norm_act)
+
+        self.conv7 = nn.Sequential(
+            nn.ConvTranspose3d(CHANNELS[3], CHANNELS[2], 3, padding=1,
+                               stride=2, bias=False),
+            norm_act(CHANNELS[2]))
+
+        self.conv9 = nn.Sequential(
+            nn.ConvTranspose3d(CHANNELS[2], CHANNELS[1], 3, padding=1, output_padding=1,
+                               stride=2, bias=False),
+            norm_act(CHANNELS[1]))
+
+        self.conv11 = nn.Sequential(
+            nn.ConvTranspose3d(CHANNELS[1], CHANNELS[0], 3, padding=1, output_padding=1,
+                               stride=2, bias=False),
+            norm_act(CHANNELS[0]))
+
+        # self.conv12 = nn.Conv3d(8, 8, 3, stride=1, padding=1, bias=True)
+        self.conv_out = nn.Conv3d(CHANNELS[0], out_channels, 1, stride=1, padding=0, bias=True)
+        
+
+    def forward(self, x):
+        voxel_list = [] # to store multi-scale features
+        voxel_list.append(x)
+        conv0 = self.conv0(x) 
+        conv2 = self.conv2(self.conv1(conv0)) # 16, 50^3
+        conv4 = self.conv4(self.conv3(conv2)) # 32, 25^3
+
+        x = self.conv6(self.conv5(conv4)) # 64, 13^3
+        x = conv4 + self.conv7(x) # 32, 25^3
+        voxel_list.append(x)
+        del conv4
+        x = conv2 + self.conv9(x)
+        voxel_list.append(x)
+        del conv2
+        x = conv0 + self.conv11(x)
+        del conv0
+        x = self.conv_out(x)
+        return x, voxel_list
+#-------------------------------nerf----------------------------------
 
 class ConvTranspose3DBlock(nn.Module):
     def __init__(

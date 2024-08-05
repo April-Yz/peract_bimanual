@@ -34,7 +34,8 @@ class CameraConfig(object):
         self.depth = value
         self.point_cloud = value
         self.mask = value
-
+        # # for nerf (mani里面也加了注释)
+        # self.point_cloud_nerf = value
 
 
 #@dataclass
@@ -58,8 +59,13 @@ class ObservationConfig(object):
                  record_gripper_closing=False,
                  task_low_dim_state=True,
                  record_ignore_collisions=True,
-                 robot_name=''
+                 robot_name='',
+                 nerf_multi_view=True, # for nerf（Mani）
                  ):
+        # -------还有一下左右臂的设置没有改-----------nerf mani------------------------------------------------------------
+        self.nerf_multi_view = nerf_multi_view
+        # print(colored("[ObservationConfig] nerf_multi_view: {}".format(nerf_multi_view), "green"))
+        # nerf mani------------------------------------------------------------
         self.camera_configs = camera_configs or dict()
         self.joint_velocities = joint_velocities
         self.joint_velocities_noise = joint_velocities_noise

@@ -1,0 +1,121 @@
+ddp:
+  master_addr: localhost
+  master_port: 12345
+  num_devices: 4
+rlbench:
+  task_name: mani
+  tasks:
+  - coordinated_push_box
+  - bimanual_push_single_button
+  demos: 1
+  demo_path: home/zjyang/peract_bimanual/data1/train
+  episode_length: 4
+  cameras:
+  - over_shoulder_left
+  - over_shoulder_right
+  - overhead
+  - wrist_right
+  - wrist_left
+  - front
+  camera_resolution:
+  - 256
+  - 256
+  scene_bounds:
+  - -0.3
+  - -0.5
+  - 0.6
+  - 0.7
+  - 0.5
+  - 1.6
+  include_lang_goal_in_obs: true
+replay:
+  batch_size: 1
+  timesteps: 1
+  prioritisation: false
+  task_uniform: true
+  use_disk: true
+  path: /home/zjyang/program/peract_bimanual/log/arm/replay
+  max_parallel_processes: 32
+framework:
+  log_freq: 100
+  save_freq: 1000
+  train_envs: 1
+  replay_ratio: ${replay.batch_size}
+  transitions_before_train: 200
+  tensorboard_logging: true
+  csv_logging: true
+  training_iterations: 1000
+  gpu: 0
+  env_gpu: 0
+  logdir: /home/zjyang/program/peract_bimanual/log-mani
+  logging_level: 20
+  seeds: 1
+  start_seed: 0
+  load_existing_weights: false
+  num_weights_to_keep: 60
+  num_workers: 0
+  record_every_n: 5
+  checkpoint_name_prefix: checkpoint
+  use_wandb: true
+  wandb_project: peract_bimanual
+  wandb_group: mani
+  seed: 0
+  wandb_name: mani
+method:
+  name: PERACT_BC
+  agent_type: leader_follower
+  robot_name: bimanual
+  image_crop_size: 64
+  bounds_offset:
+  - 0.15
+  voxel_sizes:
+  - 100
+  include_prev_layer: false
+  num_latents: 2048
+  latent_dim: 512
+  transformer_depth: 6
+  transformer_iterations: 1
+  cross_heads: 1
+  cross_dim_head: 64
+  latent_heads: 8
+  latent_dim_head: 64
+  pos_encoding_with_lang: true
+  conv_downsample: true
+  lang_fusion_type: seq
+  voxel_patch_size: 5
+  voxel_patch_stride: 5
+  final_dim: 64
+  low_dim_size: 4
+  input_dropout: 0.1
+  attn_dropout: 0.1
+  decoder_dropout: 0.0
+  lr: 0.0005
+  lr_scheduler: false
+  num_warmup_steps: 3000
+  optimizer: lamb
+  lambda_weight_l2: 1.0e-06
+  trans_loss_weight: 1.0
+  rot_loss_weight: 1.0
+  grip_loss_weight: 1.0
+  collision_loss_weight: 1.0
+  rotation_resolution: 5
+  activation: lrelu
+  norm: None
+  crop_augmentation: true
+  transform_augmentation:
+    apply_se3: true
+    aug_xyz:
+    - 0.125
+    - 0.125
+    - 0.125
+    aug_rpy:
+    - 0.0
+    - 0.0
+    - 45.0
+    aug_rot_resolution: ${method.rotation_resolution}
+  demo_augmentation: true
+  demo_augmentation_every_n: 10
+  no_skip_connection: false
+  no_perceiver: false
+  no_language: false
+  keypoint_method: heuristic

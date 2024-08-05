@@ -8,11 +8,11 @@ import torchvision.transforms as T
 from termcolor import colored, cprint
 from dotmap import DotMap
 
-import agents.manigaussian_bc.utils as utils
-from agents.manigaussian_bc.models_embed import GeneralizableGSEmbedNet
-from agents.manigaussian_bc.loss import l1_loss, l2_loss, cosine_loss, ssim
-from agents.manigaussian_bc.graphics_utils import getWorld2View2, getProjectionMatrix, focal2fov
-from agents.manigaussian_bc.gaussian_renderer import render
+import agents.manigaussian_bc2.utils as utils
+from agents.manigaussian_bc2.models_embed import GeneralizableGSEmbedNet
+from agents.manigaussian_bc2.loss import l1_loss, l2_loss, cosine_loss, ssim
+from agents.manigaussian_bc2.graphics_utils import getWorld2View2, getProjectionMatrix, focal2fov
+from agents.manigaussian_bc2.gaussian_renderer import render
 
 import visdom
 import logging

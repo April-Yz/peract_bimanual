@@ -14,10 +14,15 @@ from helpers.observation_utils import create_obs_config
 
 import torch.multiprocessing as mp
 import wandb
+# --------------------------Mani------------------------
+import numpy as np
+import lightning as L
+#---------------------------Mani-------------------------
 
 @hydra.main(config_name="config", config_path="conf")
 def main(cfg: DictConfig) -> None:
 
+    print("main start")
     cfg_yaml = OmegaConf.to_yaml(cfg)
     logging.info("\n" + cfg_yaml)
 
@@ -33,9 +38,12 @@ def main(cfg: DictConfig) -> None:
     for camera_name in cfg.rlbench.cameras:
         assert("rgb" not in camera_name)
 
+    print("use_depth=cfg.method.use_depth",cfg.method.use_depth)
     obs_config = create_obs_config(
-        cfg.rlbench.cameras, cfg.rlbench.camera_resolution, cfg.method.name
+        cfg.rlbench.cameras, cfg.rlbench.camera_resolution, cfg.method.name,
+        use_depth=cfg.method.use_depth, # !!! Mani新增的depth
     )
+    multi_task = len(cfg.rlbench.tasks) > 1 # Mani新增的multi_task
 
     cwd = os.getcwd()
     logging.info("CWD:" + os.getcwd())
@@ -71,15 +79,17 @@ def main(cfg: DictConfig) -> None:
     # if so, exit the script
     latest_weight = 0
     weights_folder = os.path.join(seed_folder, "weights")
-    # if os.path.isdir(weights_folder) and len(os.listdir(weights_folder)) > 0:
-    #     weights = os.listdir(weights_folder)
-    #     latest_weight = sorted(map(int, weights))[-1]
-    #     if latest_weight >= cfg.framework.training_iterations:
-    #         logging.info(
-    #             "Agent was already trained for %d iterations. Exiting." % latest_weight
-    #         )
-    #         sys.exit(0)
-
+    # ----------------------------Mani---------------------------
+    # 列出weight文件夹文件>0
+    if os.path.isdir(weights_folder) and len(os.listdir(weights_folder)) > 0:
+        weights = os.listdir(weights_folder)
+        latest_weight = sorted(map(int, weights))[-1]
+        if latest_weight >= cfg.framework.training_iterations:
+            logging.info(
+                "Agent was already trained for %d iterations. Exiting." % latest_weight
+            )
+            sys.exit(0)
+    # ----------------------------Mani---------------------------
 
     with open(os.path.join(seed_folder, "training.log"), "a") as f:
 
@@ -95,21 +105,65 @@ def main(cfg: DictConfig) -> None:
         logging.info("Starting seed %d." % seed)
 
         world_size = cfg.ddp.num_devices
-        mp.spawn(
-            run_seed_fn.run_seed,
-            args=(
-                # 0, rank
-                cfg,
-                obs_config,
-                # y7.26新增 cfg.rlbench.cameras,
-                seed,
-                # y7.26新增 fabric, 
-                world_size,
-            ),
-            nprocs=world_size,
-            join=True,
-        )
+        # ----------------------------Mani---------------------------
+        if cfg.method.use_fabric:
+            # we use fabric DDP 我们使用织物 DDP
+            fabric = L.Fabric(devices=world_size, strategy='ddp')
+            fabric.launch()
+            run_seed_fn.run_seed(
+                                # 0,  # 多rank, will be overwrited by fabric
+                                cfg,
+                                obs_config,
+                                # cfg.rlbench.cameras,    #多
+                                multi_task,
+                                seed,
+                                world_size,
+                                # fabric, 
+                                )
+        
+        else:
+            # use pytorch DDP 
+            # "DDP"指的是"Distributed Data Parallel"，即分布式数据并行
+            import torch.multiprocessing as mp
+            mp.set_sharing_strategy('file_system')
+            from torch.multiprocessing import set_start_method, get_start_method
 
+            try:
+                if get_start_method() != 'spawn':
+                    set_start_method('spawn', force=True)
+            except RuntimeError:
+                # 无法将启动方法设置为生成
+                print("Could not set start method to spawn")
+                pass
+            mp.spawn(run_seed_fn.run_seed,
+                    args=(cfg,
+                        obs_config,
+                        # cfg.rlbench.cameras,
+                        # multi_task,
+                        seed,
+                        world_size,
+                        # None,   # fabric
+                        ),
+                    nprocs=world_size,
+                    join=True)
+        # ----------------------------Mani---------------------------
+        
+        # ----------------------------bimanual---------------------------
+        # mp.spawn(
+        #     run_seed_fn.run_seed,
+        #     args=(
+        #         # 0, rank
+        #         cfg,
+        #         obs_config,
+        #         # y7.26新增 cfg.rlbench.cameras,
+        #         seed,
+        #         # y7.26新增 fabric, 
+        #         world_size,
+        #     ),
+        #     nprocs=world_size,
+        #     join=True,
+        # )
+        # ----------------------------bimanual---------------------------
     end_time = datetime.now()
     duration = (end_time - start_time)
     with open(os.path.join(seed_folder, "training.log"), "a") as f:

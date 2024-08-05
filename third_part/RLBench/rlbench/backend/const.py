@@ -20,6 +20,9 @@ EPISODE_FOLDER = 'episode%d'
 VARIATIONS_FOLDER = 'variation%d'
 VARIATIONS_ALL_FOLDER = 'all_variations'
 
+# new
+NERF_MULTI_VIEW_FOLDER = 'nerf_data'
+
 LOW_DIM_PICKLE = 'low_dim_obs.pkl'
 VARIATION_DESCRIPTIONS = 'variation_descriptions.pkl'
 VARIATION_NUMBER = 'variation_number.pkl'

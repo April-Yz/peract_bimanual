@@ -26,11 +26,16 @@ def extract_obs(
     prev_action=None,
     channels_last: bool = False,
     episode_length: int = 10,
-    robot_name: str = ""
+    robot_name: str = "",
+    next_obs: Observation = None # mani多的
 ):
+    #-------------------Mani--------------------
+    # bimanual里面用了函数的方式，Mani里面只有一个函数
+    #-------------------Mani--------------------
     if obs.is_bimanual:
         return extract_obs_bimanual(
-            obs, cameras, t, prev_action, channels_last, episode_length, robot_name
+            obs, cameras, t, prev_action, channels_last, episode_length, robot_name,
+            next_obs# mani多的
         )
     else:
         return extract_obs_unimanual(
@@ -52,6 +57,7 @@ def extract_obs_unimanual(
     joint_pos = obs.joint_positions
     obs.gripper_pose = None
     obs.gripper_matrix = None
+    obs.wrist_camera_matrix = None # mani多的
     obs.joint_positions = None
     if obs.gripper_joint_positions is not None:
         obs.gripper_joint_positions = np.clip(obs.gripper_joint_positions, 0.0, 0.04)
@@ -110,7 +116,9 @@ def extract_obs_bimanual(
     channels_last: bool = False,
     episode_length: int = 10,
     robot_name: str = "",
+    next_obs: Observation = None, # mani多的
 ):
+    # Mani区别多了right和left双臂
     obs.right.joint_velocities = None
     right_grip_mat = obs.right.gripper_matrix
     right_grip_pose = obs.right.gripper_pose
@@ -118,6 +126,7 @@ def extract_obs_bimanual(
     obs.right.gripper_pose = None
     obs.right.gripper_matrix = None
     obs.right.joint_positions = None
+    obs.right.wrist_camera_matrix = None    # mani多的
 
     obs.left.joint_velocities = None
     left_grip_mat = obs.left.gripper_matrix
@@ -126,6 +135,7 @@ def extract_obs_bimanual(
     obs.left.gripper_pose = None
     obs.left.gripper_matrix = None
     obs.left.joint_positions = None
+    obs.left.wrist_camera_matrix = None    # mani多的
 
     if obs.right.gripper_joint_positions is not None:
         obs.right.gripper_joint_positions = np.clip(
@@ -135,30 +145,54 @@ def extract_obs_bimanual(
             obs.left.gripper_joint_positions, 0.0, 0.04
         )
 
+    # Mani增加---------------------------------------------
+    if obs.nerf_multi_view_rgb is not None:
+        nerf_multi_view_rgb = obs.nerf_multi_view_rgb
+    else:
+        nerf_multi_view_rgb = None
+
+    if obs.nerf_multi_view_depth is not None:
+        nerf_multi_view_depth = obs.nerf_multi_view_depth
+    else:
+        nerf_multi_view_depth = None
+
+    if obs.nerf_multi_view_camera is not None:
+        nerf_multi_view_camera = obs.nerf_multi_view_camera
+    else:
+        nerf_multi_view_camera = None
+    # Mani增加---------------------------------------------
 
     # fixme::
     obs_dict = vars(obs)
     obs_dict = {k: v for k, v in obs_dict.items() if v is not None}
 
+    # 新的双臂 get_low_dim_data是啥!! ?? --[{2}]---------------------------------------------
     right_robot_state = obs.get_low_dim_data(obs.right)
     left_robot_state = obs.get_low_dim_data(obs.left)
+    #原来Mani
+    # robot_state = np.array([obs.gripper_open,*obs.gripper_joint_positions])
+
 
     # remove low-level proprioception variables that are not needed
+    # 删除不需要的低水平本体感觉变量
     obs_dict = {k: v for k, v in obs_dict.items() if k not in REMOVE_KEYS}
 
     if not channels_last:
         # swap channels from last dim to 1st dim
+        # 从最后一个 DIM 切换到第一个 DIM 的通道
         obs_dict = {
             k: np.transpose(v, [2, 0, 1]) if v.ndim == 3 else np.expand_dims(v, 0)
             for k, v in obs.perception_data.items()
             if type(v) == np.ndarray or type(v) == list
         }
     else:
-        # add extra dim to depth data
+        # add extra dim to depth data 
+        # 为深度数据添加额外的 DIM
         obs_dict = {
             k: v if v.ndim == 3 else np.expand_dims(v, -1) for k, v in obs.perception_data.items()
         }
 
+    # 双臂新增的 只看bimanual就行（单纯这个if）
     if robot_name == "right":
         obs_dict["low_dim_state"] = right_robot_state.astype(np.float32)
         # binary variable indicating if collisions are allowed or not while planning paths to reach poses
@@ -172,6 +206,9 @@ def extract_obs_bimanual(
         )
     elif robot_name == "bimanual":
         obs_dict["right_low_dim_state"] = right_robot_state.astype(np.float32)
+        # -------------在这里已经错了--------------------------------------------------------------------------
+        # print("obs_dict[right_low_dim_state]--------------------------------",obs_dict["right_low_dim_state"])
+        # ---------------------------------------------------------------------------------------
         obs_dict["left_low_dim_state"] = left_robot_state.astype(np.float32)
         obs_dict["right_ignore_collisions"] = np.array(
             [obs.right.ignore_collisions], dtype=np.float32
@@ -192,9 +229,11 @@ def extract_obs_bimanual(
             "%s_camera_intrinsics" % camera_name
         ]
 
-    # add timestep to low_dim_state
+    # add timestep to low_dim_state 
+    # 将 TimeStep 添加到low_dim_state
     time = (1.0 - (t / float(episode_length - 1))) * 2.0 - 1.0
 
+    # 双臂估计是else中运行的
     if "low_dim_state" in obs_dict:
         obs_dict["low_dim_state"] = np.concatenate(
             [obs_dict["low_dim_state"], [time]]
@@ -214,6 +253,25 @@ def extract_obs_bimanual(
     obs.left.joint_positions = left_joint_pos
     obs.left.gripper_pose = left_grip_pose
 
+    # Mani NERF 新增----------------------------------
+    obs_dict['nerf_multi_view_rgb'] = nerf_multi_view_rgb
+    obs_dict['nerf_multi_view_depth'] = nerf_multi_view_depth
+    obs_dict['nerf_multi_view_camera'] = nerf_multi_view_camera
+
+    # for next frame prediction
+    if next_obs is not None:
+        if next_obs.nerf_multi_view_rgb is not None:
+            obs_dict['nerf_next_multi_view_rgb'] = next_obs.nerf_multi_view_rgb
+            obs_dict['nerf_next_multi_view_depth'] = next_obs.nerf_multi_view_depth
+            obs_dict['nerf_next_multi_view_camera'] = next_obs.nerf_multi_view_camera
+        else:
+            obs_dict['nerf_next_multi_view_rgb'] = None
+            obs_dict['nerf_next_multi_view_depth'] = None
+            obs_dict['nerf_next_multi_view_camera'] = None
+
+    # if next_obs is None, we do not add the next frame prediction
+    # Mani NERF 新增----------------------------------
+
     return obs_dict
 
 
@@ -221,6 +279,7 @@ def create_obs_config(
     camera_names: List[str],
     camera_resolution: List[int],
     method_name: str,
+    use_depth:bool,
     robot_name: str = "bimanual"
 ):
     unused_cams = CameraConfig()

@@ -15,6 +15,9 @@ rlbench:
     camera_resolution: [256,256]
     scene_bounds: [-0.3, -0.5, 0.6, 0.7, 0.5, 1.6]
     include_lang_goal_in_obs: True
+    # new
+    num_view_for_nerf: 21
+    # new
 
 replay:
     batch_size: 8

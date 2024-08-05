@@ -29,10 +29,11 @@ from helpers import demo_loading_utils, utils
 from helpers.preprocess_agent import PreprocessAgent
 from helpers.clip.core.clip import tokenize
 from helpers.language_model import create_language_model
+from helpers import observation_utils # new
 
-from agents.manigaussian_bc.perceiver_lang_io import PerceiverVoxelLangEncoder
-from agents.manigaussian_bc.qattention_manigaussian_bc_agent import QAttentionPerActBCAgent
-from agents.manigaussian_bc.qattention_stack_agent import QAttentionStackAgent
+from agents.manigaussian_bc2.perceiver_lang_io import PerceiverVoxelLangEncoder
+from agents.manigaussian_bc2.qattention_manigaussian_bc_agent import QAttentionPerActBCAgent
+from agents.manigaussian_bc2.qattention_stack_agent import QAttentionStackAgent
 
 import torch
 import torch.nn as nn
@@ -61,18 +62,67 @@ def create_replay(batch_size: int, timesteps: int,
     ignore_collisions_size = 1
     max_token_seq_len = 77
     lang_feat_dim = 1024
-    lang_emb_dim = cfg.method.language_model_dim
+    lang_emb_dim = cfg.method.language_model_dim # !!(原来是512)要不要改成512
+    # 绿色输出[create_replay] lang_emb_dim:值
     cprint(f"[create_replay] lang_emb_dim: {lang_emb_dim}", "green")
 
+    # !! --Gaussian特有---------------------------------------------
     num_view_for_nerf = cfg.rlbench.num_view_for_nerf
+    # !! -----------------------------------------------
     
-    # low_dim_state
+    # low_dim_state-------bimanual特有-------------------------------------------
+    # observation_elements = []
+    # observation_elements.append(
+        # ObservationElement('low_dim_state', (LOW_DIM_SIZE,), np.float32))
+    # observation_elements 增加一个， 下面增加了depth参数
     observation_elements = []
     observation_elements.append(
-        ObservationElement('low_dim_state', (LOW_DIM_SIZE,), np.float32))
-
+        ObservationElement("right_low_dim_state", (LOW_DIM_SIZE,), np.float32)
+    )
+    #--------------------------------------------------------------------------------------
+    # for store_element in observation_elements:
+    #     if store_element.name == "right_low_dim_state":
+    #         print("--------------------------------manigaussian:launch_utils:create_replay-----------------------")
+    #         print("store_element.name=",store_element.name)
+    #         print("store_element=",store_element)
+    #         print("store_element.shape=",store_element.shape)
+    #-----------------------------------------------------------------------------------
+    observation_elements.append(
+        ObservationElement("left_low_dim_state", (LOW_DIM_SIZE,), np.float32)
+    )
+    
     # rgb, depth, point cloud, intrinsics, extrinsics
     for cname in cameras:
+        observation_elements.append(
+            # color, height, width 新增depth
+            ObservationElement(
+                "%s_rgb" % cname,
+                (3,image_size[1],image_size[0],),
+                np.float32,
+            )
+        )
+        observation_elements.append(
+            ObservationElement('%s_depth' % cname, (1, image_size[1], image_size[0]), np.float32))
+        observation_elements.append(
+            ObservationElement("%s_point_cloud" % cname, (3, image_size[1], image_size[0]), np.float16)
+        )  # see pyrep/objects/vision_sensor.py on how pointclouds are extracted from depth frames
+        observation_elements.append(
+            ObservationElement(
+                "%s_camera_extrinsics" % cname,
+                (4,4,),
+                np.float32,
+            )
+        )
+        observation_elements.append(
+            ObservationElement(
+                "%s_camera_intrinsics" % cname,
+                (3,3,),
+                np.float32,
+            )
+        )        
+
+
+        """
         observation_elements.append(
             ObservationElement('%s_rgb' % cname, (3, *image_size,), np.float32))
         observation_elements.append(
@@ -84,8 +134,13 @@ def create_replay(batch_size: int, timesteps: int,
             ObservationElement('%s_camera_extrinsics' % cname, (4, 4,), np.float32))
         observation_elements.append(
             ObservationElement('%s_camera_intrinsics' % cname, (3, 3,), np.float32))
+        """
+        #------加了nerf和-------------------------------------------------------------
 
+    #-------------------------------NERF----------------------------------------------
     # for nerf img, exs, ins
+    # 使用 append 时，添加的对象会作为一个单一的元素（无论它本身是一个列表还是其他类型）。
+    # 使用 extend 时，添加的对象（必须是可迭代的）会被拆分，其元素会被逐个添加到列表中。
     observation_elements.append(
         ObservationElement('nerf_multi_view_rgb', (num_view_for_nerf,), np.object_))
     observation_elements.append(
@@ -100,37 +155,83 @@ def create_replay(batch_size: int, timesteps: int,
         ObservationElement('nerf_next_multi_view_depth', (num_view_for_nerf,), np.object_))
     observation_elements.append(
         ObservationElement('nerf_next_multi_view_camera', (num_view_for_nerf,), np.object_))
+    #-------------------------------NERF----------------------------------------------
 
+
+
+    #-------------------------------bimanual双臂----------------------------------------------
+    # 离散化翻译、离散化旋转、离散忽略碰撞、6-DoF 抓手姿势和预训练语言嵌入
     # discretized translation, discretized rotation, discrete ignore collision, 6-DoF gripper pose, and pre-trained language embeddings
-    observation_elements.extend([
-        ReplayElement('trans_action_indicies', (trans_indicies_size,),
-                      np.int32),
-        ReplayElement('rot_grip_action_indicies', (rot_and_grip_indicies_size,),
-                      np.int32),
-        ReplayElement('ignore_collisions', (ignore_collisions_size,),
-                      np.int32),
-        ReplayElement('gripper_pose', (gripper_pose_size,),
-                      np.float32),
-        ReplayElement('lang_goal_emb', (lang_feat_dim,),
-                      np.float32),
-        ReplayElement('lang_token_embs', (max_token_seq_len, lang_emb_dim,),
-                      np.float32), # extracted from CLIP's language encoder
-        ReplayElement('task', (),
-                      str),
-        ReplayElement('lang_goal', (1,),
-                      object),  # language goal string for debugging and visualization
-    ])
+    for robot_name in ["right", "left"]:
+        observation_elements.extend(
+            [
+                ReplayElement(
+                    f"{robot_name}_trans_action_indicies",
+                    (trans_indicies_size,),
+                    np.int32,
+                ),
+                ReplayElement(
+                    f"{robot_name}_rot_grip_action_indicies",
+                    (rot_and_grip_indicies_size,),
+                    np.int32,
+                ),
+                ReplayElement(
+                    f"{robot_name}_ignore_collisions",
+                    (ignore_collisions_size,),
+                    np.int32,
+                ),
+                ReplayElement(
+                    f"{robot_name}_gripper_pose", (gripper_pose_size,), np.float32
+                ),
+            ]
+        )
+    # observation_elements.extend([
+    #     ReplayElement('trans_action_indicies', (trans_indicies_size,),
+    #                   np.int32),
+    #     ReplayElement('rot_grip_action_indicies', (rot_and_grip_indicies_size,),
+    #                   np.int32),
+    #     ReplayElement('ignore_collisions', (ignore_collisions_size,),
+    #                   np.int32),
+    #     ReplayElement('gripper_pose', (gripper_pose_size,),
+    #                   np.float32),
+    # -------上面在双臂中改了一部分----------------------------------------------------------
+    #     ReplayElement('lang_goal_emb', (lang_feat_dim,),
+    #                   np.float32),
+    #     ReplayElement('lang_token_embs', (max_token_seq_len, lang_emb_dim,),
+    #                   np.float32), # extracted from CLIP's language encoder
+    #     ReplayElement('task', (),str),
+    #     ReplayElement('lang_goal', (1,),object),  # language goal string for debugging and visualization
+    # ])
+    observation_elements.extend(
+        [
+            ReplayElement("lang_goal_emb", (lang_feat_dim,), np.float32),
+            ReplayElement(
+                "lang_token_embs",
+                (
+                    max_token_seq_len,
+                    lang_emb_dim,
+                ),
+                np.float32,
+            ),  # extracted from CLIP's language encoder
+            ReplayElement("task", (), str),
+            ReplayElement(
+                "lang_goal", (1,), object
+            ),  # language goal string for debugging and visualization
+        ]
+    )
 
     extra_replay_elements = [
         ReplayElement('demo', (), np.bool),
     ]
     if not single_process:  # default: False
+        # TaskUniformReplayBuffer不用改
         replay_buffer = TaskUniformReplayBuffer(
             save_dir=save_dir,
             batch_size=batch_size,
             timesteps=timesteps,
             replay_capacity=int(replay_size),
-            action_shape=(8,),
+            # action_shape=(8,), # 单臂时的大小
+            action_shape=(8 * 2,),
             action_dtype=np.float32,
             reward_shape=(),
             reward_dtype=np.float32,
@@ -164,8 +265,8 @@ def _get_action(
         rotation_resolution: int,
         crop_augmentation: bool):
     '''
-    obs_tp1: current observation
-    obs_tm1: previous observation
+    obs_tp1: current observation    obs_tp1：当前观测值
+    obs_tm1: previous observation    obs_tm1：先前的观察
     '''
     quat = utils.normalize_quaternion(obs_tp1.gripper_pose[3:])
     if quat[-1] < 0:
@@ -214,43 +315,182 @@ def _add_keypoints_to_replay(
         description: str = '',
         language_model = None,
         device = 'cpu'):
+    #  bimanual!! 双臂必须要加（其他参数两边类似）-------------------
+    robot_name = cfg.method.robot_name
+
     prev_action = None
     obs = inital_obs    # initial observation is 0
 
    
     for k, keypoint in enumerate(episode_keypoints):    # demo[-1].nerf_multi_view_rgb is None
         obs_tp1 = demo[keypoint]    # e.g, 44
-
         obs_tm1 = demo[max(0, keypoint - 1)]    # previous observation, e.g., 43
+        # -----bimanual----------
+        if obs_tp1.is_bimanual and robot_name == "bimanual":
+            #assert isinstance(obs_tp1, BimanualObservation)
+            (
+                right_trans_indicies,
+                right_rot_grip_indicies,
+                right_ignore_collisions,
+                right_action,
+                right_attention_coordinates,
+            ) = _get_action(
+                obs_tp1.right,
+                obs_tm1.right,
+                rlbench_scene_bounds,
+                voxel_sizes,
+                bounds_offset,
+                rotation_resolution,
+                crop_augmentation,
+            )
 
-        trans_indicies, rot_grip_indicies, ignore_collisions, action, attention_coordinates = _get_action(
-            obs_tp1, obs_tm1, rlbench_scene_bounds, voxel_sizes, bounds_offset,
-            rotation_resolution, crop_augmentation)
+            (
+                left_trans_indicies,
+                left_rot_grip_indicies,
+                left_ignore_collisions,
+                left_action,
+                left_attention_coordinates,
+            ) = _get_action(
+                obs_tp1.left,
+                obs_tm1.left,
+                rlbench_scene_bounds,
+                voxel_sizes,
+                bounds_offset,
+                rotation_resolution,
+                crop_augmentation,
+            )
+            #下面三行不懂(好像是action整合+格式转换)
+            action = np.append(right_action, left_action)
+
+            right_ignore_collisions = np.array([right_ignore_collisions])
+            left_ignore_collisions = np.array([left_ignore_collisions])
+
+        # 不用看（双臂在上面if中）    
+        elif robot_name == "unimanual":
+            (
+                trans_indicies,
+                rot_grip_indicies,
+                ignore_collisions,
+                action,
+                attention_coordinates,
+            ) = _get_action(
+                obs_tp1,
+                obs_tm1,
+                rlbench_scene_bounds,
+                voxel_sizes,
+                bounds_offset,
+                rotation_resolution,
+                crop_augmentation,
+            )
+            gripper_pose = obs_tp1.gripper_pose
+        elif obs_tp1.is_bimanual and robot_name == "right":
+            (
+                trans_indicies,
+                rot_grip_indicies,
+                ignore_collisions,
+                action,
+                attention_coordinates,
+            ) = _get_action(
+                obs_tp1.right,
+                obs_tm1.right,
+                rlbench_scene_bounds,
+                voxel_sizes,
+                bounds_offset,
+                rotation_resolution,
+                crop_augmentation,
+            )
+            gripper_pose = obs_tp1.right.gripper_pose
+        elif obs_tp1.is_bimanual and robot_name == "left":
+            (
+                trans_indicies,
+                rot_grip_indicies,
+                ignore_collisions,
+                action,
+                attention_coordinates,
+            ) = _get_action(
+                obs_tp1.left,
+                obs_tm1.left,
+                rlbench_scene_bounds,
+                voxel_sizes,
+                bounds_offset,
+                rotation_resolution,
+                crop_augmentation,
+            )
+            gripper_pose = obs_tp1.left.gripper_pose
+        else:
+            logging.error("Invalid robot name %s", cfg.method.robot_name)
+            raise Exception("Invalid robot name.")
+
+        # 原本的单臂mani代码
+        # trans_indicies, rot_grip_indicies, ignore_collisions, action, attention_coordinates = _get_action(
+        #     obs_tp1, obs_tm1, rlbench_scene_bounds, voxel_sizes, bounds_offset,
+        #     rotation_resolution, crop_augmentation)
+        #------------------------------------------------------------
+
 
         terminal = (k == len(episode_keypoints) - 1)
         reward = float(terminal) * REWARD_SCALE if terminal else 0
 
-        obs_dict = utils.extract_obs(obs, t=k, prev_action=prev_action,
-                                     cameras=cameras, episode_length=cfg.rlbench.episode_length,
-                                     next_obs=obs_tp1 if not terminal else obs_tm1,
-                                     )
+        # ---新增的双臂方法--------------------和原来的NERF（clip用的原来的）--------------------------------------
+        obs_dict = observation_utils.extract_obs(
+            obs,
+            t=k,
+            prev_action=prev_action,
+            cameras=cameras,
+            episode_length=cfg.rlbench.episode_length,
+            robot_name=robot_name,
+            next_obs=obs_tp1 if not terminal else obs_tm1   #新增的
+        )
+        # 以下三行均是针对language做的预处理
+        # tokens = tokenize([description]).numpy()
+        # token_tensor = torch.from_numpy(tokens).to(device)
+        # sentence_emb, token_embs = clip_model.encode_text_with_embeddings(token_tensor)
+        # ----------下面是原来mani的-------------------------------------------------------
+        # obs_dict = utils.extract_obs(obs, t=k, prev_action=prev_action,
+        #                              cameras=cameras, episode_length=cfg.rlbench.episode_length,
+        #                              next_obs=obs_tp1 if not terminal else obs_tm1,
+        #                              )
         # FIXME: better way to use the last sample for next frame prediction?
+        # FIXME：使用最后一个样本进行下一帧预测的更好方法？
         sentence_emb, token_embs = language_model.extract(description)
+        #---------------------------------------------------------------
 
         obs_dict['lang_goal_emb'] = sentence_emb[0].float().detach().cpu().numpy()
         obs_dict['lang_token_embs'] = token_embs[0].float().detach().cpu().numpy()
+        # 下一行mani多的
         obs_dict['lang_goal'] = np.array([description], dtype=object) # add this for usage in diffusion model
 
         prev_action = np.copy(action)
 
         others = {'demo': True}
-        final_obs = {
-            'trans_action_indicies': trans_indicies,
-            'rot_grip_action_indicies': rot_grip_indicies,
-            'gripper_pose': obs_tp1.gripper_pose,
-            'task': task,
-            'lang_goal': np.array([description], dtype=object),
-        }
+        if robot_name == "bimanual":
+
+            final_obs = {
+                "right_trans_action_indicies": right_trans_indicies,
+                "right_rot_grip_action_indicies": right_rot_grip_indicies,
+                "right_gripper_pose": obs_tp1.right.gripper_pose,
+                "left_trans_action_indicies": left_trans_indicies,
+                "left_rot_grip_action_indicies": left_rot_grip_indicies,
+                "left_gripper_pose": obs_tp1.left.gripper_pose,
+                "task": task,
+                "lang_goal": np.array([description], dtype=object),
+            }
+        else:
+            final_obs = {
+                "trans_action_indicies": trans_indicies,
+                "rot_grip_action_indicies": rot_grip_indicies,
+                "gripper_pose": gripper_pose,
+                "task": task,
+                "lang_goal": np.array([description], dtype=object),
+            }
+        # mani原有的
+        # final_obs = {
+        #     'trans_action_indicies': trans_indicies,
+        #     'rot_grip_action_indicies': rot_grip_indicies,
+        #     'gripper_pose': obs_tp1.gripper_pose,
+        #     'task': task,
+        #     'lang_goal': np.array([description], dtype=object),
+        # }
 
         others.update(final_obs)
         others.update(obs_dict)
@@ -260,18 +500,29 @@ def _add_keypoints_to_replay(
         obs = obs_tp1
 
     # final step
-    obs_dict_tp1 = utils.extract_obs(obs_tp1, t=k + 1, prev_action=prev_action,
-                                     cameras=cameras, episode_length=cfg.rlbench.episode_length,
-                                     next_obs=obs_tp1,  
-                                     )
+    obs_dict_tp1 = observation_utils.extract_obs(
+        obs_tp1,
+        t=k + 1,
+        prev_action=prev_action,
+        cameras=cameras,
+        episode_length=cfg.rlbench.episode_length,
+        robot_name=cfg.method.robot_name,
+        next_obs=obs_tp1 # 新增的
+    )
+    # obs_dict_tp1 = utils.extract_obs(obs_tp1, t=k + 1, prev_action=prev_action,
+    #                                  cameras=cameras, episode_length=cfg.rlbench.episode_length,
+    #                                  next_obs=obs_tp1,  
+    #                                  )
+
     # nerf_multi_view_rgb is None
     obs_dict_tp1['lang_goal_emb'] = sentence_emb[0].float().detach().cpu().numpy()
     obs_dict_tp1['lang_token_embs'] = token_embs[0].float().detach().cpu().numpy()
+    # mani new!!
     obs_dict_tp1['lang_goal'] = np.array([description], dtype=object) # add this for usage in diffusion model
 
     obs_dict_tp1.pop('wrist_world_to_cam', None)
     obs_dict_tp1.update(final_obs)
-    # check nerf data here. find None
+    # check nerf data here. find None 在此处查看 NERF 数据。查找 无
     replay.add_final(**obs_dict_tp1)
 
 
@@ -292,7 +543,14 @@ def fill_replay(cfg: DictConfig,
                 language_model = None,
                 device = 'cpu',
                 keypoint_method = 'heuristic'):
-    logging.getLogger().setLevel(cfg.framework.logging_level)        
+    logging.getLogger().setLevel(cfg.framework.logging_level)    
+    # ---bimanual的language modle（）clip------------------------
+    # if clip_model is None:
+    #     model, _ = load_clip("RN50", jit=False, device=device)
+    #     clip_model = build_model(model.state_dict())
+    #     clip_model.to(device)
+    #     del model    
+    # ---bimanual的language modle（）clip------------------------
 
     logging.debug('Filling %s replay ...' % task)
     for d_idx in range(num_demos):
@@ -321,7 +579,6 @@ def fill_replay(cfg: DictConfig,
                 continue
 
             obs = demo[i]
-           
 
             desc = descs[0]
             # if our starting point is past one of the keypoints, then remove it
@@ -330,11 +587,14 @@ def fill_replay(cfg: DictConfig,
             if len(episode_keypoints) == 0:
                 break
             
-
             _add_keypoints_to_replay(
-                cfg, task, replay, obs, demo, episode_keypoints, cameras,
+                cfg, task, replay, obs, demo, episode_keypoints,
+                # 中间mani新的
+                cameras,
                 rlbench_scene_bounds, voxel_sizes, bounds_offset,
-                rotation_resolution, crop_augmentation, description=desc,
+                rotation_resolution, crop_augmentation, 
+                # 下面共有的（language和clip不一样）
+                description=desc,
                 language_model=language_model, device=device)
     logging.debug('Replay %s filled with demos.' % task)
 
@@ -344,6 +604,8 @@ def fill_multi_task_replay(cfg: DictConfig,
                            rank: int,   # non-sense
                            replay: ReplayBuffer,
                            tasks: List[str],
+                        #  clip_model=None,(bimanual特有参数但是无传参，so None)
+                        # 下面都是新参数    
                            num_demos: int,
                            demo_augmentation: bool,
                            demo_augmentation_every_n: int,
@@ -355,11 +617,13 @@ def fill_multi_task_replay(cfg: DictConfig,
                            crop_augmentation: bool,
                            keypoint_method = 'heuristic',
                            fabric: Fabric = None):
+    # tasks = cfg.rlbench.tasks bimanual特有
     manager = Manager()
     store = manager.dict()
 
     # create a MP dict for storing indicies
     # TODO(mohit): this shouldn't be initialized here
+    # mani加了个判断
     if hasattr(replay, '_task_idxs'):
         del replay._task_idxs
     task_idxs = manager.dict()
@@ -374,8 +638,10 @@ def fill_multi_task_replay(cfg: DictConfig,
     n = np.arange(len(tasks))
     split_n = utils.split_list(n, max_parallel_processes)
     
+    # ------------------mani language_model-----------------------------------
     device = fabric.device if fabric is not None else None
     language_model = create_language_model(name=cfg.method.language_model, device=device)
+    # ------------------mani language_model-----------------------------------
 
     for split in split_n:
         for e_idx, task_idx in enumerate(split):
@@ -387,6 +653,8 @@ def fill_multi_task_replay(cfg: DictConfig,
                                                   rank,
                                                   replay,
                                                   task,
+                                                # clip_model,(bimanual)
+                                                # 以下除了device mani特有
                                                   num_demos,
                                                   demo_augmentation,
                                                   demo_augmentation_every_n,
@@ -486,7 +754,7 @@ def create_agent(cfg: DictConfig):
             optimizer_type=cfg.method.optimizer,
             num_devices=cfg.ddp.num_devices,
             # yzj !! 隔壁有的
-            checkpoint_name_prefix=cfg.framework.checkpoint_name_prefix,
+            # checkpoint_name_prefix=cfg.framework.checkpoint_name_prefix,
             # cfg这里特有的
             cfg=cfg.method,
         )
