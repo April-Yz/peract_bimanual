@@ -160,6 +160,7 @@ class QFunction(nn.Module):
         self._coord_trans = torch.diag(torch.tensor([1, 1, 1, 1], dtype=torch.float32)).to(device)
         
         self.cfg = cfg
+        # use fabric=false时后面可以加上 and  fabric!=None
         if cfg.use_neural_rendering:
             self._neural_renderer = NeuralRenderer(cfg.neural_renderer).to(device)
             if training and use_ddp:

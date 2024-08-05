@@ -54,8 +54,8 @@ tasks=[coordinated_push_box,bimanual_push_single_button]
 # demo=100
 # episode_length=25
 # for debug
-demo=1
-episode_length=4
+demo= 100 # 1
+episode_length=10 # 4
 
 #########
 

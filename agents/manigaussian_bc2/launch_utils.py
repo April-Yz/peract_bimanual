@@ -143,6 +143,14 @@ def create_replay(batch_size: int, timesteps: int,
     # 使用 extend 时，添加的对象（必须是可迭代的）会被拆分，其元素会被逐个添加到列表中。
     observation_elements.append(
         ObservationElement('nerf_multi_view_rgb', (num_view_for_nerf,), np.object_))
+    # ------------------------2024.8.5-----------------------------------------------------------------
+    # for store_element in observation_elements:
+    #     if store_element.name == "nerf_multi_view_rgb":
+    #         print("--------------------Manigaussian_BC2/launch_utils-----nerf_multi_view_rgb-----------------------")
+    #         print("store_element.name=",store_element.name)
+    #         print("store_element=",store_element)
+    #         print("store_element.shape=",store_element.shape)
+    # ------------------------2024.8.5-----------------------------------------------------------------
     observation_elements.append(
         ObservationElement('nerf_multi_view_depth', (num_view_for_nerf,), np.object_))
     observation_elements.append(

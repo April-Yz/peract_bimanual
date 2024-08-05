@@ -416,6 +416,9 @@ def extract_obs(obs: Observation,
     obs.gripper_pose = grip_pose
 
     obs_dict['nerf_multi_view_rgb'] = nerf_multi_view_rgb
+    # ----------------------------------------------------------------
+    # print("helpers utils.py -- obs_dict[nerf_multi_view_rgb]",obs_dict['nerf_multi_view_rgb'])
+    #---------------------------------------------------------------
     obs_dict['nerf_multi_view_depth'] = nerf_multi_view_depth
     obs_dict['nerf_multi_view_camera'] = nerf_multi_view_camera
 

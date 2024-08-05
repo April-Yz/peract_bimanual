@@ -11,11 +11,11 @@ robot_name: 'bimanual'
 # ---------------bimanual新加的-----------
 
 
-use_fabric: False #True
+use_fabric: True # False #
 
 use_depth: True
 use_neural_rendering: True
-num_view_for_nerf: 20
+num_view_for_nerf: 2
 
 # choices: T5 (768), CLIP (512)
 # we use CLIP as language model. Users could explore more about other language models such as T5.

@@ -148,6 +148,7 @@ def extract_obs_bimanual(
     # Mani增加---------------------------------------------
     if obs.nerf_multi_view_rgb is not None:
         nerf_multi_view_rgb = obs.nerf_multi_view_rgb
+        # print("nerf_multi_view_rgb",nerf_multi_view_rgb)
     else:
         nerf_multi_view_rgb = None
 
@@ -255,6 +256,9 @@ def extract_obs_bimanual(
 
     # Mani NERF 新增----------------------------------
     obs_dict['nerf_multi_view_rgb'] = nerf_multi_view_rgb
+    # ---------在这里会输出一堆地址（21个一组）----------------------------------------------------------
+    # print("helpers observation_utils.py --- obs_dict[nerf_multi_view_rgb]",obs_dict['nerf_multi_view_rgb'])
+    # -------------------------------------------------------------------
     obs_dict['nerf_multi_view_depth'] = nerf_multi_view_depth
     obs_dict['nerf_multi_view_camera'] = nerf_multi_view_camera
 

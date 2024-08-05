@@ -1,3 +1,4 @@
+[2024-08-06 00:28:16,593][root][INFO] - 
 method:
   name: ManiGaussian_BC2
   agent_type: bimanual
@@ -5,7 +6,7 @@ method:
   use_fabric: true
   use_depth: true
   use_neural_rendering: true
-  num_view_for_nerf: 2
+  num_view_for_nerf: 21
   language_model: CLIP
   language_model_dim: 512
   image_crop_size: 64
@@ -140,7 +141,7 @@ method:
 ddp:
   master_addr: localhost
   master_port: 12345
-  num_devices: 1
+  num_devices: 2
 rlbench:
   task_name: mani
   tasks:
@@ -201,3 +202,7 @@ framework:
   wandb_group: mani
   seed: 0
   wandb_name: mani
+
+[2024-08-06 00:28:16,593][root][INFO] - CWD:/home/zjyang/program/peract_bimanual/log-mani/mani/ManiGaussian_BC2
+[2024-08-06 00:28:16,594][root][INFO] - Starting seed 0.
+[2024-08-06 00:28:16,645][torch.distributed.distributed_c10d][INFO] - Added key: store_based_barrier_key:1 to store for rank: 1

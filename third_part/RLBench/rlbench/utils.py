@@ -277,6 +277,9 @@ def get_stored_demos(amount: int, image_paths: bool, dataset_root: str,
                     nerf_img_dir = join(obs[i].nerf_multi_view, 'images')
                     nerf_depth_dir = join(obs[i].nerf_multi_view, 'depths')
                     nerf_camera_dir = join(obs[i].nerf_multi_view, 'poses')
+                    # print("nerf_img_dir",nerf_img_dir,exists(nerf_img_dir))
+                    # print("nerf_camera_dir",nerf_camera_dir,exists(nerf_camera_dir))
+                    # print("nerf_img_dir",nerf_img_dir,exists(nerf_img_dir))
                     if not exists(nerf_img_dir):
                         obs[i].nerf_multi_view_rgb = None
                         obs[i].nerf_multi_view_depth = None
@@ -298,44 +301,34 @@ def get_stored_demos(amount: int, image_paths: bool, dataset_root: str,
 
                         # here we do not load the images, but load the paths. during training, we will load the images
                         obs[i].nerf_multi_view_rgb = np.array(all_img_files)
+                        # ----------------------------------------------------------------
+                        # print("helpers utilr.py --  obs[i].nerf_multi_view_rgb", obs[i].nerf_multi_view_rgb)
+                        #---------------------------------------------------------------
                         obs[i].nerf_multi_view_depth = np.array(all_depth_files)
                         obs[i].nerf_multi_view_camera = np.array(all_camera_files)
-        # -------------------------------------------------------------------------------------------
+                        # -------------------------------------------------------------------------------------------
                         # print(colored(f"step {i}: {len(all_img_files)} nerf multi-view images found.", "cyan"))
                     
 
         #         if obs_config.left_shoulder_camera.rgb:
-        #             obs[i].left_shoulder_rgb = np.array(
-        #                 _resize_if_needed(
-        #                     Image.open(obs[i].left_shoulder_rgb),
-        #                     obs_config.left_shoulder_camera.image_size))
+        #             obs[i].left_shoulder_rgb = np.array(_resize_if_needed(Image.open(obs[i].left_shoulder_rgb),obs_config.left_shoulder_camera.image_size))
         #         if obs_config.right_shoulder_camera.rgb:
-        #             obs[i].right_shoulder_rgb = np.array(
-        #                 _resize_if_needed(Image.open(
-        #                 obs[i].right_shoulder_rgb),
-        #                     obs_config.right_shoulder_camera.image_size))
+        #             obs[i].right_shoulder_rgb = np.array(_resize_if_needed(Image.open(obs[i].right_shoulder_rgb),obs_config.right_shoulder_camera.image_size))
         #         if obs_config.overhead_camera.rgb:
-        #             obs[i].overhead_rgb = np.array(
-        #                 _resize_if_needed(Image.open(
-        #                 obs[i].overhead_rgb),
-        #                     obs_config.overhead_camera.image_size))
+        #             obs[i].overhead_rgb = np.array(_resize_if_needed(Image.open(obs[i].overhead_rgb),obs_config.overhead_camera.image_size))
         #         if obs_config.wrist_camera.rgb:
         #             obs[i].wrist_rgb = np.array(
         #                 _resize_if_needed(
-        #                     Image.open(obs[i].wrist_rgb),
-        #                     obs_config.wrist_camera.image_size))
+        #                     Image.open(obs[i].wrist_rgb),obs_config.wrist_camera.image_size))
         #         if obs_config.front_camera.rgb: # in
         #             obs[i].front_rgb = np.array(
         #                 _resize_if_needed(
-        #                     Image.open(obs[i].front_rgb),
-        #                     obs_config.front_camera.image_size))
+        #                     Image.open(obs[i].front_rgb), obs_config.front_camera.image_size))
 
         #         if obs_config.left_shoulder_camera.depth or obs_config.left_shoulder_camera.point_cloud:
         #             l_sh_depth = image_to_float_array(
         #                 _resize_if_needed(
-        #                     Image.open(obs[i].left_shoulder_depth),
-        #                     obs_config.left_shoulder_camera.image_size),
-        #                 DEPTH_SCALE)
+        #                     Image.open(obs[i].left_shoulder_depth),obs_config.left_shoulder_camera.image_size),DEPTH_SCALE)
         #             near = obs[i].misc['left_shoulder_camera_near']
         #             far = obs[i].misc['left_shoulder_camera_far']
         #             l_sh_depth_m = near + l_sh_depth * (far - near)
