@@ -1,3 +1,25 @@
+# import sys
+
+# # 接受三个参数：type（异常类型），value（异常值），和tb（追踪栈，即traceback）
+# def info(type, value, tb):
+#     if hasattr(sys, 'ps1') or not sys.stderr.isatty():
+#     # we are in interactive mode or we don't have a tty-like
+#     # 我们处于交互模式，或者没有类似 tty 的 # 设备。
+#     # 设备，所以我们调用默认钩子
+#     # device, so we call the default hook
+#         sys.__excepthook__(type, value, tb)
+#     else:
+#         import traceback, pdb
+#         # 我们不在交互模式下，打印异常...
+#         # we are NOT in interactive mode, print the exception...
+#         traceback.print_exception(type, value, tb)
+#         print
+#         # ...then start the debugger in post-mortem mode.
+#         # pdb.pm() # deprecated
+#         pdb.post_mortem(tb) # more "modern"
+
+# sys.excepthook = info
+# 上面--------------new---------------
 from typing import List
 import logging
 import os
@@ -17,6 +39,7 @@ import wandb
 # --------------------------Mani------------------------
 import numpy as np
 import lightning as L
+import torch
 #---------------------------Mani-------------------------
 
 @hydra.main(config_name="config", config_path="conf")
@@ -27,6 +50,12 @@ def main(cfg: DictConfig) -> None:
     logging.info("\n" + cfg_yaml)
 
     peract_config.on_config(cfg)
+    # new-------------------------------------------------------
+    os.environ['MASTER_ADDR'] = cfg.ddp.master_addr
+    os.environ['MASTER_PORT'] = str(cfg.ddp.master_port)
+    os.environ['OPENBLAS_NUM_THREADS'] = '1'
+    print("device available: ", torch.cuda.device_count())
+    # new-------------------------------------------------------
 
     cfg.rlbench.cameras = (
         cfg.rlbench.cameras
@@ -110,17 +139,18 @@ def main(cfg: DictConfig) -> None:
             # we use fabric DDP 我们使用织物 DDP
             fabric = L.Fabric(devices=world_size, strategy='ddp')
             fabric.launch()
+            print("we  are using ddp ----------问题出在run_seed-----------------")
             run_seed_fn.run_seed(
-                                # 0,  # 多rank, will be overwrited by fabric
+                                0,  # 多rank, will be overwrited by fabric
                                 cfg,
                                 obs_config,
-                                # cfg.rlbench.cameras,    #多
+                                cfg.rlbench.cameras,    #多
                                 multi_task,
                                 seed,
                                 world_size,
-                                # fabric, 
+                                fabric, 
                                 )
-        
+            print("we  are using ddp ------------end---------------")
         else:
             # use pytorch DDP 
             # "DDP"指的是"Distributed Data Parallel"，即分布式数据并行

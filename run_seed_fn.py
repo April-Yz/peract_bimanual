@@ -21,23 +21,31 @@ from agents import replay_utils
 
 import peract_config
 from functools import partial
-
+# new
+import lightning as L
+# new
 def run_seed(
     rank,
     cfg: DictConfig,
     obs_config: ObservationConfig,
-    # cams, # y7.26
-    # multi_task, # y7.26
+    cams, # y7.26
+    multi_task, # y7.26
     seed,
     world_size,
-    # fabric: L.Fabric = None, # yzj7.26 
+    fabric: L.Fabric = None, # yzj7.26 
 ) -> None:
     
 
     peract_config.config_logging()
-    
-    dist.init_process_group("gloo", rank=rank, world_size=world_size)
+    # 下一行原来的代码
+    # dist.init_process_group("gloo", rank=rank, world_size=world_size)
+    # new86---
+    if fabric is not None:
+        rank = fabric.global_rank
+    else:
+        dist.init_process_group("gloo",rank=rank,world_size=world_size)
 
+    # new86---
     tasks = cfg.rlbench.tasks
     cams = cfg.rlbench.cameras
 
@@ -220,7 +228,7 @@ def run_seed(
             cfg.method.rotation_resolution, 
             cfg.method.crop_augmentation,
             keypoint_method=cfg.method.keypoint_method,
-            #暂时不用分布式 fabric=fabric,  
+            fabric=fabric,  # 暂时不用分布式 
         )
 
         agent = manigaussian_bc2.launch_utils.create_agent(cfg)
@@ -258,8 +266,8 @@ def run_seed(
         load_existing_weights=cfg.framework.load_existing_weights,
         rank=rank,
         world_size=world_size,
-        cfg=cfg
-        # fabric=fabric       # yzj分布式训练
+        cfg=cfg,
+        fabric=fabric       # yzj分布式训练
     )
 
     #yzj本来多的?处理多进程用的应该不用管

@@ -11,8 +11,9 @@
 # handover_item_medium 
 # bimanual_pick_plate未运行完毕 gong22个？
 # coordinated_push_box bimanual_push_single_button coordinated_put_bottle_in_fridge bimanual_set_the_table 
-# coordinated_put_item_in_drawer coordinated_put_item_in_drawer 未运行完毕
-ALL_TASK=" left_open_drawer bimanual_straighten_rope coordinated_put_item_in_drawer_right bimanual_sweep_to_dustpan  coordinated_take_shoes_out_of_box right_open_drawer coordinated_close_jar coordinated_take_tray_out_of_oven unimanual_push_single_button_left coordinated_lift_ball dual_push_buttons coordinated_lift_stick handover_item_easy "
+# coordinated_put_item_in_drawer  未运行完毕
+# ALL_TASK=" left_open_drawer bimanual_straighten_rope coordinated_put_item_in_drawer_right bimanual_sweep_to_dustpan  coordinated_take_shoes_out_of_box right_open_drawer coordinated_close_jar coordinated_take_tray_out_of_oven unimanual_push_single_button_left coordinated_lift_ball dual_push_buttons coordinated_lift_stick handover_item_easy "
+ALL_TASK="coordinated_lift_tray bimanual_pick_plate"
 tasks=($ALL_TASK)
 
 for task in "${tasks[@]}"; do

@@ -700,7 +700,360 @@ class QAttentionPerActBCAgent(Agent):
         else:
             self.feature = output.detach()
             
+    # new86--- bimanual中的新增的
+    def update(self, step: int, replay_sample: dict) -> dict:
+        right_action_trans = replay_sample["right_trans_action_indicies"][
+            :, self._layer * 3 : self._layer * 3 + 3
+        ].int()
+        right_action_rot_grip = replay_sample["right_rot_grip_action_indicies"].int()
+        right_action_gripper_pose = replay_sample["right_gripper_pose"]
+        right_action_ignore_collisions = replay_sample["right_ignore_collisions"].int()
+
+        left_action_trans = replay_sample["left_trans_action_indicies"][
+            :, self._layer * 3 : self._layer * 3 + 3
+        ].int()
+        left_action_rot_grip = replay_sample["left_rot_grip_action_indicies"].int()
+        left_action_gripper_pose = replay_sample["left_gripper_pose"]
+        left_action_ignore_collisions = replay_sample["left_ignore_collisions"].int()
+
+        lang_goal_emb = replay_sample["lang_goal_emb"].float()
+        lang_token_embs = replay_sample["lang_token_embs"].float()
+        prev_layer_voxel_grid = replay_sample.get("prev_layer_voxel_grid", None)
+        prev_layer_bounds = replay_sample.get("prev_layer_bounds", None)
+        device = self._device
+
+        rank = device
+        bounds = self._coordinate_bounds.to(device)
+        if self._layer > 0:
+            right_cp = replay_sample[
+                "right_attention_coordinate_layer_%d" % (self._layer - 1)
+            ]
+
+            left_cp = replay_sample[
+                "left_attention_coordinate_layer_%d" % (self._layer - 1)
+            ]
+
+            right_bounds = torch.cat(
+                [right_cp - self._bounds_offset, right_cp + self._bounds_offset], dim=1
+            )
+            left_bounds = torch.cat(
+                [left_cp - self._bounds_offset, left_cp + self._bounds_offset], dim=1
+            )
+
+        else:
+            right_bounds = bounds
+            left_bounds = bounds
+
+        right_proprio = None
+        left_proprio = None
+        if self._include_low_dim_state:
+            right_proprio = replay_sample["right_low_dim_state"]
+            left_proprio = replay_sample["left_low_dim_state"]
+
+        # ..TODO::
+        # Can we add the coordinates of both robots?
+        #
+
+        obs, pcd = self._preprocess_inputs(replay_sample)
+
+        # batch size
+        bs = pcd[0].shape[0]
+
+        # We can move the point cloud w.r.t to the other robot's cooridinate system
+        # similar to apply_se3_augmentation
+        #
+
+        # SE(3) augmentation of point clouds and actions
+        if self._transform_augmentation:
+            from voxel import augmentation
+
+            (
+                right_action_trans,
+                right_action_rot_grip,
+                left_action_trans,
+                left_action_rot_grip,
+                pcd,
+            ) = augmentation.bimanual_apply_se3_augmentation(
+                pcd,
+                right_action_gripper_pose,
+                right_action_trans,
+                right_action_rot_grip,
+                left_action_gripper_pose,
+                left_action_trans,
+                left_action_rot_grip,
+                bounds,
+                self._layer,
+                self._transform_augmentation_xyz,
+                self._transform_augmentation_rpy,
+                self._transform_augmentation_rot_resolution,
+                self._voxel_size,
+                self._rotation_resolution,
+                self._device,
+            )
+        else:
+            right_action_trans = right_action_trans.int()
+            left_action_trans = left_action_trans.int()
+
+        proprio = torch.cat((right_proprio, left_proprio), dim=1)
+
+        right_action = (
+            right_action_trans,
+            right_action_rot_grip,
+            right_action_ignore_collisions,
+        )
+        left_action = (
+            left_action_trans,
+            left_action_rot_grip,
+            left_action_ignore_collisions,
+        )
+        # forward pass
+        q, voxel_grid = self._q(
+            obs,
+            proprio,
+            pcd,
+            lang_goal_emb,
+            lang_token_embs,
+            bounds,
+            prev_layer_bounds,
+            prev_layer_voxel_grid,
+        )
+
+        (
+            right_q_trans,
+            right_q_rot_grip,
+            right_q_collision,
+            left_q_trans,
+            left_q_rot_grip,
+            left_q_collision,
+        ) = q
+
+        # argmax to choose best action
+        (
+            right_coords,
+            right_rot_and_grip_indicies,
+            right_ignore_collision_indicies,
+        ) = self._q.choose_highest_action(
+            right_q_trans, right_q_rot_grip, right_q_collision
+        )
+
+        (
+            left_coords,
+            left_rot_and_grip_indicies,
+            left_ignore_collision_indicies,
+        ) = self._q.choose_highest_action(
+            left_q_trans, left_q_rot_grip, left_q_collision
+        )
+
+
+        right_q_trans_loss, right_q_rot_loss, right_q_grip_loss, right_q_collision_loss = 0.0, 0.0, 0.0, 0.0
+        left_q_trans_loss, left_q_rot_loss, left_q_grip_loss, left_q_collision_loss = 0.0, 0.0, 0.0, 0.0
+
+        # translation one-hot
+        right_action_trans_one_hot = self._action_trans_one_hot_zeros.clone().detach()
+        left_action_trans_one_hot = self._action_trans_one_hot_zeros.clone().detach()
+        for b in range(bs):
+            right_gt_coord = right_action_trans[b, :].int()
+            right_action_trans_one_hot[
+                b, :, right_gt_coord[0], right_gt_coord[1], right_gt_coord[2]
+            ] = 1
+            left_gt_coord = left_action_trans[b, :].int()
+            left_action_trans_one_hot[
+                b, :, left_gt_coord[0], left_gt_coord[1], left_gt_coord[2]
+            ] = 1
+
+        # translation loss
+        right_q_trans_flat = right_q_trans.view(bs, -1)
+        right_action_trans_one_hot_flat = right_action_trans_one_hot.view(bs, -1)
+        right_q_trans_loss = self._celoss(
+            right_q_trans_flat, right_action_trans_one_hot_flat
+        )
+        left_q_trans_flat = left_q_trans.view(bs, -1)
+        left_action_trans_one_hot_flat = left_action_trans_one_hot.view(bs, -1)
+        left_q_trans_loss = self._celoss(
+            left_q_trans_flat, left_action_trans_one_hot_flat
+        )
+
+        q_trans_loss = right_q_trans_loss + left_q_trans_loss
+
+        with_rot_and_grip = (
+            len(right_rot_and_grip_indicies) > 0 and len(left_rot_and_grip_indicies) > 0
+        )
+        if with_rot_and_grip:
+            # rotation, gripper, and collision one-hots
+            right_action_rot_x_one_hot = self._action_rot_x_one_hot_zeros.clone()
+            right_action_rot_y_one_hot = self._action_rot_y_one_hot_zeros.clone()
+            right_action_rot_z_one_hot = self._action_rot_z_one_hot_zeros.clone()
+            right_action_grip_one_hot = self._action_grip_one_hot_zeros.clone()
+            right_action_ignore_collisions_one_hot = (
+                self._action_ignore_collisions_one_hot_zeros.clone()
+            )
+
+            left_action_rot_x_one_hot = self._action_rot_x_one_hot_zeros.clone()
+            left_action_rot_y_one_hot = self._action_rot_y_one_hot_zeros.clone()
+            left_action_rot_z_one_hot = self._action_rot_z_one_hot_zeros.clone()
+            left_action_grip_one_hot = self._action_grip_one_hot_zeros.clone()
+            left_action_ignore_collisions_one_hot = (
+                self._action_ignore_collisions_one_hot_zeros.clone()
+            )
+
+            for b in range(bs):
+                right_gt_rot_grip = right_action_rot_grip[b, :].int()
+                right_action_rot_x_one_hot[b, right_gt_rot_grip[0]] = 1
+                right_action_rot_y_one_hot[b, right_gt_rot_grip[1]] = 1
+                right_action_rot_z_one_hot[b, right_gt_rot_grip[2]] = 1
+                right_action_grip_one_hot[b, right_gt_rot_grip[3]] = 1
+
+                right_gt_ignore_collisions = right_action_ignore_collisions[b, :].int()
+                right_action_ignore_collisions_one_hot[
+                    b, right_gt_ignore_collisions[0]
+                ] = 1
+
+                left_gt_rot_grip = left_action_rot_grip[b, :].int()
+                left_action_rot_x_one_hot[b, left_gt_rot_grip[0]] = 1
+                left_action_rot_y_one_hot[b, left_gt_rot_grip[1]] = 1
+                left_action_rot_z_one_hot[b, left_gt_rot_grip[2]] = 1
+                left_action_grip_one_hot[b, left_gt_rot_grip[3]] = 1
+
+                left_gt_ignore_collisions = left_action_ignore_collisions[b, :].int()
+                left_action_ignore_collisions_one_hot[
+                    b, left_gt_ignore_collisions[0]
+                ] = 1
+
+            # flatten predictions
+            right_q_rot_x_flat = right_q_rot_grip[
+                :, 0 * self._num_rotation_classes : 1 * self._num_rotation_classes
+            ]
+            right_q_rot_y_flat = right_q_rot_grip[
+                :, 1 * self._num_rotation_classes : 2 * self._num_rotation_classes
+            ]
+            right_q_rot_z_flat = right_q_rot_grip[
+                :, 2 * self._num_rotation_classes : 3 * self._num_rotation_classes
+            ]
+            right_q_grip_flat = right_q_rot_grip[:, 3 * self._num_rotation_classes :]
+            right_q_ignore_collisions_flat = right_q_collision
+
+            left_q_rot_x_flat = left_q_rot_grip[
+                :, 0 * self._num_rotation_classes : 1 * self._num_rotation_classes
+            ]
+            left_q_rot_y_flat = left_q_rot_grip[
+                :, 1 * self._num_rotation_classes : 2 * self._num_rotation_classes
+            ]
+            left_q_rot_z_flat = left_q_rot_grip[
+                :, 2 * self._num_rotation_classes : 3 * self._num_rotation_classes
+            ]
+            left_q_grip_flat = left_q_rot_grip[:, 3 * self._num_rotation_classes :]
+            left_q_ignore_collisions_flat = left_q_collision
+
+
+            # rotation loss
+            right_q_rot_loss += self._celoss(right_q_rot_x_flat, right_action_rot_x_one_hot)
+            right_q_rot_loss += self._celoss(right_q_rot_y_flat, right_action_rot_y_one_hot)
+            right_q_rot_loss += self._celoss(right_q_rot_z_flat, right_action_rot_z_one_hot)
+
+            left_q_rot_loss += self._celoss(left_q_rot_x_flat, left_action_rot_x_one_hot)
+            left_q_rot_loss += self._celoss(left_q_rot_y_flat, left_action_rot_y_one_hot)
+            left_q_rot_loss += self._celoss(left_q_rot_z_flat, left_action_rot_z_one_hot)
+
+            # gripper loss
+            right_q_grip_loss += self._celoss(right_q_grip_flat, right_action_grip_one_hot)
+            left_q_grip_loss += self._celoss(left_q_grip_flat, left_action_grip_one_hot)
+
+            # collision loss
+            right_q_collision_loss += self._celoss(
+                right_q_ignore_collisions_flat, right_action_ignore_collisions_one_hot
+            )
+            left_q_collision_loss += self._celoss(
+                left_q_ignore_collisions_flat, left_action_ignore_collisions_one_hot
+            )
+
+
+        q_trans_loss = right_q_trans_loss + left_q_trans_loss
+        q_rot_loss = right_q_rot_loss + left_q_rot_loss
+        q_grip_loss = right_q_grip_loss + left_q_grip_loss
+        q_collision_loss = right_q_collision_loss + left_q_collision_loss
         
+        combined_losses = (
+            (q_trans_loss * self._trans_loss_weight)
+            + (q_rot_loss * self._rot_loss_weight)
+            + (q_grip_loss * self._grip_loss_weight)
+            + (q_collision_loss * self._collision_loss_weight)
+        )
+        total_loss = combined_losses.mean()
+
+        if step % 10 == 0 and rank == 0:
+            wandb.log({
+                'train/grip_loss': q_grip_loss.mean(),
+                'train/trans_loss': q_trans_loss.mean(),
+                'train/rot_loss': q_rot_loss.mean(),
+                'train/collision_loss': q_collision_loss.mean(),
+                'train/total_loss': total_loss,
+            }, step=step)
+                    
+        self._optimizer.zero_grad()
+        total_loss.backward()
+        self._optimizer.step()
+        torch.cuda.empty_cache()
+        self._summaries = {
+            "losses/total_loss": total_loss,
+            "losses/trans_loss": q_trans_loss.mean(),
+            "losses/rot_loss": q_rot_loss.mean() if with_rot_and_grip else 0.0,
+            "losses/grip_loss": q_grip_loss.mean() if with_rot_and_grip else 0.0,
+
+            "losses/right/trans_loss": q_trans_loss.mean(),
+            "losses/right/rot_loss": q_rot_loss.mean() if with_rot_and_grip else 0.0,
+            "losses/right/grip_loss": q_grip_loss.mean() if with_rot_and_grip else 0.0,
+            "losses/right/collision_loss": q_collision_loss.mean() if with_rot_and_grip else 0.0,
+
+            "losses/left/trans_loss": q_trans_loss.mean(),
+            "losses/left/rot_loss": q_rot_loss.mean() if with_rot_and_grip else 0.0,
+            "losses/left/grip_loss": q_grip_loss.mean() if with_rot_and_grip else 0.0,
+            "losses/left/collision_loss": q_collision_loss.mean() if with_rot_and_grip else 0.0,
+
+            "losses/collision_loss": q_collision_loss.mean()
+            if with_rot_and_grip
+            else 0.0,
+        }
+
+        self._wandb_summaries = {
+            'losses/total_loss': total_loss,
+            'losses/trans_loss': q_trans_loss.mean(),
+            'losses/rot_loss': q_rot_loss.mean() if with_rot_and_grip else 0.,
+            'losses/grip_loss': q_grip_loss.mean() if with_rot_and_grip else 0.,
+            'losses/collision_loss': q_collision_loss.mean() if with_rot_and_grip else 0.
+        }
+
+        if self._lr_scheduler:
+            self._scheduler.step()
+            self._summaries["learning_rate"] = self._scheduler.get_last_lr()[0]
+
+        self._vis_voxel_grid = voxel_grid[0]
+        self._right_vis_translation_qvalue = self._softmax_q_trans(right_q_trans[0])
+        self._right_vis_max_coordinate = right_coords[0]
+        self._right_vis_gt_coordinate = right_action_trans[0]
+
+        self._left_vis_translation_qvalue = self._softmax_q_trans(left_q_trans[0])
+        self._left_vis_max_coordinate = left_coords[0]
+        self._left_vis_gt_coordinate = left_action_trans[0]
+
+        # Note: PerAct doesn't use multi-layer voxel grids like C2FARM
+        # stack prev_layer_voxel_grid(s) from previous layers into a list
+        if prev_layer_voxel_grid is None:
+            prev_layer_voxel_grid = [voxel_grid]
+        else:
+            prev_layer_voxel_grid = prev_layer_voxel_grid + [voxel_grid]
+
+        # stack prev_layer_bound(s) from previous layers into a list
+        if prev_layer_bounds is None:
+            prev_layer_bounds = [self._coordinate_bounds.repeat(bs, 1)]
+        else:
+            prev_layer_bounds = prev_layer_bounds + [bounds]
+
+        return {
+            "total_loss": total_loss,
+            "prev_layer_voxel_grid": prev_layer_voxel_grid,
+            "prev_layer_bounds": prev_layer_bounds,
+        }
+
     def update(self, step: int, replay_sample: dict, fabric: Fabric) -> dict:
         '''
         self:类的实例。
@@ -952,6 +1305,9 @@ class QAttentionPerActBCAgent(Agent):
 
             if step % 10 == 0 and rank == 0:
                 cprint(f'total L: {total_loss.item():.4f} | \
+    
+    # new86--- bimanual中的新增的    
+
 L_BC: {combined_losses.item():.3f} x {lambda_BC:.3f} | \
 L_trans: {q_trans_loss.item():.3f} x {(self._trans_loss_weight * lambda_BC):.3f} | \
 L_rot: {q_rot_loss.item():.3f} x {(self._rot_loss_weight * lambda_BC):.3f} | \

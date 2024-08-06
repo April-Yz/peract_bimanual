@@ -1,7 +1,9 @@
 ddp:
     master_addr: "localhost"
-    master_port: "0"
+    master_port: "29501" # "0"
     num_devices: 1
+    # new
+    device_id: 0
 
 rlbench:
     task_name: "multi"
@@ -17,10 +19,11 @@ rlbench:
     include_lang_goal_in_obs: True
     # new
     num_view_for_nerf: 21
+    headless: True
     # new
 
 replay:
-    batch_size: 2 #原来8
+    batch_size: 1 #原来8
     timesteps: 1
     prioritisation: False
     task_uniform: True # uniform sampling of tasks for multi-task buffers
@@ -28,6 +31,17 @@ replay:
     path: '/home/zjyang/program/peract_bimanual/log/arm/replay' 
     # path: '/tmp/arm/replay' # only used when use_disk is True.
     max_parallel_processes: 1 # 32
+
+# new
+evaluation: # for online evaluation
+    eval_freq: 10000
+    eval_episodes: 25
+    time_in_state: True
+    record_every_n: 10000
+    episode_length: 15  # default
+    # episode_length: 25
+    gpu: 0
+#  new
 
 framework:
     log_freq: 100
@@ -50,6 +64,7 @@ framework:
     num_workers: 0
     record_every_n: 5
     checkpoint_name_prefix: "checkpoint"
+    # wandb setting
     use_wandb: True
     wandb_project: "peract_bimanual"
     wandb_group: ${rlbench.task_name}_${method.name}

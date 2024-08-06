@@ -191,3 +191,12 @@ __pycache__/
 # #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 # #.idea/
 
+log-mani/mani/ManiGaussian_BC2/seed0/config.yaml
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722925467.server189.1082237.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722925611.server189.1083146.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722925708.server189.1084134.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722926746.server189.1089342.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722927096.server189.1090682.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722927344.server189.1091644.0
+log-mani/mani/ManiGaussian_BC2/seed0/training.log
+log-mani/mani/ManiGaussian_BC2/seed0/weights/0/QAttentionAgent_layer0.pt

@@ -2,7 +2,7 @@ method:
   name: ManiGaussian_BC2
   agent_type: bimanual
   robot_name: bimanual
-  use_fabric: false
+  use_fabric: true
   use_depth: true
   use_neural_rendering: true
   num_view_for_nerf: 20
@@ -139,8 +139,9 @@ method:
       include_input: true
 ddp:
   master_addr: localhost
-  master_port: 12345
+  master_port: 12346
   num_devices: 1
+  device_id: 0
 rlbench:
   task_name: mani
   tasks:
@@ -157,8 +158,8 @@ rlbench:
   - wrist_left
   - front
   camera_resolution:
-  - 256
-  - 256
+  - 128
+  - 128
   scene_bounds:
   - -0.3
   - -0.5
@@ -168,6 +169,7 @@ rlbench:
   - 1.6
   include_lang_goal_in_obs: true
   num_view_for_nerf: 21
+  headless: true
 replay:
   batch_size: 1
   timesteps: 1
@@ -175,7 +177,14 @@ replay:
   task_uniform: true
   use_disk: true
   path: /home/zjyang/program/peract_bimanual/log/arm/replay
-  max_parallel_processes: 32
+  max_parallel_processes: 1
+evaluation:
+  eval_freq: 10000
+  eval_episodes: 25
+  time_in_state: true
+  record_every_n: 10000
+  episode_length: 15
+  gpu: 0
 framework:
   log_freq: 100
   save_freq: 1000

@@ -12,6 +12,8 @@ from yarr.agents.agent import (
     ImageSummary,
 )
 
+# 886new---
+from termcolor import cprint
 
 class PreprocessAgent(Agent):
 
@@ -23,8 +25,15 @@ class PreprocessAgent(Agent):
         self._norm_rgb = norm_rgb
         self._norm_type = norm_type
 
-    def build(self, training: bool, device: torch.device = None):
-        self._pose_agent.build(training, device)
+    # new86---
+    # def build(self, training: bool, device: torch.device = None):
+    #     self._pose_agent.build(training, device)
+    def build(self, training: bool, device: torch.device = None, use_ddp: bool = True, **kwargs):
+        try:
+            self._pose_agent.build(training, device, use_ddp, **kwargs)
+        except:
+            self._pose_agent.build(training, device, **kwargs)
+    # new86---
 
     def _norm_rgb_(self, x):
         if self._norm_type == 'zero_mean':
@@ -37,20 +46,69 @@ class PreprocessAgent(Agent):
         else:
             raise NotImplementedError
 
-    def update(self, step: int, replay_sample: dict) -> dict:
-        # Samples are (B, N, ...) where N is number of buffers/tasks. This is a single task setup, so 0 index.
-        replay_sample = {
-            k: v[:, 0]
-            if len(v.shape) > 2 and v.shape[1] == 1
-            else v for k, v in replay_sample.items()
-        }
+    # new86---
+    # def update(self, step: int, replay_sample: dict) -> dict:
+    #     # Samples are (B, N, ...) where N is number of buffers/tasks. This is a single task setup, so 0 index.
+    #     replay_sample = {
+    #         k: v[:, 0]
+    #         if len(v.shape) > 2 and v.shape[1] == 1
+    #         else v for k, v in replay_sample.items()
+    #     }
+    #     for k, v in replay_sample.items():
+    #         if self._norm_rgb and "rgb" in k:
+    #             replay_sample[k] = self._norm_rgb_(v)
+    #         else:
+    #             replay_sample[k] = v.float()
+    #     self._replay_sample = replay_sample
+    #     return self._pose_agent.update(step, replay_sample)
+    def update(self, step: int, replay_sample: dict, **kwargs) -> dict:
+        # !! 
+        nerf_multi_view_rgb = replay_sample['nerf_multi_view_rgb']
+        nerf_multi_view_depth = replay_sample['nerf_multi_view_depth']
+        nerf_multi_view_camera = replay_sample['nerf_multi_view_camera']
+
+        if 'nerf_next_multi_view_rgb' in replay_sample:
+            nerf_next_multi_view_rgb = replay_sample['nerf_next_multi_view_rgb']
+            nerf_next_multi_view_depth = replay_sample['nerf_next_multi_view_depth']
+            nerf_next_multi_view_camera = replay_sample['nerf_next_multi_view_camera']
+        lang_goal = replay_sample['lang_goal']
+
+        if replay_sample['nerf_multi_view_rgb'] is None or replay_sample['nerf_multi_view_rgb'][0,0] is None:
+            cprint("preprocess agent no nerf rgb 1", "red")
+
+        replay_sample = {k: v[:, 0] if len(v.shape) > 2 else v for k, v in replay_sample.items()}
+
+        # !! 如何搜集的
         for k, v in replay_sample.items():
-            if self._norm_rgb and "rgb" in k:
+            if self._norm_rgb and 'rgb' in k and 'nerf' not in k:
                 replay_sample[k] = self._norm_rgb_(v)
+            elif 'nerf' in k:
+                replay_sample[k] = v
             else:
-                replay_sample[k] = v.float()
+                try:
+                    replay_sample[k] = v.float()
+                except:
+                    replay_sample[k] = v
+                    pass # some elements are not tensors/arrays
+        replay_sample['nerf_multi_view_rgb'] = nerf_multi_view_rgb
+        replay_sample['nerf_multi_view_depth'] = nerf_multi_view_depth
+        replay_sample['nerf_multi_view_camera'] = nerf_multi_view_camera
+
+        if 'nerf_next_multi_view_rgb' in replay_sample:
+            replay_sample['nerf_next_multi_view_rgb'] = nerf_next_multi_view_rgb
+            replay_sample['nerf_next_multi_view_depth'] = nerf_next_multi_view_depth
+            replay_sample['nerf_next_multi_view_camera'] = nerf_next_multi_view_camera
+        
+        replay_sample['lang_goal'] = lang_goal
         self._replay_sample = replay_sample
-        return self._pose_agent.update(step, replay_sample)
+
+
+        if replay_sample['nerf_multi_view_rgb'] is None or replay_sample['nerf_multi_view_rgb'][0,0] is None:
+            cprint("preprocess agent no nerf rgb 2", "red")
+
+        return self._pose_agent.update(step, replay_sample, **kwargs)
+
+    # new86---
 
     def act(self, step: int, observation: dict, deterministic=False) -> ActResult:
         # observation = {k: torch.tensor(v) for k, v in observation.items()}
