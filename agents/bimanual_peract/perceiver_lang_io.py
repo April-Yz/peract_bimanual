@@ -243,7 +243,8 @@ class PerceiverVoxelLangEncoder(nn.Module):
 
         # 2nd 3D softmax
         self.ss1 = SpatialSoftmax3D(
-            spatial_size, spatial_size, spatial_size, self.input_dim_before_seq
+            spatial_size, spatial_size, spatial_size, 
+            self.input_dim_before_seq
         )
 
         flat_size += self.input_dim_before_seq * 4
@@ -281,7 +282,8 @@ class PerceiverVoxelLangEncoder(nn.Module):
         # rotation, gripper, and collision MLP layers
         if self.num_rotation_classes > 0:
             self.ss_final = SpatialSoftmax3D(
-                self.voxel_size, self.voxel_size, self.voxel_size, self.im_channels
+                self.voxel_size, self.voxel_size, self.voxel_size, 
+                self.im_channels
             )
 
             flat_size += self.im_channels * 4

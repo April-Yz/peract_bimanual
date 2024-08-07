@@ -14,7 +14,7 @@ rlbench:
     episode_length: 25
     cameras: ["over_shoulder_left", "over_shoulder_right", "overhead", "wrist_right", "wrist_left", "front"]
     camera_resolution: [128, 128]
-    # camera_resolution: [256,256] 原来的
+    # camera_resolution: [256,256] # 原来的
     scene_bounds: [-0.3, -0.5, 0.6, 0.7, 0.5, 1.6]
     include_lang_goal_in_obs: True
     # new
@@ -23,14 +23,14 @@ rlbench:
     # new
 
 replay:
-    batch_size: 1 #原来8
+    batch_size: 8 #原来8
     timesteps: 1
     prioritisation: False
     task_uniform: True # uniform sampling of tasks for multi-task buffers
     use_disk: True
     path: '/home/zjyang/program/peract_bimanual/log/arm/replay' 
     # path: '/tmp/arm/replay' # only used when use_disk is True.
-    max_parallel_processes: 1 # 32
+    max_parallel_processes: 32 # 1 # 32
 
 # new
 evaluation: # for online evaluation

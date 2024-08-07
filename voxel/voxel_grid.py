@@ -188,7 +188,7 @@ class VoxelGrid(nn.Module):
         )
         return flat_scatter.view(self._total_dims_list)
 
-    def coords_to_bounding_voxel_grid(
+    def coords_to_bounding_voxel_grid_bimanual_no_nerf(
         self, coords, coord_features=None, coord_bounds=None
     ):
         voxel_indicy_denmominator = self._voxel_indicy_denmominator
@@ -250,3 +250,83 @@ class VoxelGrid(nn.Module):
             ],
             -1,
         )
+
+    def coords_to_bounding_voxel_grid(
+        self, coords, coord_features=None, coord_bounds=None,
+         only_features=False, return_density=False # nerf中的参数
+    ):
+        voxel_indicy_denmominator = self._voxel_indicy_denmominator
+        res, bb_mins = self._res, self._bb_mins
+        if coord_bounds is not None:
+            bb_mins = coord_bounds[..., 0:3]
+            bb_maxs = coord_bounds[..., 3:6]
+            bb_ranges = bb_maxs - bb_mins
+            res = bb_ranges / (self._dims_orig.float() + MIN_DENOMINATOR)
+            voxel_indicy_denmominator = res + MIN_DENOMINATOR
+
+        bb_mins_shifted = bb_mins - res  # shift back by one
+        floor = torch.floor(
+            (coords - bb_mins_shifted.unsqueeze(1))
+            / voxel_indicy_denmominator.unsqueeze(1)
+        ).int()
+        voxel_indices = torch.min(floor, self._dims_m_one)
+        voxel_indices = torch.max(voxel_indices, self._dims_m_one_zeros)
+
+        # BS x NC x 3
+        voxel_values = coords
+        if coord_features is not None:
+            voxel_values = torch.cat([voxel_values, coord_features], -1)
+
+        _, num_coords, _ = voxel_indices.shape
+        # BS x N x (num_batch_dims + 2)
+        all_indices = torch.cat(
+            [self._tiled_batch_indices[:, :num_coords], voxel_indices], -1
+        )
+
+        # BS x N x 4
+        voxel_values_pruned_flat = torch.cat(
+            [voxel_values, self._ones_max_coords[:, :num_coords]], -1
+        )
+
+        # BS x x_max x y_max x z_max x 4
+        scattered = self._scatter_nd(
+            all_indices.view([-1, 1 + 3]),
+            voxel_values_pruned_flat.view(-1, self._voxel_feature_size),
+        )
+
+        vox = scattered[:, 1:-1, 1:-1, 1:-1]
+        if INCLUDE_PER_VOXEL_COORD:
+            res_expanded = res.unsqueeze(1).unsqueeze(1).unsqueeze(1)
+            res_centre = (res_expanded * self._index_grid) + res_expanded / 2.0
+            coord_positions = (
+                res_centre + bb_mins_shifted.unsqueeze(1).unsqueeze(1).unsqueeze(1)
+            )[:, 1:-1, 1:-1, 1:-1]
+            vox = torch.cat([vox[..., :-1], coord_positions, vox[..., -1:]], -1)
+
+        occupied = (vox[..., -1:] > 0).float()
+        vox = torch.cat([vox[..., :-1], occupied], -1)
+
+        # nerf
+        vox = torch.cat(
+            [vox[..., :-1], self._index_grid[:, :-2, :-2, :-2] / self._voxel_d,
+            vox[..., -1:]], -1)
+        
+        if not only_features:
+            if return_density:
+                return vox, occupied
+            else:
+                return vox
+        else: # remove the occupancy channel, coords and indices
+            return vox[..., :-7]
+        
+        # return torch.cat(
+        #     [
+        #         vox[..., :-1],
+        #         self._index_grid[:, :-2, :-2, :-2] / self._voxel_d,
+        #         vox[..., -1:],
+        #     ],
+        #     -1,
+        # )
+        # nerf
+
+

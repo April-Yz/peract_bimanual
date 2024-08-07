@@ -4230,3 +4230,39 @@ Successfully saved 580 time steps
 2064it [4:54:39,  8.72s/it][A
 2065it [4:54:48,  8.65s/it][A
 2066it [4:54:56,  8.53s/it][A
+2067it [4:55:04,  8.54s/it][A
+2068it [4:55:13,  8.53s/it][A
+2069it [4:55:21,  8.54s/it][A
+2070it [4:55:30,  8.53s/it][A
+2071it [4:55:38,  8.52s/it][A
+2072it [4:55:47,  8.49s/it][A
+2073it [4:55:55,  8.46s/it][A
+2074it [4:56:04,  8.44s/it][A
+2075it [4:56:12,  8.44s/it][A
+2076it [4:56:20,  8.42s/it][A
+2077it [4:56:29,  8.40s/it][A
+2078it [4:56:37,  8.40s/it][A
+2079it [4:56:46,  8.38s/it][A
+2080it [4:56:54,  8.41s/it][A
+2081it [4:57:02,  8.39s/it][A
+2082it [4:57:11,  8.39s/it][A
+2083it [4:57:19,  8.41s/it][A
+2084it [4:57:28,  8.42s/it][A
+2085it [4:57:36,  8.36s/it][A
+2086it [4:57:44,  8.40s/it][A
+2087it [4:57:53,  8.38s/it][A
+2088it [4:58:01,  8.37s/it][A
+2089it [4:58:09,  8.32s/it][A
+2090it [4:58:18,  8.35s/it][A
+2091it [4:58:26,  8.41s/it][A
+2092it [4:58:35,  8.42s/it][A
+2093it [4:58:43,  8.44s/it][A
+2094it [4:58:52,  8.43s/it][A
+2095it [4:59:00,  8.44s/it][A
+2096it [4:59:08,  8.44s/it][A
+2097it [4:59:17,  8.39s/it][A
+2098it [4:59:25,  8.28s/it][A
+2099it [4:59:33,  8.21s/it][A
+2100it [4:59:41,  8.15s/it][A
+2101it [4:59:49,  8.11s/it][A[08/06/24 15:46:36] WARNING  WARNING:bimanual_pick_plate:Bad demo. Error in task bimanual_pick_plate. Demo was completed, but was not successful. Attempts left:  task_environment.py:188
+                             0                                                                                                                                                           

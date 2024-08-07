@@ -148,7 +148,7 @@ class QFunction(nn.Module):
                  rotation_resolution: float,
                  device,
                  training,
-                #  !!yzj多的
+                #  !! Mani多了两个
                  use_ddp=True,  # default: True
                  cfg=None,
                  fabric=None,):
@@ -254,9 +254,9 @@ class QFunction(nn.Module):
                                 proprio, # [1,4]
                                 lang_goal_emb, # [1,1024]
                                 lang_token_embs, # [1,77,512]
-                                None,   # 一样，双手中prev_layer_voxel_grid=None,
+                                prev_layer_voxel_grid, #None,   # 一样，双手中prev_layer_voxel_grid=None,
                                 bounds, # [1,6]
-                                None    # 一样，双手中prev_bounds=None,
+                                prev_bounds, # None    # 一样，双手中prev_bounds=None,
                                 )
 
         # !!新 ----------------------------------------------------------------
@@ -576,6 +576,7 @@ class QAttentionPerActBCAgent(Agent):
             self._voxelizer.to(device)
             self._q.to(device)
 
+    # nerf[6]---
     def _preprocess_inputs(self, replay_sample, sample_id=None):
         """用于预处理从回放缓冲区获取的输入数据，包括 RGB 图像、深度图、点云、相机内外参等。
         用于预处理从回放缓冲区(eplay buffer)获取的输入数据"""
@@ -607,6 +608,40 @@ class QAttentionPerActBCAgent(Agent):
             exs.append(extin)
             ins.append(intin)
         return obs, depths, pcds, exs, ins
+
+    def _mani_preprocess_inputs(self, replay_sample, sample_id=None):
+        """用于预处理从回放缓冲区获取的输入数据，包括 RGB 图像、深度图、点云、相机内外参等。
+        用于预处理从回放缓冲区(eplay buffer)获取的输入数据"""
+        # 存储观察结果（obs）、深度信息（depths）、点云数据（pcds）、
+        # 相机外参（exs，代表 extrinsics）、相机内参（ins，代表 intrinsics）
+        obs = []
+        depths = [] # 深度信息是多的
+        pcds = []
+        exs = []
+        ins = []
+        self._crop_summary = []
+        # 遍历 self._camera_names 中定义的所有相机名称。这些名称可能是 ['front', 'left_shoulder', 'right_shoulder', 'wrist'] 或其他配置。
+        for n in self._camera_names:    # default: [front,left_shoulder,right_shoulder,wrist] or [front]
+            if sample_id is not None:   # default: None
+                rgb = replay_sample['%s_rgb' % n][sample_id:sample_id+1]
+                depth = replay_sample['%s_depth' % n][sample_id:sample_id+1]
+                pcd = replay_sample['%s_point_cloud' % n][sample_id:sample_id+1]
+                extin = replay_sample['%s_camera_extrinsics' % n][sample_id:sample_id+1]
+                intin = replay_sample['%s_camera_intrinsics' % n][sample_id:sample_id+1]
+            else:
+                rgb = replay_sample['%s_rgb' % n]
+                depth = replay_sample['%s_depth' % n]
+                pcd = replay_sample['%s_point_cloud' % n]
+                extin = replay_sample['%s_camera_extrinsics' % n]
+                intin = replay_sample['%s_camera_intrinsics' % n]
+            obs.append([rgb, pcd])
+            depths.append(depth)
+            pcds.append(pcd)
+            exs.append(extin)
+            ins.append(intin)
+        return obs, depths, pcds, exs, ins
+  
+    # nerf[6]---
 
     def _act_preprocess_inputs(self, observation):
         """用于预处理来自环境的实时观察数据,以便进行动作选择(acting)"""
@@ -700,8 +735,8 @@ class QAttentionPerActBCAgent(Agent):
         else:
             self.feature = output.detach()
             
-    # new86--- bimanual中的新增的
-    def update(self, step: int, replay_sample: dict) -> dict:
+    # new86--- bimanual中的新增的下面是Mani上面是bimanual
+    def update(self, step: int, replay_sample: dict, fabric: Fabric) -> dict:
         right_action_trans = replay_sample["right_trans_action_indicies"][
             :, self._layer * 3 : self._layer * 3 + 3
         ].int()
@@ -720,9 +755,110 @@ class QAttentionPerActBCAgent(Agent):
         lang_token_embs = replay_sample["lang_token_embs"].float()
         prev_layer_voxel_grid = replay_sample.get("prev_layer_voxel_grid", None)
         prev_layer_bounds = replay_sample.get("prev_layer_bounds", None)
+        lang_goal = replay_sample['lang_goal'] # mani
+        action_gt = replay_sample['action'] # [bs, 8] # mani
         device = self._device
 
         rank = device
+
+        # nerf[2]---------------------------
+        # rank = self._q.device
+        # obs, depth, pcd, extrinsics, intrinsics = self._preprocess_inputs(replay_sample)
+        # batch size
+        # bs = pcd[0].shape[0]
+        # 整体上移后
+        # obs, pcd = self._preprocess_inputs(replay_sample)
+        # 其实不用带Mani的也一样，都是5个返回值
+        obs, depth, pcd, extrinsics, intrinsics = self._mani_preprocess_inputs(replay_sample)
+
+        # # batch size
+        bs = pcd[0].shape[0]
+        # nerf[2]-----------------------------
+
+        # nerf[1]---------------------------
+        # !! for nerf multi-view training
+        nerf_multi_view_rgb_path = replay_sample['nerf_multi_view_rgb'] # only succeed to get path sometime
+        nerf_multi_view_depth_path = replay_sample['nerf_multi_view_depth']
+        nerf_multi_view_camera_path = replay_sample['nerf_multi_view_camera']
+
+        nerf_next_multi_view_rgb_path = replay_sample['nerf_next_multi_view_rgb']
+        nerf_next_multi_view_depth_path = replay_sample['nerf_next_multi_view_depth']
+        nerf_next_multi_view_camera_path = replay_sample['nerf_next_multi_view_camera']
+
+        if nerf_multi_view_rgb_path is None or nerf_multi_view_rgb_path[0,0] is None:
+            cprint(nerf_multi_view_rgb_path, 'red')
+            cprint(replay_sample['indices'], 'red')
+            nerf_target_rgb = None
+            nerf_target_camera_extrinsic = None
+            print(colored('warn: one iter not use additional multi view', 'cyan'))
+            raise ValueError('nerf_multi_view_rgb_path is None')
+        else:
+            # control the number of views by the following code 
+            # 通过以下代码控制查看次数
+            num_view = nerf_multi_view_rgb_path.shape[-1]
+            num_view_by_user = self.cfg.num_view_for_nerf
+            # compute interval first
+            # 先算区间
+            assert num_view_by_user <= num_view, f'num_view_by_user {num_view_by_user} should be less than num_view {num_view}'
+            interval = num_view // num_view_by_user # 21//20?
+            # !! 第一个冒号:表示选择所有行（第一个维度）。
+            # !! 第二个::interval表示从第二列开始，每隔interval列选择一列。例如，如果interval是3，那么会选择第1、4、7、...列。
+            nerf_multi_view_rgb_path = nerf_multi_view_rgb_path[:, ::interval]
+            
+            # sample one target img
+            # 一个目标图像样本 !! 
+            view_dix = np.random.randint(0, num_view_by_user)
+            # !! [:, view_dix]：这是NumPy的切片语法，用于从数组中选择一个子集。冒号:表示选择所有行，而view_dix是一个索引，指定了要选择的列（或视角）。
+            # !! nerf_multi_view_rgb_path[:, view_dix]：这行代码的结果是一个新数组，只包含原始数组中第view_dix列的数据，即特定视角的所有图像路径。
+            nerf_multi_view_rgb_path = nerf_multi_view_rgb_path[:, view_dix]
+            nerf_multi_view_depth_path = nerf_multi_view_depth_path[:, view_dix]
+            nerf_multi_view_camera_path = nerf_multi_view_camera_path[:, view_dix]
+
+            next_view_dix = np.random.randint(0, num_view_by_user)
+            nerf_next_multi_view_rgb_path = nerf_next_multi_view_rgb_path[:, next_view_dix]
+            nerf_next_multi_view_depth_path = nerf_next_multi_view_depth_path[:, next_view_dix]
+            nerf_next_multi_view_camera_path = nerf_next_multi_view_camera_path[:, next_view_dix]
+
+            # load img and camera (support bs>1)
+            nerf_target_rgbs, nerf_target_depths, nerf_target_camera_extrinsics, nerf_target_camera_intrinsics = [], [], [], []
+            nerf_next_target_rgbs, nerf_next_target_depths, nerf_next_target_camera_extrinsics, nerf_next_target_camera_intrinsics = [], [], [], []
+            # 增加！！！ 莫非就是这个循环  bs 代表批量大小（batch size）
+            for i in range(bs):
+                # 图像文件解析 对于每个视角,调用 parse_img_file 函数解析图像文件，并将解析后的RGB图像数据添加到 nerf_target_rgbs 列表中。
+                # parse_img_file 函数来解析位于 nerf_multi_view_rgb_path[i] 路径的图像文件。这个函数可能读取图像文件并对其进行处理。
+                # mask_gt_rgb=self._mask_gt_rgb：传递一个名为 mask_gt_rgb 的参数给 parse_img_file 函数
+                nerf_target_rgbs.append(parse_img_file(nerf_multi_view_rgb_path[i], mask_gt_rgb=self._mask_gt_rgb))#, session=self._rembg_session))    # FIXME: file_path 'NoneType' object has no attribute 'read'
+                # 深度文件解析： 函数解析深度图文件，并将解析后的深度数据添加到 nerf_target_depths 列表中。
+                nerf_target_depths.append(parse_depth_file(nerf_multi_view_depth_path[i]))
+                # 相机文件解析：解析相机文件，获取相机的外参、内参和焦距值。
+                nerf_target_camera_extrinsic, nerf_target_camera_intrinsic, nerf_target_focal = parse_camera_file(nerf_multi_view_camera_path[i])
+                # 将解析得到的相机外参和内参分别添加到相应的列表中。
+                nerf_target_camera_extrinsics.append(nerf_target_camera_extrinsic)
+                nerf_target_camera_intrinsics.append(nerf_target_camera_intrinsic)
+
+                # 处理下一视角的图像和相机数据（与上述步骤类似，但是用于 nerf_next_target_*）
+                nerf_next_target_rgbs.append(parse_img_file(nerf_next_multi_view_rgb_path[i], mask_gt_rgb=self._mask_gt_rgb))#, session=self._rembg_session))    # FIXME: file_path 'NoneType' object has no attribute 'read'
+                nerf_next_target_depths.append(parse_depth_file(nerf_next_multi_view_depth_path[i]))
+                nerf_next_target_camera_extrinsic, nerf_next_target_camera_intrinsic, nerf_next_target_focal = parse_camera_file(nerf_next_multi_view_camera_path[i])
+                nerf_next_target_camera_extrinsics.append(nerf_next_target_camera_extrinsic)
+                nerf_next_target_camera_intrinsics.append(nerf_next_target_camera_intrinsic)
+
+            # 转换为张量： 使用 numpy 的 stack 函数将 nerf_target_rgbs 列表中的所有图像堆叠成一个数组，然后转换为PyTorch张量，并将其移动到指定的设备（如GPU）上。
+            nerf_target_rgb = torch.from_numpy(np.stack(nerf_target_rgbs)).float().to(device) # [bs, H, W, 3], [0,1]
+            nerf_target_depth = torch.from_numpy(np.stack(nerf_target_depths)).float().to(device) # [bs, H, W, 1], no normalization
+            nerf_target_camera_extrinsic = torch.from_numpy(np.stack(nerf_target_camera_extrinsics)).float().to(device)
+            nerf_target_camera_intrinsic = torch.from_numpy(np.stack(nerf_target_camera_intrinsics)).float().to(device)
+
+            nerf_next_target_rgb = torch.from_numpy(np.stack(nerf_next_target_rgbs)).float().to(device) # [bs, H, W, 3], [0,1]
+            nerf_next_target_depth = torch.from_numpy(np.stack(nerf_next_target_depths)).float().to(device) # [bs, H, W, 1], no normalization
+            nerf_next_target_camera_extrinsic = torch.from_numpy(np.stack(nerf_next_target_camera_extrinsics)).float().to(device)
+            nerf_next_target_camera_intrinsic = torch.from_numpy(np.stack(nerf_next_target_camera_intrinsics)).float().to(device)
+
+        # nerf[1]-------------------------
+
+
+
+
         bounds = self._coordinate_bounds.to(device)
         if self._layer > 0:
             right_cp = replay_sample[
@@ -739,7 +875,6 @@ class QAttentionPerActBCAgent(Agent):
             left_bounds = torch.cat(
                 [left_cp - self._bounds_offset, left_cp + self._bounds_offset], dim=1
             )
-
         else:
             right_bounds = bounds
             left_bounds = bounds
@@ -754,10 +889,13 @@ class QAttentionPerActBCAgent(Agent):
         # Can we add the coordinates of both robots?
         #
 
-        obs, pcd = self._preprocess_inputs(replay_sample)
+        # 整体上移
+        # obs, pcd = self._preprocess_inputs(replay_sample)
+        # 其实不用带Mani的也一样，都是5个返回值
+        # obs, depth, pcd, extrinsics, intrinsics = self._mani_preprocess_inputs(replay_sample)
 
-        # batch size
-        bs = pcd[0].shape[0]
+        # # batch size
+        # bs = pcd[0].shape[0]
 
         # We can move the point cloud w.r.t to the other robot's cooridinate system
         # similar to apply_se3_augmentation
@@ -766,15 +904,17 @@ class QAttentionPerActBCAgent(Agent):
         # SE(3) augmentation of point clouds and actions
         if self._transform_augmentation:
             from voxel import augmentation
-
+            # nerf[4]---得新写一个函数-------------
             (
                 right_action_trans,
                 right_action_rot_grip,
                 left_action_trans,
                 left_action_rot_grip,
                 pcd,
-            ) = augmentation.bimanual_apply_se3_augmentation(
+                extrinsics   # 无用 right camera_pose应该无用先不写左臂了
+            ) = augmentation.bimanual_apply_se3_augmentation_with_camera_pose(
                 pcd,
+                extrinsics, # nerf new
                 right_action_gripper_pose,
                 right_action_trans,
                 right_action_rot_grip,
@@ -790,6 +930,30 @@ class QAttentionPerActBCAgent(Agent):
                 self._rotation_resolution,
                 self._device,
             )
+            # (
+            #     right_action_trans,
+            #     right_action_rot_grip,
+            #     left_action_trans,
+            #     left_action_rot_grip,
+            #     pcd,
+            # ) = augmentation.bimanual_apply_se3_augmentation(
+            #     pcd,
+            #     right_action_gripper_pose,
+            #     right_action_trans,
+            #     right_action_rot_grip,
+            #     left_action_gripper_pose,
+            #     left_action_trans,
+            #     left_action_rot_grip,
+            #     bounds,
+            #     self._layer,
+            #     self._transform_augmentation_xyz,
+            #     self._transform_augmentation_rpy,
+            #     self._transform_augmentation_rot_resolution,
+            #     self._voxel_size,
+            #     self._rotation_resolution,
+            #     self._device,
+            # )
+            # nerf[4]----------------
         else:
             right_action_trans = right_action_trans.int()
             left_action_trans = left_action_trans.int()
@@ -807,15 +971,34 @@ class QAttentionPerActBCAgent(Agent):
             left_action_ignore_collisions,
         )
         # forward pass
-        q, voxel_grid = self._q(
+        # q在下面会被分别赋值到以下三个参数的左右手
+        # q_trans, q_rot_grip, q_collision,voxel_grid, rendering_loss_dict=
+        q, voxel_grid, rendering_loss_dict = self._q(
             obs,
+            depth, # nerf new
             proprio,
             pcd,
+            extrinsics, # nerf new although augmented, not used
+            intrinsics, # nerf new
             lang_goal_emb,
             lang_token_embs,
             bounds,
             prev_layer_bounds,
             prev_layer_voxel_grid,
+            # nerf[3]---------------------
+            use_neural_rendering=self.use_neural_rendering,
+            nerf_target_rgb=nerf_target_rgb,
+            nerf_target_depth=nerf_target_depth,
+            nerf_target_pose=nerf_target_camera_extrinsic,
+            nerf_target_camera_intrinsic=nerf_target_camera_intrinsic,
+            lang_goal=lang_goal,
+            nerf_next_target_rgb=nerf_next_target_rgb,
+            nerf_next_target_depth=nerf_next_target_depth,
+            nerf_next_target_pose=nerf_next_target_camera_extrinsic,
+            nerf_next_target_camera_intrinsic=nerf_next_target_camera_intrinsic,
+            step=step,
+            action=action_gt,
+            # nerf[3]---------------------
         )
 
         (
@@ -827,7 +1010,7 @@ class QAttentionPerActBCAgent(Agent):
             left_q_collision,
         ) = q
 
-        # argmax to choose best action
+        # argmax to choose best action 选择最佳操作
         (
             right_coords,
             right_rot_and_grip_indicies,
@@ -971,7 +1154,7 @@ class QAttentionPerActBCAgent(Agent):
         q_rot_loss = right_q_rot_loss + left_q_rot_loss
         q_grip_loss = right_q_grip_loss + left_q_grip_loss
         q_collision_loss = right_q_collision_loss + left_q_collision_loss
-        
+
         combined_losses = (
             (q_trans_loss * self._trans_loss_weight)
             + (q_rot_loss * self._rot_loss_weight)
@@ -979,311 +1162,9 @@ class QAttentionPerActBCAgent(Agent):
             + (q_collision_loss * self._collision_loss_weight)
         )
         total_loss = combined_losses.mean()
+        # argmax to choose best action 到此三个步骤 都一模一样（就是单纯的左右分别算，然后简单相加）
 
-        if step % 10 == 0 and rank == 0:
-            wandb.log({
-                'train/grip_loss': q_grip_loss.mean(),
-                'train/trans_loss': q_trans_loss.mean(),
-                'train/rot_loss': q_rot_loss.mean(),
-                'train/collision_loss': q_collision_loss.mean(),
-                'train/total_loss': total_loss,
-            }, step=step)
-                    
-        self._optimizer.zero_grad()
-        total_loss.backward()
-        self._optimizer.step()
-        torch.cuda.empty_cache()
-        self._summaries = {
-            "losses/total_loss": total_loss,
-            "losses/trans_loss": q_trans_loss.mean(),
-            "losses/rot_loss": q_rot_loss.mean() if with_rot_and_grip else 0.0,
-            "losses/grip_loss": q_grip_loss.mean() if with_rot_and_grip else 0.0,
-
-            "losses/right/trans_loss": q_trans_loss.mean(),
-            "losses/right/rot_loss": q_rot_loss.mean() if with_rot_and_grip else 0.0,
-            "losses/right/grip_loss": q_grip_loss.mean() if with_rot_and_grip else 0.0,
-            "losses/right/collision_loss": q_collision_loss.mean() if with_rot_and_grip else 0.0,
-
-            "losses/left/trans_loss": q_trans_loss.mean(),
-            "losses/left/rot_loss": q_rot_loss.mean() if with_rot_and_grip else 0.0,
-            "losses/left/grip_loss": q_grip_loss.mean() if with_rot_and_grip else 0.0,
-            "losses/left/collision_loss": q_collision_loss.mean() if with_rot_and_grip else 0.0,
-
-            "losses/collision_loss": q_collision_loss.mean()
-            if with_rot_and_grip
-            else 0.0,
-        }
-
-        self._wandb_summaries = {
-            'losses/total_loss': total_loss,
-            'losses/trans_loss': q_trans_loss.mean(),
-            'losses/rot_loss': q_rot_loss.mean() if with_rot_and_grip else 0.,
-            'losses/grip_loss': q_grip_loss.mean() if with_rot_and_grip else 0.,
-            'losses/collision_loss': q_collision_loss.mean() if with_rot_and_grip else 0.
-        }
-
-        if self._lr_scheduler:
-            self._scheduler.step()
-            self._summaries["learning_rate"] = self._scheduler.get_last_lr()[0]
-
-        self._vis_voxel_grid = voxel_grid[0]
-        self._right_vis_translation_qvalue = self._softmax_q_trans(right_q_trans[0])
-        self._right_vis_max_coordinate = right_coords[0]
-        self._right_vis_gt_coordinate = right_action_trans[0]
-
-        self._left_vis_translation_qvalue = self._softmax_q_trans(left_q_trans[0])
-        self._left_vis_max_coordinate = left_coords[0]
-        self._left_vis_gt_coordinate = left_action_trans[0]
-
-        # Note: PerAct doesn't use multi-layer voxel grids like C2FARM
-        # stack prev_layer_voxel_grid(s) from previous layers into a list
-        if prev_layer_voxel_grid is None:
-            prev_layer_voxel_grid = [voxel_grid]
-        else:
-            prev_layer_voxel_grid = prev_layer_voxel_grid + [voxel_grid]
-
-        # stack prev_layer_bound(s) from previous layers into a list
-        if prev_layer_bounds is None:
-            prev_layer_bounds = [self._coordinate_bounds.repeat(bs, 1)]
-        else:
-            prev_layer_bounds = prev_layer_bounds + [bounds]
-
-        return {
-            "total_loss": total_loss,
-            "prev_layer_voxel_grid": prev_layer_voxel_grid,
-            "prev_layer_bounds": prev_layer_bounds,
-        }
-
-    def update(self, step: int, replay_sample: dict, fabric: Fabric) -> dict:
-        '''
-        self:类的实例。
-        step:当前的训练步骤或时间步。
-        replay_sample:一个字典，包含从回放缓冲区中提取的样本数据，用于训练。 从回放缓冲区中提取的样本数据。
-        fabric:用于分布式训练的Fabric对象。
-        方法返回一个字典，可能包含训练过程中的统计信息或中间结果。
-
-        : replay_sample.action: [bs, 8]
-        : replay_sample['trans_action_indicies']: [bs, 3]
-        '''
-        # !!gt等参数不同
-        action_gt = replay_sample['action'] # [bs, 8]
-        action_trans = replay_sample['trans_action_indicies'][:, self._layer * 3:self._layer * 3 + 3].int()
-        action_rot_grip = replay_sample['rot_grip_action_indicies'].int()
-        action_gripper_pose = replay_sample['gripper_pose']
-        action_ignore_collisions = replay_sample['ignore_collisions'].int()
-        lang_goal_emb = replay_sample['lang_goal_emb'].float()
-        lang_token_embs = replay_sample['lang_token_embs'].float()
-        prev_layer_voxel_grid = replay_sample.get('prev_layer_voxel_grid', None)
-        prev_layer_bounds = replay_sample.get('prev_layer_bounds', None)
-        lang_goal = replay_sample['lang_goal']
-
-        device = self._device
-
-        # get rank by device id
-        rank = self._q.device
-
-        obs, depth, pcd, extrinsics, intrinsics = self._preprocess_inputs(replay_sample)
-        # batch size
-        bs = pcd[0].shape[0]
-
-        #--------------------------------重要--------------------------------
-        # !! for nerf multi-view training
-        nerf_multi_view_rgb_path = replay_sample['nerf_multi_view_rgb'] # only succeed to get path sometime
-        nerf_multi_view_depth_path = replay_sample['nerf_multi_view_depth']
-        nerf_multi_view_camera_path = replay_sample['nerf_multi_view_camera']
-
-        nerf_next_multi_view_rgb_path = replay_sample['nerf_next_multi_view_rgb']
-        nerf_next_multi_view_depth_path = replay_sample['nerf_next_multi_view_depth']
-        nerf_next_multi_view_camera_path = replay_sample['nerf_next_multi_view_camera']
-
-        if nerf_multi_view_rgb_path is None or nerf_multi_view_rgb_path[0,0] is None:
-            cprint(nerf_multi_view_rgb_path, 'red')
-            cprint(replay_sample['indices'], 'red')
-            nerf_target_rgb = None
-            nerf_target_camera_extrinsic = None
-            print(colored('warn: one iter not use additional multi view', 'cyan'))
-            raise ValueError('nerf_multi_view_rgb_path is None')
-        else:
-            # control the number of views by the following code 
-            # 通过以下代码控制查看次数
-            num_view = nerf_multi_view_rgb_path.shape[-1]
-            num_view_by_user = self.cfg.num_view_for_nerf
-            # compute interval first
-            # 先算区间
-            assert num_view_by_user <= num_view, f'num_view_by_user {num_view_by_user} should be less than num_view {num_view}'
-            interval = num_view // num_view_by_user # 21//20?
-            # !! 第一个冒号:表示选择所有行（第一个维度）。
-            # !! 第二个::interval表示从第二列开始，每隔interval列选择一列。例如，如果interval是3，那么会选择第1、4、7、...列。
-            nerf_multi_view_rgb_path = nerf_multi_view_rgb_path[:, ::interval]
-            
-            # sample one target img
-            # 一个目标图像样本 !! 
-            view_dix = np.random.randint(0, num_view_by_user)
-            # !! [:, view_dix]：这是NumPy的切片语法，用于从数组中选择一个子集。冒号:表示选择所有行，而view_dix是一个索引，指定了要选择的列（或视角）。
-            # !! nerf_multi_view_rgb_path[:, view_dix]：这行代码的结果是一个新数组，只包含原始数组中第view_dix列的数据，即特定视角的所有图像路径。
-            nerf_multi_view_rgb_path = nerf_multi_view_rgb_path[:, view_dix]
-            nerf_multi_view_depth_path = nerf_multi_view_depth_path[:, view_dix]
-            nerf_multi_view_camera_path = nerf_multi_view_camera_path[:, view_dix]
-
-            next_view_dix = np.random.randint(0, num_view_by_user)
-            nerf_next_multi_view_rgb_path = nerf_next_multi_view_rgb_path[:, next_view_dix]
-            nerf_next_multi_view_depth_path = nerf_next_multi_view_depth_path[:, next_view_dix]
-            nerf_next_multi_view_camera_path = nerf_next_multi_view_camera_path[:, next_view_dix]
-
-            # load img and camera (support bs>1)
-            nerf_target_rgbs, nerf_target_depths, nerf_target_camera_extrinsics, nerf_target_camera_intrinsics = [], [], [], []
-            nerf_next_target_rgbs, nerf_next_target_depths, nerf_next_target_camera_extrinsics, nerf_next_target_camera_intrinsics = [], [], [], []
-            # 增加！！！ 莫非就是这个循环  bs 代表批量大小（batch size）
-            for i in range(bs):
-                # 图像文件解析 对于每个视角,调用 parse_img_file 函数解析图像文件，并将解析后的RGB图像数据添加到 nerf_target_rgbs 列表中。
-                # parse_img_file 函数来解析位于 nerf_multi_view_rgb_path[i] 路径的图像文件。这个函数可能读取图像文件并对其进行处理。
-                # mask_gt_rgb=self._mask_gt_rgb：传递一个名为 mask_gt_rgb 的参数给 parse_img_file 函数
-                nerf_target_rgbs.append(parse_img_file(nerf_multi_view_rgb_path[i], mask_gt_rgb=self._mask_gt_rgb))#, session=self._rembg_session))    # FIXME: file_path 'NoneType' object has no attribute 'read'
-                # 深度文件解析： 函数解析深度图文件，并将解析后的深度数据添加到 nerf_target_depths 列表中。
-                nerf_target_depths.append(parse_depth_file(nerf_multi_view_depth_path[i]))
-                # 相机文件解析：解析相机文件，获取相机的外参、内参和焦距值。
-                nerf_target_camera_extrinsic, nerf_target_camera_intrinsic, nerf_target_focal = parse_camera_file(nerf_multi_view_camera_path[i])
-                # 将解析得到的相机外参和内参分别添加到相应的列表中。
-                nerf_target_camera_extrinsics.append(nerf_target_camera_extrinsic)
-                nerf_target_camera_intrinsics.append(nerf_target_camera_intrinsic)
-
-                # 处理下一视角的图像和相机数据（与上述步骤类似，但是用于 nerf_next_target_*）
-                nerf_next_target_rgbs.append(parse_img_file(nerf_next_multi_view_rgb_path[i], mask_gt_rgb=self._mask_gt_rgb))#, session=self._rembg_session))    # FIXME: file_path 'NoneType' object has no attribute 'read'
-                nerf_next_target_depths.append(parse_depth_file(nerf_next_multi_view_depth_path[i]))
-                nerf_next_target_camera_extrinsic, nerf_next_target_camera_intrinsic, nerf_next_target_focal = parse_camera_file(nerf_next_multi_view_camera_path[i])
-                nerf_next_target_camera_extrinsics.append(nerf_next_target_camera_extrinsic)
-                nerf_next_target_camera_intrinsics.append(nerf_next_target_camera_intrinsic)
-
-            # 转换为张量： 使用 numpy 的 stack 函数将 nerf_target_rgbs 列表中的所有图像堆叠成一个数组，然后转换为PyTorch张量，并将其移动到指定的设备（如GPU）上。
-            nerf_target_rgb = torch.from_numpy(np.stack(nerf_target_rgbs)).float().to(device) # [bs, H, W, 3], [0,1]
-            nerf_target_depth = torch.from_numpy(np.stack(nerf_target_depths)).float().to(device) # [bs, H, W, 1], no normalization
-            nerf_target_camera_extrinsic = torch.from_numpy(np.stack(nerf_target_camera_extrinsics)).float().to(device)
-            nerf_target_camera_intrinsic = torch.from_numpy(np.stack(nerf_target_camera_intrinsics)).float().to(device)
-
-            nerf_next_target_rgb = torch.from_numpy(np.stack(nerf_next_target_rgbs)).float().to(device) # [bs, H, W, 3], [0,1]
-            nerf_next_target_depth = torch.from_numpy(np.stack(nerf_next_target_depths)).float().to(device) # [bs, H, W, 1], no normalization
-            nerf_next_target_camera_extrinsic = torch.from_numpy(np.stack(nerf_next_target_camera_extrinsics)).float().to(device)
-            nerf_next_target_camera_intrinsic = torch.from_numpy(np.stack(nerf_next_target_camera_intrinsics)).float().to(device)
-
-        bounds = self._coordinate_bounds.to(device)
-        if self._layer > 0:
-            cp = replay_sample['attention_coordinate_layer_%d' % (self._layer - 1)]
-            bounds = torch.cat([cp - self._bounds_offset, cp + self._bounds_offset], dim=1)
-
-        proprio = None
-        if self._include_low_dim_state:
-            proprio = replay_sample['low_dim_state']
-
-        # 多了extrinsics
-        # SE(3) augmentation of point clouds and actions
-        if self._transform_augmentation:    # default: True
-            action_trans, \
-            action_rot_grip, \
-            pcd,\
-            extrinsics = apply_se3_augmentation_with_camera_pose(pcd,
-                                         extrinsics,
-                                         action_gripper_pose,
-                                         action_trans,
-                                         action_rot_grip,
-                                         bounds,
-                                         self._layer,
-                                         self._transform_augmentation_xyz,
-                                         self._transform_augmentation_rpy,
-                                         self._transform_augmentation_rot_resolution,
-                                         self._voxel_size,
-                                         self._rotation_resolution,
-                                         self._device)
-
-        # forward pass !!多了rendering_loss_dict
-        q_trans, q_rot_grip, \
-        q_collision, \
-        voxel_grid, \
-        rendering_loss_dict = self._q(obs,
-                                depth,
-                                proprio,
-                                pcd,
-                                extrinsics, # although augmented, not used
-                                intrinsics,
-                                lang_goal_emb,
-                                lang_token_embs,
-                                bounds,
-                                prev_layer_bounds,
-                                prev_layer_voxel_grid,
-                                use_neural_rendering=self.use_neural_rendering,
-                                nerf_target_rgb=nerf_target_rgb,
-                                nerf_target_depth=nerf_target_depth,
-                                nerf_target_pose=nerf_target_camera_extrinsic,
-                                nerf_target_camera_intrinsic=nerf_target_camera_intrinsic,
-                                lang_goal=lang_goal,
-                                nerf_next_target_rgb=nerf_next_target_rgb,
-                                nerf_next_target_depth=nerf_next_target_depth,
-                                nerf_next_target_pose=nerf_next_target_camera_extrinsic,
-                                nerf_next_target_camera_intrinsic=nerf_next_target_camera_intrinsic,
-                                step=step,
-                                action=action_gt,
-                                )
-        # argmax to choose best action
-        coords, \
-        rot_and_grip_indicies, \
-        ignore_collision_indicies = self._q.choose_highest_action(q_trans, q_rot_grip, q_collision)
-
-        q_trans_loss, q_rot_loss, q_grip_loss, q_collision_loss = 0., 0., 0., 0.
-
-        # translation one-hot
-        action_trans_one_hot = self._action_trans_one_hot_zeros.clone()
-        # action_trans: [bs, 3]
-        for b in range(bs):
-            gt_coord = action_trans[b, :].int()
-            action_trans_one_hot[b, :, gt_coord[0], gt_coord[1], gt_coord[2]] = 1
-            
-        # translation loss
-        q_trans_flat = q_trans.view(bs, -1)
-        action_trans_one_hot_flat = action_trans_one_hot.view(bs, -1)   # [1,1,100,100,100]
-        q_trans_loss = self._celoss(q_trans_flat, action_trans_one_hot_flat)
-
-        with_rot_and_grip = rot_and_grip_indicies is not None
-        if with_rot_and_grip:
-            # rotation, gripper, and collision one-hots
-            action_rot_x_one_hot = self._action_rot_x_one_hot_zeros.clone()
-            action_rot_y_one_hot = self._action_rot_y_one_hot_zeros.clone()
-            action_rot_z_one_hot = self._action_rot_z_one_hot_zeros.clone()
-            action_grip_one_hot = self._action_grip_one_hot_zeros.clone()
-            action_ignore_collisions_one_hot = self._action_ignore_collisions_one_hot_zeros.clone()
-
-            for b in range(bs):
-                gt_rot_grip = action_rot_grip[b, :].int()
-                action_rot_x_one_hot[b, gt_rot_grip[0]] = 1
-                action_rot_y_one_hot[b, gt_rot_grip[1]] = 1
-                action_rot_z_one_hot[b, gt_rot_grip[2]] = 1
-                action_grip_one_hot[b, gt_rot_grip[3]] = 1
-
-                gt_ignore_collisions = action_ignore_collisions[b, :].int()
-                action_ignore_collisions_one_hot[b, gt_ignore_collisions[0]] = 1
-
-            # flatten predictions
-            q_rot_x_flat = q_rot_grip[:, 0*self._num_rotation_classes:1*self._num_rotation_classes]
-            q_rot_y_flat = q_rot_grip[:, 1*self._num_rotation_classes:2*self._num_rotation_classes]
-            q_rot_z_flat = q_rot_grip[:, 2*self._num_rotation_classes:3*self._num_rotation_classes]
-            q_grip_flat =  q_rot_grip[:, 3*self._num_rotation_classes:]
-            q_ignore_collisions_flat = q_collision
-
-            # rotation loss
-            q_rot_loss += self._celoss(q_rot_x_flat, action_rot_x_one_hot)
-            q_rot_loss += self._celoss(q_rot_y_flat, action_rot_y_one_hot)
-            q_rot_loss += self._celoss(q_rot_z_flat, action_rot_z_one_hot)
-
-            # gripper loss
-            q_grip_loss += self._celoss(q_grip_flat, action_grip_one_hot)
-
-            # collision loss
-            q_collision_loss += self._celoss(q_ignore_collisions_flat, action_ignore_collisions_one_hot)
-
-        combined_losses = (q_trans_loss * self._trans_loss_weight) + \
-                          (q_rot_loss * self._rot_loss_weight) + \
-                          (q_grip_loss * self._grip_loss_weight) + \
-                          (q_collision_loss * self._collision_loss_weight)
-        total_loss = combined_losses.mean()
-
+        # nerf[3]-----
         if self.use_neural_rendering:   # eval default: False; train default: True
             
             lambda_nerf = self.cfg.neural_renderer.lambda_nerf
@@ -1303,22 +1184,20 @@ class QAttentionPerActBCAgent(Agent):
             lambda_dyna = (self.cfg.neural_renderer.lambda_dyna if step >= self.cfg.neural_renderer.next_mlp.warm_up else 0.) * lambda_nerf  # 0.01
             lambda_reg = (self.cfg.neural_renderer.lambda_reg if step >= self.cfg.neural_renderer.next_mlp.warm_up else 0.) * lambda_nerf  # 0.01
 
+            # 输出操作
             if step % 10 == 0 and rank == 0:
+                # 输出操作
                 cprint(f'total L: {total_loss.item():.4f} | \
-    
-    # new86--- bimanual中的新增的    
-
-L_BC: {combined_losses.item():.3f} x {lambda_BC:.3f} | \
-L_trans: {q_trans_loss.item():.3f} x {(self._trans_loss_weight * lambda_BC):.3f} | \
-L_rot: {q_rot_loss.item():.3f} x {(self._rot_loss_weight * lambda_BC):.3f} | \
-L_grip: {q_grip_loss.item():.3f} x {(self._grip_loss_weight * lambda_BC):.3f} | \
-L_col: {q_collision_loss.item():.3f} x {(self._collision_loss_weight * lambda_BC):.3f} | \
-L_rgb: {loss_rgb_item:.3f} x {lambda_rgb:.3f} | \
-L_embed: {loss_embed_item:.3f} x {lambda_embed:.4f} | \
-L_dyna: {loss_dyna_item:.3f} x {lambda_dyna:.4f} | \
-L_reg: {loss_reg_item:.3f} x {lambda_reg:.4f} | \
-psnr: {psnr:.3f}', 'green')
-
+                    L_BC: {combined_losses.item():.3f} x {lambda_BC:.3f} | \
+                    L_trans: {q_trans_loss.item():.3f} x {(self._trans_loss_weight * lambda_BC):.3f} | \
+                    L_rot: {q_rot_loss.item():.3f} x {(self._rot_loss_weight * lambda_BC):.3f} | \
+                    L_grip: {q_grip_loss.item():.3f} x {(self._grip_loss_weight * lambda_BC):.3f} | \
+                    L_col: {q_collision_loss.item():.3f} x {(self._collision_loss_weight * lambda_BC):.3f} | \
+                    L_rgb: {loss_rgb_item:.3f} x {lambda_rgb:.3f} | \
+                    L_embed: {loss_embed_item:.3f} x {lambda_embed:.4f} | \
+                    L_dyna: {loss_dyna_item:.3f} x {lambda_dyna:.4f} | \
+                    L_reg: {loss_reg_item:.3f} x {lambda_reg:.4f} | \
+                    psnr: {psnr:.3f}', 'green')
                 if self.cfg.use_wandb:
                     wandb.log({
                         'train/BC_loss':combined_losses.item(), 
@@ -1332,23 +1211,35 @@ psnr: {psnr:.3f}', 'green')
             if step % 10 == 0 and rank == 0:
                 lambda_BC = self.cfg.lambda_bc
                 cprint(f'total L: {total_loss.item():.4f} | \
-L_BC: {combined_losses.item():.3f} x {lambda_BC:.3f} | \
-L_trans: {q_trans_loss.item():.3f} x {(self._trans_loss_weight * lambda_BC):.3f} | \
-L_rot: {q_rot_loss.item():.3f} x {(self._rot_loss_weight * lambda_BC):.3f} | \
-L_grip: {q_grip_loss.item():.3f} x {(self._grip_loss_weight * lambda_BC):.3f} | \
-L_col: {q_collision_loss.item():.3f} x {(self._collision_loss_weight * lambda_BC):.3f}', 'green')
-            
+                    L_BC: {combined_losses.item():.3f} x {lambda_BC:.3f} | \
+                    L_trans: {q_trans_loss.item():.3f} x {(self._trans_loss_weight * lambda_BC):.3f} | \
+                    L_rot: {q_rot_loss.item():.3f} x {(self._rot_loss_weight * lambda_BC):.3f} | \
+                    L_grip: {q_grip_loss.item():.3f} x {(self._grip_loss_weight * lambda_BC):.3f} | \
+                    L_col: {q_collision_loss.item():.3f} x {(self._collision_loss_weight * lambda_BC):.3f}', 'green')            
                 if self.cfg.use_wandb:
                     wandb.log({
                         'train/BC_loss':combined_losses.item(), 
                         }, step=step)
 
+        # nerf[3]-----
+        # nerf[3]-----原来的输出操作------------ 
+        # if step % 10 == 0 and rank == 0:
+        #     wandb.log({
+        #         'train/grip_loss': q_grip_loss.mean(),
+        #         'train/trans_loss': q_trans_loss.mean(),
+        #         'train/rot_loss': q_rot_loss.mean(),
+        #         'train/collision_loss': q_collision_loss.mean(),
+        #         'train/total_loss': total_loss,
+        #     }, step=step)
+        # nerf[3]----- 在上面被替换掉了
+
         self._optimizer.zero_grad()
-        # total_loss.backward()
-        # use fabric ddp
+        # total_loss.backward() # 在Mani nerf中被注释了
+        # Mani中用的下面fabric ddp的方式
         fabric.backward(total_loss)
         self._optimizer.step()
 
+        # new rendering---
         ############### Render in training process #################
 
         # 渲染频率，决定多久进行一次神经渲染
@@ -1446,40 +1337,58 @@ L_col: {q_collision_loss.item():.3f} x {(self._collision_loss_weight * lambda_BC
                     workdir = os.getcwd()
                     cprint(f'Saved {workdir}/recon/{step}_rgb.png locally', 'cyan')
 
-
+        # new rendering---
+        # TODO: _summaries内容不同相关的肯定要改
+        torch.cuda.empty_cache()
         self._summaries = {
-            'losses/total_loss': total_loss.item(),
-            'losses/trans_loss': q_trans_loss.mean(),
-            'losses/rot_loss': q_rot_loss.mean() if with_rot_and_grip else 0.,
-            'losses/grip_loss': q_grip_loss.mean() if with_rot_and_grip else 0.,
-            'losses/collision_loss': q_collision_loss.mean() if with_rot_and_grip else 0.,
+            "losses/total_loss": total_loss,
+            "losses/trans_loss": q_trans_loss.mean(),
+            "losses/rot_loss": q_rot_loss.mean() if with_rot_and_grip else 0.0,
+            "losses/grip_loss": q_grip_loss.mean() if with_rot_and_grip else 0.0,
+
+            "losses/right/trans_loss": q_trans_loss.mean(),
+            "losses/right/rot_loss": q_rot_loss.mean() if with_rot_and_grip else 0.0,
+            "losses/right/grip_loss": q_grip_loss.mean() if with_rot_and_grip else 0.0,
+            "losses/right/collision_loss": q_collision_loss.mean() if with_rot_and_grip else 0.0,
+
+            "losses/left/trans_loss": q_trans_loss.mean(),
+            "losses/left/rot_loss": q_rot_loss.mean() if with_rot_and_grip else 0.0,
+            "losses/left/grip_loss": q_grip_loss.mean() if with_rot_and_grip else 0.0,
+            "losses/left/collision_loss": q_collision_loss.mean() if with_rot_and_grip else 0.0,
+
+            "losses/collision_loss": q_collision_loss.mean()
+            if with_rot_and_grip
+            else 0.0,
         }
 
         self._wandb_summaries = {
-            'losses/total_loss': total_loss.item(),
+            'losses/total_loss': total_loss,
             'losses/trans_loss': q_trans_loss.mean(),
             'losses/rot_loss': q_rot_loss.mean() if with_rot_and_grip else 0.,
             'losses/grip_loss': q_grip_loss.mean() if with_rot_and_grip else 0.,
             'losses/collision_loss': q_collision_loss.mean() if with_rot_and_grip else 0.,
-
-            # for visualization
+        
+            # for visualization new form mani nerf
             'point_cloud': None,
-            'coord_pred': coords,
-            'coord_gt': gt_coord,
+            'left_coord_pred': left_coords,
+            'right_coord_pred': right_coords,
+            'right_coord_gt': right_gt_coord,
+            'left_coord_gt': left_gt_coord,
         }
 
         if self._lr_scheduler:
             self._scheduler.step()
-            self._summaries['learning_rate'] = self._scheduler.get_last_lr()[0]
+            self._summaries["learning_rate"] = self._scheduler.get_last_lr()[0]
 
-        self._vis_voxel_grid = voxel_grid[0]        
-        
-        self._vis_translation_qvalue = self._softmax_q_trans(q_trans[0])
-        self._vis_max_coordinate = coords[0]
-        self._vis_gt_coordinate = action_trans[0]
+        self._vis_voxel_grid = voxel_grid[0]
+        self._right_vis_translation_qvalue = self._softmax_q_trans(right_q_trans[0])
+        self._right_vis_max_coordinate = right_coords[0]
+        self._right_vis_gt_coordinate = right_action_trans[0]
 
-        # 注意：PerAct 并不像 C2FARM 那样使用多层体素网格
-        # 将前几层的 prev_layer_voxel_grid 堆叠到一个列表中
+        self._left_vis_translation_qvalue = self._softmax_q_trans(left_q_trans[0])
+        self._left_vis_max_coordinate = left_coords[0]
+        self._left_vis_gt_coordinate = left_action_trans[0]
+
         # Note: PerAct doesn't use multi-layer voxel grids like C2FARM
         # stack prev_layer_voxel_grid(s) from previous layers into a list
         if prev_layer_voxel_grid is None:
@@ -1494,10 +1403,12 @@ L_col: {q_collision_loss.item():.3f} x {(self._collision_loss_weight * lambda_BC
             prev_layer_bounds = prev_layer_bounds + [bounds]
 
         return {
-            'total_loss': total_loss,
-            'prev_layer_voxel_grid': prev_layer_voxel_grid,
-            'prev_layer_bounds': prev_layer_bounds,
+            "total_loss": total_loss,
+            "prev_layer_voxel_grid": prev_layer_voxel_grid,
+            "prev_layer_bounds": prev_layer_bounds,
         }
+    # 基于bimanual照着Mani中的改写
+    # new86--- bimanual中的新增的
 
     def act(self, step: int, observation: dict,
             deterministic=False) -> ActResult:
@@ -1515,10 +1426,18 @@ L_col: {q_collision_loss.item():.3f} x {(self._collision_loss_weight * lambda_BC
         # voxelization resolution
         res = (bounds[:, 3:] - bounds[:, :3]) / self._voxel_size
         max_rot_index = int(360 // self._rotation_resolution)
-        proprio = None
+        # proprio = None
+
+        # if self._include_low_dim_state:
+        #     proprio = observation['low_dim_state']
+        right_proprio = None
+        left_proprio = None
 
         if self._include_low_dim_state:
-            proprio = observation['low_dim_state']
+            right_proprio = observation["right_low_dim_state"]
+            left_proprio = observation["left_low_dim_state"]
+            right_proprio = right_proprio[0].to(self._device)
+            left_proprio = left_proprio[0].to(self._device)
 
         obs, depth, pcd, extrinsics, intrinsics = self._act_preprocess_inputs(observation)
 
@@ -1532,40 +1451,108 @@ L_col: {q_collision_loss.item():.3f} x {(self._collision_loss_weight * lambda_BC
         prev_layer_voxel_grid = prev_layer_voxel_grid.to(self._device) if prev_layer_voxel_grid is not None else None
         prev_layer_bounds = prev_layer_bounds.to(self._device) if prev_layer_bounds is not None else None
 
+        proprio = torch.cat((right_proprio, left_proprio), dim=1) # new bimanual
+
         # inference !!多了一个渲染损失
-        q_trans, \
-        q_rot_grip, \
-        q_ignore_collisions, \
-        vox_grid,\
-        rendering_loss_dict  = self._q(obs,
-                            depth,
-                            proprio,
-                            pcd,
-                            extrinsics, # !! append
-                            intrinsics, #
-                            lang_goal_emb,
-                            lang_token_embs,
-                            bounds,
-                            prev_layer_bounds,
-                            prev_layer_voxel_grid, 
-                            use_neural_rendering=False)     # 
+        # q_trans, \
+        # q_rot_grip, \
+        # q_ignore_collisions, \
+        # vox_grid,\
+        # rendering_loss_dict  = self._q(obs,
+        #                     depth,
+        #                     proprio,
+        #                     pcd,
+        #                     extrinsics, # !! append
+        #                     intrinsics, #
+        #                     lang_goal_emb,
+        #                     lang_token_embs,
+        #                     bounds,
+        #                     prev_layer_bounds,
+        #                     prev_layer_voxel_grid, 
+        #                     use_neural_rendering=False)     # 
+        (
+            right_q_trans,
+            right_q_rot_grip,
+            right_q_ignore_collisions,
+            left_q_trans,
+            left_q_rot_grip,
+            left_q_ignore_collisions,
+        ), vox_grid = self._q(
+            obs,
+            proprio,
+            pcd,
+            lang_goal_emb,
+            lang_token_embs,
+            bounds,
+            prev_layer_bounds,
+            prev_layer_voxel_grid,
+        )
 
         # softmax Q predictions
-        q_trans = self._softmax_q_trans(q_trans)
-        q_rot_grip =  self._softmax_q_rot_grip(q_rot_grip) if q_rot_grip is not None else q_rot_grip
-        q_ignore_collisions = self._softmax_ignore_collision(q_ignore_collisions) \
-            if q_ignore_collisions is not None else q_ignore_collisions
+        # q_trans = self._softmax_q_trans(q_trans)
+        # q_rot_grip =  self._softmax_q_rot_grip(q_rot_grip) if q_rot_grip is not None else q_rot_grip
+        # q_ignore_collisions = self._softmax_ignore_collision(q_ignore_collisions) \
+        #     if q_ignore_collisions is not None else q_ignore_collisions
+        right_q_trans = self._softmax_q_trans(right_q_trans)
+        left_q_trans = self._softmax_q_trans(left_q_trans)
+
+        if right_q_rot_grip is not None:
+            right_q_rot_grip = self._softmax_q_rot_grip(right_q_rot_grip)
+
+        if left_q_rot_grip is not None:
+            left_q_rot_grip = self._softmax_q_rot_grip(left_q_rot_grip)
+
+        if right_q_ignore_collisions is not None:
+            right_q_ignore_collisions = self._softmax_ignore_collision(
+                right_q_ignore_collisions
+            )
+
+        if left_q_ignore_collisions is not None:
+            left_q_ignore_collisions = self._softmax_ignore_collision(
+                left_q_ignore_collisions
+            )
 
         # argmax Q predictions
-        coords, \
-        rot_and_grip_indicies, \
-        ignore_collisions = self._q.choose_highest_action(q_trans, q_rot_grip, q_ignore_collisions)
+        # coords, \
+        # rot_and_grip_indicies, \
+        # ignore_collisions = self._q.choose_highest_action(q_trans, q_rot_grip, q_ignore_collisions)
 
-        rot_grip_action = rot_and_grip_indicies if q_rot_grip is not None else None
-        ignore_collisions_action = ignore_collisions.int() if ignore_collisions is not None else None
+        # rot_grip_action = rot_and_grip_indicies if q_rot_grip is not None else None
+        # ignore_collisions_action = ignore_collisions.int() if ignore_collisions is not None else None
 
-        coords = coords.int()
-        attention_coordinate = bounds[:, :3] + res * coords + res / 2
+        # coords = coords.int()
+        # attention_coordinate = bounds[:, :3] + res * coords + res / 2
+        (
+            right_coords,
+            right_rot_and_grip_indicies,
+            right_ignore_collisions,
+        ) = self._q.choose_highest_action(
+            right_q_trans, right_q_rot_grip, right_q_ignore_collisions
+        )
+        (
+            left_coords,
+            left_rot_and_grip_indicies,
+            left_ignore_collisions,
+        ) = self._q.choose_highest_action(
+            left_q_trans, left_q_rot_grip, left_q_ignore_collisions
+        )
+
+        if right_q_rot_grip is not None:
+            right_rot_grip_action = right_rot_and_grip_indicies
+        if right_q_ignore_collisions is not None:
+            right_ignore_collisions_action = right_ignore_collisions.int()
+
+        if left_q_rot_grip is not None:
+            left_rot_grip_action = left_rot_and_grip_indicies
+        if left_q_ignore_collisions is not None:
+            left_ignore_collisions_action = left_ignore_collisions.int()
+
+        right_coords = right_coords.int()
+        left_coords = left_coords.int()
+
+        right_attention_coordinate = bounds[:, :3] + res * right_coords + res / 2
+        left_attention_coordinate = bounds[:, :3] + res * left_coords + res / 2
+
 
         # 将 prev_layer_voxel_grid(s) 叠加到列表中
         # 注意：PerAct 没有像 C2FARM 那样使用多层体素网格
@@ -1581,27 +1568,82 @@ L_col: {q_collision_loss.item():.3f} x {(self._collision_loss_weight * lambda_BC
         else:
             prev_layer_bounds = prev_layer_bounds + [bounds]
 
+        # observation_elements = {
+        #     'attention_coordinate': attention_coordinate,
+        #     'prev_layer_voxel_grid': prev_layer_voxel_grid,
+        #     'prev_layer_bounds': prev_layer_bounds,
+        # }
+        # info = {
+        #     'voxel_grid_depth%d' % self._layer: vox_grid,
+        #     'q_depth%d' % self._layer: q_trans,
+        #     'voxel_idx_depth%d' % self._layer: coords
+        # }
         observation_elements = {
-            'attention_coordinate': attention_coordinate,
-            'prev_layer_voxel_grid': prev_layer_voxel_grid,
-            'prev_layer_bounds': prev_layer_bounds,
+            "right_attention_coordinate": right_attention_coordinate,
+            "left_attention_coordinate": left_attention_coordinate,
+            "prev_layer_voxel_grid": prev_layer_voxel_grid,
+            "prev_layer_bounds": prev_layer_bounds,
         }
         info = {
-            'voxel_grid_depth%d' % self._layer: vox_grid,
-            'q_depth%d' % self._layer: q_trans,
-            'voxel_idx_depth%d' % self._layer: coords
+            "voxel_grid_depth%d" % self._layer: vox_grid,
+            "right_q_depth%d" % self._layer: right_q_trans,
+            "right_voxel_idx_depth%d" % self._layer: right_coords,
+            "left_q_depth%d" % self._layer: left_q_trans,
+            "left_voxel_idx_depth%d" % self._layer: left_coords,
         }
+        # self._act_voxel_grid = vox_grid[0]
+        # self._act_max_coordinate = coords[0]
+        # self._act_qvalues = q_trans[0].detach()
         self._act_voxel_grid = vox_grid[0]
-        self._act_max_coordinate = coords[0]
-        self._act_qvalues = q_trans[0].detach()
-        return ActResult((coords, rot_grip_action, ignore_collisions_action),
-                         observation_elements=observation_elements,
-                         info=info)
+        self._right_act_max_coordinate = right_coords[0]
+        self._right_act_qvalues = right_q_trans[0].detach()
+        self._left_act_max_coordinate = left_coords[0]
+        self._left_act_qvalues = left_q_trans[0].detach()
+        action = (
+            right_coords,
+            right_rot_grip_action,
+            right_ignore_collisions,
+            left_coords,
+            left_rot_grip_action,
+            left_ignore_collisions,
+        )
+
+        # return ActResult((coords, rot_grip_action, ignore_collisions_action),
+        #                  observation_elements=observation_elements,
+        #                  info=info)
+        return ActResult(action, observation_elements=observation_elements, info=info)
+
 
     def update_summaries(self) -> List[Summary]:
-        """收集和更新神经网络训练过程中的各种统计摘要信息"""
+        """收集和更新神经网络训练过程中的各种统计摘要信息 bimanual中有好多，但是都注释掉了"""
+        # voxel_grid = self._vis_voxel_grid.detach().cpu().numpy()
         summaries = []
-
+        # summaries.append(
+        #     ImageSummary(
+        #         "%s/right_update_qattention" % self._name,
+        #         transforms.ToTensor()(
+        #             visualise_voxel(
+        #                 voxel_grid,
+        #                 self._right_vis_translation_qvalue.detach().cpu().numpy(),
+        #                 self._right_vis_max_coordinate.detach().cpu().numpy(),
+        #                 self._right_vis_gt_coordinate.detach().cpu().numpy(),
+        #             )
+        #         ),
+        #     )
+        # )
+        # summaries.append(
+        #     ImageSummary(
+        #         "%s/left_update_qattention" % self._name,
+        #         transforms.ToTensor()(
+        #             visualise_voxel(
+        #                 voxel_grid,
+        #                 self._left_vis_translation_qvalue.detach().cpu().numpy(),
+        #                 self._left_vis_max_coordinate.detach().cpu().numpy(),
+        #                 self._left_vis_gt_coordinate.detach().cpu().numpy(),
+        #             )
+        #         ),
+        #     )
+        # )
         for n, v in self._summaries.items():
             summaries.append(ScalarSummary('%s/%s' % (self._name, n), v))
 
@@ -1638,6 +1680,29 @@ L_col: {q_collision_loss.item():.3f} x {(self._collision_loss_weight * lambda_BC
 
     def act_summaries(self) -> List[Summary]:
         """生成动作选择过程中的可视化摘要信息"""
+        # voxel_grid = self._act_voxel_grid.cpu().numpy()
+        # right_q_attention = self._right_act_qvalues.cpu().numpy()
+        # right_highlight_coordinate = self._right_act_max_coordinate.cpu().numpy()
+        # right_visualization = visualise_voxel(
+        #     voxel_grid, right_q_attention, right_highlight_coordinate
+        # )
+
+        # left_q_attention = self._left_act_qvalues.cpu().numpy()
+        # left_highlight_coordinate = self._left_act_max_coordinate.cpu().numpy()
+        # left_visualization = visualise_voxel(
+        #     voxel_grid, left_q_attention, left_highlight_coordinate
+        # )
+
+        # return [
+        #     ImageSummary(
+        #         f"{self._name}/right_act_Qattention",
+        #         transforms.ToTensor()(right_visualization),
+        #     ),
+        #     ImageSummary(
+        #         f"{self._name}/left_act_Qattention",
+        #         transforms.ToTensor()(left_visualization),
+        #     ),
+        # ]
         return [
             ImageSummary('%s/act_Qattention' % self._name,
                          transforms.ToTensor()(visualise_voxel(
@@ -1672,6 +1737,25 @@ L_col: {q_collision_loss.item():.3f} x {(self._collision_loss_weight * lambda_BC
             else:
                 if '_voxelizer' not in k: #and '_neural_renderer' not in k:
                     logging.warning(f"key {k} is found in checkpoint, but not found in current model.")
+        # ---bimanual--
+        # if not self._training:
+        #     # reshape voxelizer weights
+        #     b = merged_state_dict["_voxelizer._ones_max_coords"].shape[0]
+        #     merged_state_dict["_voxelizer._ones_max_coords"] = merged_state_dict[
+        #         "_voxelizer._ones_max_coords"
+        #     ][0:1]
+        #     flat_shape = merged_state_dict["_voxelizer._flat_output"].shape[0]
+        #     merged_state_dict["_voxelizer._flat_output"] = merged_state_dict[
+        #         "_voxelizer._flat_output"
+        #     ][0 : flat_shape // b]
+        #     merged_state_dict["_voxelizer._tiled_batch_indices"] = merged_state_dict[
+        #         "_voxelizer._tiled_batch_indices"
+        #     ][0:1]
+        #     merged_state_dict["_voxelizer._index_grid"] = merged_state_dict[
+        #         "_voxelizer._index_grid"
+        #     ][0:1]
+        # ---bimanual--
+        
         msg = self._q.load_state_dict(merged_state_dict, strict=False)
         # msg = self._q.load_state_dict(merged_state_dict, strict=True)
         if msg.missing_keys:

@@ -496,6 +496,7 @@ class DenseBlock(nn.Module):
             self.activation = act_layer(activation)
 
     def forward(self, x):
+        # print("DenseBlock的forward")
         x = self.linear(x)
         x = self.norm(x) if self.norm is not None else x
         x = self.activation(x) if self.activation is not None else x

@@ -27,7 +27,8 @@ method:
   lang_fusion_type: seq
   voxel_patch_size: 5
   voxel_patch_stride: 5
-  final_dim: 128
+  final_dim: 64
+  low_dim_size: 8
   input_dropout: 0.1
   attn_dropout: 0.1
   decoder_dropout: 0.0
@@ -139,7 +140,7 @@ method:
       include_input: true
 ddp:
   master_addr: localhost
-  master_port: 12346
+  master_port: 12345
   num_devices: 1
   device_id: 0
 rlbench:
@@ -171,13 +172,13 @@ rlbench:
   num_view_for_nerf: 21
   headless: true
 replay:
-  batch_size: 1
+  batch_size: 4
   timesteps: 1
   prioritisation: false
   task_uniform: true
   use_disk: true
   path: /home/zjyang/program/peract_bimanual/log/arm/replay
-  max_parallel_processes: 1
+  max_parallel_processes: 32
 evaluation:
   eval_freq: 10000
   eval_episodes: 25
