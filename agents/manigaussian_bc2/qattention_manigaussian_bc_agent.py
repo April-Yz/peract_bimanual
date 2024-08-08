@@ -157,13 +157,16 @@ class QFunction(nn.Module):
         self._voxelizer = voxelizer
         self._bounds_offset = bounds_offset
         self._qnet = perceiver_encoder.to(device)
+        # print("Manigs bc agent Qfunction self._qnet",self._qnet.shape)
         self._coord_trans = torch.diag(torch.tensor([1, 1, 1, 1], dtype=torch.float32)).to(device)
         
         self.cfg = cfg
         # use fabric=false时后面可以加上 and  fabric!=None
         if cfg.use_neural_rendering:
             self._neural_renderer = NeuralRenderer(cfg.neural_renderer).to(device)
+            print("use_neural_rendering maybe use ddp")
             if training and use_ddp:
+                print("useddp--------------")
                 self._neural_renderer = fabric.setup(self._neural_renderer)
         else:
             self._neural_renderer = None
@@ -244,21 +247,40 @@ class QFunction(nn.Module):
             bounds = bounds.repeat(b, 1)
 
         # forward pass 前传
-        #  voxel_grid_feature,multi_scale_voxel_list是多的
-        q_trans, \
-        q_rot_and_grip,\
-        q_ignore_collisions,\
+        #  voxel_grid_feature,multi_scale_voxel_list是多的 
+        # 双臂中用split_pred代替所有参数
+        # new yzj第一行默认用左臂的观察!! 后续要看如何使用左手还是右手
+        right_trans, right_rot_and_grip,right_ignore_collisions,\
+        left_trans,left_rot_and_grip_out,left_collision_out,\
         voxel_grid_feature, \
         multi_scale_voxel_list, \
         lang_embedd = self._qnet(voxel_grid,  # [1,10,100^3]
-                                proprio, # [1,4]
+                                proprio, # [1,4]  好像不一样（【1,8】）
                                 lang_goal_emb, # [1,1024]
                                 lang_token_embs, # [1,77,512]
                                 prev_layer_voxel_grid, #None,   # 一样，双手中prev_layer_voxel_grid=None,
                                 bounds, # [1,6]
                                 prev_bounds, # None    # 一样，双手中prev_bounds=None,
                                 )
-
+        
+        q_trans=torch.cat((right_trans, left_trans), dim=1) 
+        # left 的取名代表bimanual风格可能代表的东西不一样
+        q_rot_and_grip=torch.cat((right_rot_and_grip, left_rot_and_grip_out), dim=1)
+        q_ignore_collisions=torch.cat((right_ignore_collisions, left_collision_out), dim=1)
+        voxel_grid_feature=torch.cat((voxel_grid_feature, voxel_grid_feature),dim=1)
+        print("在qfunction中出现的q_trans=",q_trans.shape) #[1,2,100,100,100]
+        print("q_rot_and_grip=",q_rot_and_grip.shape)     # [1,436]
+        print("q_ignore_collisions=",q_ignore_collisions.shape) # [1,4]
+        print("---------voxel_grid_feature=",voxel_grid_feature.shape) # [1,128,100,100]
+        # print("multi_scale_voxel_list=",multi_scale_voxel_list.shape)
+        print("lang_embedd=",lang_embedd.shape)
+        print("voxel_grid=",voxel_grid.shape)
+        print("proprio=",proprio.shape)
+        print("lang_goal_emb=",lang_goal_emb.shape)
+        print("lang_token_embs=",lang_token_embs.shape)
+        # 但是好像是None print("-------------prev_layer_voxel_grid=",prev_layer_voxel_grid.shape)
+        print("bounds=",bounds.shape)
+        # 但是好像是None print("prev_bounds=",prev_bounds.shape)
         # !!新 ----------------------------------------------------------------
         # neural rendering as an auxiliary loss # 神经渲染作为辅助损失
         rendering_loss_dict = {}
@@ -279,13 +301,14 @@ class QFunction(nn.Module):
                 depth_0 = depth[0]
                 pcd_0 = pcd[0]
 
+                print("qfunction中的已经开始错了！！！哈哈哈终于找到你了",voxel_grid_feature.shape)
                 # render loss（改变）神经渲染
                 rendering_loss_dict, _ = self._neural_renderer(
-                    rgb=rgb_0, pcd=pcd_0, depth=depth_0, \
-                    language=lang_embedd, \
-                    dec_fts=voxel_grid_feature, \
-                    gt_rgb=gt_rgb, gt_depth=gt_depth, \
-                    focal=focal, c=c, \
+                    rgb=rgb_0, pcd=pcd_0, depth=depth_0, # 第一个视角下的颜色 点云数据 深度
+                    language=lang_embedd, # 语言目标
+                    dec_fts=voxel_grid_feature, # 体素网格特征，可能用于3D体素渲染
+                    gt_rgb=gt_rgb,  gt_depth=gt_depth, focal=focal,  # 真实（Ground Truth）的图像
+                    c=c, 
                     gt_pose=gt_pose, gt_intrinsic=nerf_target_camera_intrinsic, \
                     lang_goal=lang_goal, 
                     next_gt_pose=nerf_next_target_pose, next_gt_intrinsic=nerf_next_target_camera_intrinsic, 
@@ -304,7 +327,7 @@ class QFunction(nn.Module):
                     'psnr': 0.,
                     }
 
-        return q_trans, q_rot_and_grip, q_ignore_collisions, voxel_grid, rendering_loss_dict
+        return (right_trans, right_rot_and_grip,right_ignore_collisions,left_trans,left_rot_and_grip_out,left_collision_out), voxel_grid, rendering_loss_dict
 
 
     @torch.no_grad()
@@ -345,19 +368,26 @@ class QFunction(nn.Module):
             bounds = bounds.repeat(b, 1)
 
         # forward pass 其中上一部分类似，下面不同
-        q_trans, \
-        q_rot_and_grip,\
-        q_ignore_collisions,\
-        voxel_grid_feature,\
-        multi_scale_voxel_list,\
-        lang_embedd = self._qnet(voxel_grid, 
+        # left_trans,left_rot_and_grip_out,left_collision_out,\
+        right_trans, right_rot_and_grip,right_ignore_collisions,\
+        left_trans,left_rot_and_grip_out,left_collision_out,\
+        voxel_grid_feature, \
+        multi_scale_voxel_list, \
+        lang_embedd = self._qnet(voxel_grid,
+        # q_trans, \
+        # q_rot_and_grip,\
+        # q_ignore_collisions,\
+        # voxel_grid_feature,\
+        # multi_scale_voxel_list,\
+        # lang_embedd = self._qnet(voxel_grid, 
                                         proprio,
                                         lang_goal_emb, 
                                         lang_token_embs,
                                         prev_layer_voxel_grid,
                                         bounds, 
                                         prev_bounds)
- 
+        # new 给两臂合起来
+        voxel_grid_feature = torch.cat((voxel_grid_feature, voxel_grid_feature), dim=1)
         # prepare nerf rendering            准备Nerf渲染?
         # We only use the front camera      我们只使用前置摄像头
         _, ret_dict = self._neural_renderer(
@@ -418,6 +448,7 @@ class QAttentionPerActBCAgent(Agent):
         self._layer = layer
         self._coordinate_bounds = coordinate_bounds
         self._perceiver_encoder = perceiver_encoder
+        # print("mani bc agent init perceiver_encoder", perceiver_encoder.shape)
         self._voxel_feature_size = voxel_feature_size
         self._bounds_offset = bounds_offset
         self._image_crop_size = image_crop_size
@@ -482,6 +513,8 @@ class QAttentionPerActBCAgent(Agent):
         )
 
         # 有些不同
+        # print(f"qatten mani bc agent build self._perceiver_encoder: {self._perceiver_encoder.shape}")
+        print("type(self._perceiver_encoder)",type(self._perceiver_encoder))
         self._q = QFunction(self._perceiver_encoder,
                             self._voxelizer,
                             self._bounds_offset,
@@ -974,6 +1007,16 @@ class QAttentionPerActBCAgent(Agent):
         # q在下面会被分别赋值到以下三个参数的左右手
         # q_trans, q_rot_grip, q_collision,voxel_grid, rendering_loss_dict=
         q, voxel_grid, rendering_loss_dict = self._q(
+        # (
+        #     right_q_trans,
+        #     right_q_rot_grip,
+        #     right_q_collision,
+        #     left_q_trans,
+        #     left_q_rot_grip,
+        #     left_q_collision,
+        #     voxel_grid, 
+        #     rendering_loss_dict
+        # ) = self._q(
             obs,
             depth, # nerf new
             proprio,

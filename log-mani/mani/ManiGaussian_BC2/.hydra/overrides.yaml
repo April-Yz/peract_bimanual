@@ -7,7 +7,7 @@
 - framework.wandb_group=mani
 - framework.wandb_name=mani
 - ddp.num_devices=1
-- replay.batch_size=4
+- replay.batch_size=1
 - ddp.master_port=12345
 - rlbench.tasks=[coordinated_push_box,bimanual_push_single_button]
 - rlbench.demos=1

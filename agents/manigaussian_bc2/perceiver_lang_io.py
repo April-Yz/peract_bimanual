@@ -236,7 +236,7 @@ class PerceiverVoxelLangEncoder(nn.Module):
         # --------------------好像不太一样-------------------------------------
         # 多了1个，少了两行
         # voxel input preprocessing 1x1 conv encoder（bimanual中的）
-        self.input_preprocess = Conv3DBlock(
+        self.input_preprocess = Conv3DBlock(  # 双臂时的网络（[1,64,100,100]）
             self.init_dim,
             self.im_channels,
             kernel_sizes=1,
@@ -246,7 +246,7 @@ class PerceiverVoxelLangEncoder(nn.Module):
         )
 
         # voxel input preprocessing （mani中的）
-        # self.encoder_3d = MultiLayer3DEncoderShallow(in_channels=self.init_dim, out_channels=self.im_channels)
+        self.encoder_3d = MultiLayer3DEncoderShallow(in_channels=self.init_dim, out_channels=self.im_channels)   # return x, voxel_list [1,128,100,100]
 
         # patchify conv
         # self.patchify = Conv3DBlock(
@@ -471,7 +471,6 @@ class PerceiverVoxelLangEncoder(nn.Module):
                 None,
             )
 
-
     def encode_text(self, x):
         with torch.no_grad():
             text_feat, text_emb = self._clip_rn50.encode_text_with_embeddings(x)
@@ -509,8 +508,11 @@ class PerceiverVoxelLangEncoder(nn.Module):
     ):  
 
         # preprocess input（多了东西）new bimanual
-        # d0, multi_scale_voxel_list = self.encoder_3d(ins) # [B,10,100,100,100] -> [B,128,100,100,100]
+        d1, multi_scale_voxel_list = self.encoder_3d(ins) # yzj new [B,10,100,100,100] -> [B,128,100,100,100]
+        print("PerceiverVoxelLangEncoder d1.shape: ", d1.shape)
+        # print("multi_scale_voxel_list.shape: ", multi_scale_voxel_list.shape)
         d0 = self.input_preprocess(ins)  # new bimanual # [B,10,100,100,100] -> [B,64,100,100,100]
+        print("PerceiverVoxelLangEncoder d0.shape: ", d0.shape)
         # d0: [1, 128, 100, 100, 100]
         # multi_scale_voxel_list: [torch.Size([1, 10, 100, 100, 100]), torch.Size([1, 32, 25, 25, 25]), torch.Size([1, 16, 50, 50, 50])]
         
@@ -716,8 +718,8 @@ class PerceiverVoxelLangEncoder(nn.Module):
         #     rot_and_grip_collision_out = self.rot_grip_collision_ff(feats) # [1,220]
         #     rot_and_grip_out = rot_and_grip_collision_out[:, :-self.num_collision_classes]  # [1,218]
         #     collision_out = rot_and_grip_collision_out[:, -self.num_collision_classes:] # [1,2]
-
         # return trans, rot_and_grip_out, collision_out, d0, multi_scale_voxel_list, l
+
         rot_and_grip_out = None
         if self.num_rotation_classes > 0:
             feats_right.extend(
@@ -754,6 +756,15 @@ class PerceiverVoxelLangEncoder(nn.Module):
                 :, -self.num_collision_classes :
             ]
 
+        # return trans, rot_and_grip_out, collision_out, d0, multi_scale_voxel_list, l # 原来的单臂操作
+        # concatenated_tensor = torch.cat((tensor1, tensor2), dim=1)
+        print(" right_trans",  right_trans.shape)
+        print(" right_rot_and_grip_out", right_rot_and_grip_out.shape)
+        print(" right_collision_out", right_collision_out.shape)
+        print("d0",d0.shape)
+        print("d1",d1.shape)
+        print("试试在这里拼接?现在还没")
+        print("--------------------Perceiver output:--------------- ")
         return (
             right_trans,
             right_rot_and_grip_out,
@@ -761,4 +772,16 @@ class PerceiverVoxelLangEncoder(nn.Module):
             left_trans,
             left_rot_and_grip_out,
             left_collision_out,
+            d0, # d1,
+            multi_scale_voxel_list,
+            l,
         )
+    
+        # return (  # 原来的双臂操作
+        #     right_trans,
+        #     right_rot_and_grip_out,
+        #     right_collision_out,
+        #     left_trans,
+        #     left_rot_and_grip_out,
+        #     left_collision_out,
+        # )

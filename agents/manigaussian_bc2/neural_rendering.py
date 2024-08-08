@@ -180,6 +180,7 @@ class NeuralRenderer(nn.Module):
         # format input
         data['img'] = rgb
         data['dec_fts'] = dec_fts
+        print("encode_data ----- dec_fts.shape", dec_fts.shape)
         data['depth'] = depth
         data['lang'] = lang
         data['action'] = action
@@ -264,7 +265,8 @@ class NeuralRenderer(nn.Module):
         :ret_dict: dict, rendered images
         '''
         bs = rgb.shape[0]
-
+        print("dec_fts.shape=",dec_fts.shape)
+        print("好吧，这里的data也有问题，但是谁干的是谁调用了我的neuralrender forward啊啊啊!!!! bs=",bs)
         data = self.encode_data(
             rgb=rgb, depth=depth, pcd=pcd, focal=focal, c=c, lang_goal=None, tgt_pose=gt_pose, tgt_intrinsic=gt_intrinsic,
             dec_fts=dec_fts, lang=language, next_tgt_pose=next_gt_pose, next_tgt_intrinsic=next_gt_intrinsic, 
@@ -282,7 +284,8 @@ class NeuralRenderer(nn.Module):
 
         # if gt_rgb is not None:
         if training:
-            # Gaussian Generator
+            # Gaussian Generator 高斯生成器
+            print("Gaussian Generator self.gs_model这里的data已经不对了",data["dec_fts"].shape)
             data = self.gs_model(data)
 
             # Gaussian Render

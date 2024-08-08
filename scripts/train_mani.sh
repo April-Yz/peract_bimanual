@@ -41,7 +41,7 @@ tmux new-session -d -s ${exp_name}
 #######
 # override hyper-params in config.yaml
 #######
-batch_size=4 #4 # 2
+batch_size=1 #4 # 2
 # task_name=${"multi_${addition_info}"}
 
 

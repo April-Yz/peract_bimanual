@@ -115,6 +115,7 @@ class QFunction(nn.Module):
             bounds = bounds.repeat(b, 1)
 
         # forward pass
+        # left_trans,left_rot_and_grip_out,left_collision_out,\
         q_trans, q_rot_and_grip, q_ignore_collisions = self._qnet(
             voxel_grid,
             proprio,

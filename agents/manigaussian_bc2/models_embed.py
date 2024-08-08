@@ -42,6 +42,9 @@ class GeneralizableGSEmbedNet(nn.Module):
         self.cfg = cfg
         self.with_gs_render = with_gs_render
 
+        print(colored(f"[GeneralizableNeRFEmbedNet]de的 with_gs_render参数: {with_gs_render}", "red"))
+    
+        # 坐标边界
         self.coordinate_bounds = cfg.coordinate_bounds # default: [-0.3, -0.5, 0.6, 0.7, 0.5, 1.6]
         print(colored(f"[GeneralizableNeRFEmbedNet] coordinate_bounds: {self.coordinate_bounds}", "red"))
     
@@ -80,8 +83,8 @@ class GeneralizableGSEmbedNet(nn.Module):
         
         self.gs_parm_regresser = GSPointCloudRegresser(
             cfg,
-            split_dimensions,
-            scale=scale_inits,
+            split_dimensions, # 分割尺寸
+            scale=scale_inits, # scale_inits
             bias=bias_inits,
             )
         self.scaling_activation = torch.exp
@@ -179,43 +182,62 @@ class GeneralizableGSEmbedNet(nn.Module):
         xyz_voxel_space = xyz_voxel_space * 2 - 1.0 # [0,1]->[-1,1]
 
         # unsqueeze the point cloud to also have 5 dim
-        xyz_voxel_space = xyz_voxel_space.unsqueeze(1).unsqueeze(1)
+        xyz_voxel_space = xyz_voxel_space.unsqueeze(1).unsqueeze(1)   
+        # 在第二和第三维度上增加两个维度，使得 xyz_voxel_space 的形状变为 [B, 1, 1, N, 3]
         # xyz_voxel_space: [bs, 1, 1, N, 3]
-
-        # sample in voxel space
+        print("def sample_in_canonical_voxel(self, xyz, voxel_feat): xyz_voxel_space.shape=", xyz_voxel_space.shape) # [2,1,1,16384,3]
+        # sample in voxel space 体素空间中的样本
+        print("def sample_in_canonical_voxel(self, xyz, voxel_feat): voxel_feat.shape=", voxel_feat.shape) # [2,1,100,100,100]
         point_feature = F.grid_sample(voxel_feat, xyz_voxel_space, align_corners=True, mode='bilinear')
+        print("point_feature.shape=", point_feature.shape)                                                  # [2,1,1,1,16384]
         # [bs, 128, 1, 1, N]
         # squeeze back to point cloud shape 
-        point_feature = point_feature.squeeze(2).squeeze(2).permute(0, 2, 1) 
+        point_feature = point_feature.squeeze(2).squeeze(2).permute(0, 2, 1)                                                            
+        # 使用 squeeze 方法移除第二和第三维度（它们的大小为1），然后使用 permute 方法重新排列张量的形状，使其变为 [B, N, 128]。
         # [bs, N, 128]
+        print("def sample_in_canonical_voxel(self, xyz, voxel_feat): point_feature.shape=", point_feature.shape) # [2,16384,1]
 
         return point_feature
 
     def forward(self, data):
         """
-        SB is batch size
-        N is batch of points
-        NS is number of input views
+        SB is batch size        批次大小（batch size）config/train                                                2
+        N is batch of points    批次中的点的数量                                                错了? 128
+        NS is number of input views   输入视图的数量                                           21?
 
         Predict gaussian parameter maps
         """
 
         SB, N, _ = data['xyz'].shape
         NS = self.num_views_per_obj # 1
+        print("SB=",SB,", N=",N,", NS=",NS)
 
         canon_xyz = self.world_to_canonical(data['xyz'])    # [1,N,3], min:-2.28, max:1.39
+        print("first canon_xyz.shape=",canon_xyz.shape)     # [2,16384,3]
 
-        # volumetric sampling
-        point_latent = self.sample_in_canonical_voxel(canon_xyz, data['dec_fts']) # [bs, N, 128]->[bs, 128, N]
-        point_latent = point_latent.reshape(-1, self.d_latent)  # (SB * NS * B, latent)  [N, 128]
+        # volumetric sampling 体积采样
+        print("type of data = ",type(data))
+        # print("data['dec_fts']=",data['dec_fts'])
+        print("data['dec_fts'].shape=",data['dec_fts'].shape)
+        # print("data.shape",data.shape)
+        point_latent = self.sample_in_canonical_voxel(canon_xyz, data['dec_fts']) # [bs, N, 128]->[bs, 128, N] bs是批次大小，N是体素的数量，128是特征维度。
+        print(" ")                                                                # [2,16384,1] bs=2 N=128 128  
+        print("point_latent.shape=-----------",point_latent.shape)                # [2,16384,1] 应该是 [1,16384,128]
+        point_latent = point_latent.reshape(-1, self.d_latent)  # (SB * NS * B, latent)  [N, 128]  N=256 [256*128]  
 
+        print("point_latent.shape=---------point没问题256*128",point_latent.shape,self.d_latent)
+        print("canon_xyz.shape=",canon_xyz.shape)     # 输出z_feature张量的形状    [2,16384,3] N=16384
         if self.use_xyz:    # True
-            z_feature = canon_xyz.reshape(-1, 3)  # (SB*B, 3)
+            z_feature = canon_xyz.reshape(-1, 3)  # (SB*B, 3)       将canon_xyz重塑为形状(SB*B, 3)的张量，其中每个元素包含3个坐标值。
 
+        print("z_feature.shape= before code  =    ",z_feature.shape)     # 输出z_feature张量的形状
         if self.use_code:    # True
-            # Positional encoding (no viewdirs)
+            # Positional encoding (no viewdirs) 位置编码（无 viewdirs）
             z_feature = self.code(z_feature)    # [N, 39]
-
+        
+        # ----
+        print("point_latent.shape=",point_latent.shape)  # 输出point_latent张量的形状
+        print("z_feature.shape=",z_feature.shape)     # 输出z_feature张量的形状
         latent = torch.cat((point_latent, z_feature), dim=-1) # [N, 128+39]
 
         # Camera frustum culling stuff, currently disabled
@@ -232,8 +254,9 @@ class GeneralizableGSEmbedNet(nn.Module):
             )   # 26
 
         latent = latent.reshape(-1, N, self.d_out)  # [1, N, d_out]
+        print("forward in embednet latent.shape=",latent.shape)  # 输出latent张量的形状
 
-        ## regress gaussian parms
+        ## regress gaussian parms 回归高斯参数
         split_network_outputs = self.gs_parm_regresser(latent) # [1, N, (3, 1, 3, 4, 3, 9)]
         split_network_outputs = split_network_outputs.split(self.split_dimensions_with_offset, dim=-1)
         

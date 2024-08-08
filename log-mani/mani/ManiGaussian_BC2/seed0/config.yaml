@@ -172,7 +172,7 @@ rlbench:
   num_view_for_nerf: 21
   headless: true
 replay:
-  batch_size: 4
+  batch_size: 1
   timesteps: 1
   prioritisation: false
   task_uniform: true

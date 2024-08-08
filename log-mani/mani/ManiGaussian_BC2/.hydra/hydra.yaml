@@ -118,14 +118,14 @@ hydra:
     - framework.wandb_group=mani
     - framework.wandb_name=mani
     - ddp.num_devices=1
-    - replay.batch_size=4
+    - replay.batch_size=1
     - ddp.master_port=12345
     - rlbench.tasks=[coordinated_push_box,bimanual_push_single_button]
     - rlbench.demos=1
     - rlbench.episode_length=4
   job:
     name: train
-    override_dirname: ddp.master_port=12345,ddp.num_devices=1,framework.logdir=/home/zjyang/program/peract_bimanual/log-mani,framework.start_seed=0,framework.use_wandb=True,framework.wandb_group=mani,framework.wandb_name=mani,method=ManiGaussian_BC2,replay.batch_size=4,rlbench.demo_path=/home/zjyang/program/peract_bimanual/data1/train_data,rlbench.demos=1,rlbench.episode_length=4,rlbench.task_name=mani,rlbench.tasks=[coordinated_push_box,bimanual_push_single_button]
+    override_dirname: ddp.master_port=12345,ddp.num_devices=1,framework.logdir=/home/zjyang/program/peract_bimanual/log-mani,framework.start_seed=0,framework.use_wandb=True,framework.wandb_group=mani,framework.wandb_name=mani,method=ManiGaussian_BC2,replay.batch_size=1,rlbench.demo_path=/home/zjyang/program/peract_bimanual/data1/train_data,rlbench.demos=1,rlbench.episode_length=4,rlbench.task_name=mani,rlbench.tasks=[coordinated_push_box,bimanual_push_single_button]
     id: ???
     num: ???
     config_name: config

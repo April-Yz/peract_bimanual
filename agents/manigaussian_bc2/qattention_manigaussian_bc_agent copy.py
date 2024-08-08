@@ -422,6 +422,7 @@ class QAttentionPerActBCAgent(Agent):
         self._layer = layer
         self._coordinate_bounds = coordinate_bounds
         self._perceiver_encoder = perceiver_encoder
+        # print("perceiver_encoder", perceiver_encoder)
         self._voxel_feature_size = voxel_feature_size
         self._bounds_offset = bounds_offset
         self._image_crop_size = image_crop_size
