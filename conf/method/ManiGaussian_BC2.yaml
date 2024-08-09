@@ -43,7 +43,7 @@ conv_downsample: True
 lang_fusion_type: 'seq' # or 'concat'
 voxel_patch_size: 5
 voxel_patch_stride: 5
-final_dim: 64 #8 # 128 bimanual 64
+final_dim: 128 #8 # 128 bimanual 64 别搞是这里出了问题就尴尬了
 low_dim_size: 8 # bimanual 的in_features
 
 # Training

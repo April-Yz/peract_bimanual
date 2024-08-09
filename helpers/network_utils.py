@@ -8,6 +8,7 @@ import torch.nn.functional as F
 
 from einops import rearrange, repeat
 from einops.layers.torch import Rearrange
+import logging 
 
 LRELU_SLOPE = 0.02
 
@@ -169,7 +170,7 @@ class Conv3DBlock(nn.Module):
         padding=None,
     ):
         super(Conv3DBlock, self).__init__()
-        padding = kernel_sizes // 2 if padding is None else padding
+        padding = kernel_sizes // 2 if padding is None else padding # 如果没有指定 padding，则将其设置为 kernel_sizes 的一半。
         self.conv3d = nn.Conv3d(
             in_channels,
             out_channels,
@@ -210,8 +211,11 @@ class Conv3DBlock(nn.Module):
 
     def forward(self, x):
         x = self.conv3d(x)
-        x = self.norm(x) if self.norm is not None else x
-        x = self.activation(x) if self.activation is not None else x
+        # print(" 1 Conv3DBlock 1 network_utils.py: ", x.shape) # [1,64,100,100,100]
+        x = self.norm(x) if self.norm is not None else x   # norm：归一化类型
+        # print(" 2 Conv3DBlock 1 network_utils.py: ", x.shape) # [1,64,100,100,100]
+        x = self.activation(x) if self.activation is not None else x  # 应用激活函数
+        # print(" 3 Conv3DBlock 1 network_utils.py: ", x.shape) # [1,64,100,100,100]
         return x
 
 # -------------------------------nerf---------------------------------
@@ -299,7 +303,7 @@ class MultiLayer3DEncoderShallow(nn.Module):
         # CHANNELS = [64, 128, 256, 512] # 18.60M
         # CHANNELS = [32, 64, 128, 256] # 4.65M (32+64+128=224)
         self.conv0 = ConvBnReLU3D(in_channels, CHANNELS[0], norm_act=norm_act)
-
+        # 创建第一个卷积层 conv0，使用 ConvBnReLU3D 类，包含卷积、批量归一化和ReLU激活函数
         self.conv1 = ConvBnReLU3D(CHANNELS[0], CHANNELS[1], stride=2, norm_act=norm_act)
         self.conv2 = ConvBnReLU3D(CHANNELS[1], CHANNELS[1], norm_act=norm_act)
 
@@ -337,14 +341,19 @@ class MultiLayer3DEncoderShallow(nn.Module):
 
         x = self.conv6(self.conv5(conv4)) # 64, 13^3
         x = conv4 + self.conv7(x) # 32, 25^3
+        logging.info("x.size: {x.shape} ")
         voxel_list.append(x)
+        # print("1  Muti network_utils.py: ", x.shape)  # [1,32,25,25,25]
         del conv4
         x = conv2 + self.conv9(x)
+        # print("2  Muti  network_utils.py: ", x.shape) # [1,16,50,50,50]
         voxel_list.append(x)
         del conv2
         x = conv0 + self.conv11(x)
+        # print("3  Muti network_utils.py: ", x.shape) # [1,8,100,100,100]
         del conv0
         x = self.conv_out(x)
+        print("4  Muti network_utils.py: ", x.shape) # [1,64,100,100,100]
         return x, voxel_list
 #-------------------------------nerf----------------------------------
 

@@ -27,7 +27,7 @@ method:
   lang_fusion_type: seq
   voxel_patch_size: 5
   voxel_patch_stride: 5
-  final_dim: 64
+  final_dim: 128
   low_dim_size: 8
   input_dropout: 0.1
   attn_dropout: 0.1

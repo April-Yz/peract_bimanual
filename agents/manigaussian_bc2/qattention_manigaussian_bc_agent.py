@@ -250,10 +250,11 @@ class QFunction(nn.Module):
         #  voxel_grid_feature,multi_scale_voxel_list是多的 
         # 双臂中用split_pred代替所有参数
         # new yzj第一行默认用左臂的观察!! 后续要看如何使用左手还是右手
-        right_trans, right_rot_and_grip,right_ignore_collisions,\
-        left_trans,left_rot_and_grip_out,left_collision_out,\
-        voxel_grid_feature, \
-        multi_scale_voxel_list, \
+        # right_trans, right_rot_and_grip,right_ignore_collisions,\
+        # left_trans,left_rot_and_grip_out,left_collision_out,\
+        print("--- 每次运行 QFunction forward前报告 ---")
+        # multi_scale_voxel_list, \ 暂时移除
+        split_pred,voxel_grid_feature, \
         lang_embedd = self._qnet(voxel_grid,  # [1,10,100^3]
                                 proprio, # [1,4]  好像不一样（【1,8】）
                                 lang_goal_emb, # [1,1024]
@@ -262,12 +263,13 @@ class QFunction(nn.Module):
                                 bounds, # [1,6]
                                 prev_bounds, # None    # 一样，双手中prev_bounds=None,
                                 )
-        
+        right_trans, right_rot_and_grip,right_ignore_collisions,\
+        left_trans,left_rot_and_grip_out,left_collision_out= split_pred
         q_trans=torch.cat((right_trans, left_trans), dim=1) 
         # left 的取名代表bimanual风格可能代表的东西不一样
         q_rot_and_grip=torch.cat((right_rot_and_grip, left_rot_and_grip_out), dim=1)
         q_ignore_collisions=torch.cat((right_ignore_collisions, left_collision_out), dim=1)
-        voxel_grid_feature=torch.cat((voxel_grid_feature, voxel_grid_feature),dim=1)
+        # voxel_grid_feature=torch.cat((voxel_grid_feature, voxel_grid_feature),dim=1)
         print("在qfunction中出现的q_trans=",q_trans.shape) #[1,2,100,100,100]
         print("q_rot_and_grip=",q_rot_and_grip.shape)     # [1,436]
         print("q_ignore_collisions=",q_ignore_collisions.shape) # [1,4]
@@ -326,9 +328,10 @@ class QFunction(nn.Module):
                     'l1': 0.,
                     'psnr': 0.,
                     }
-
-        return (right_trans, right_rot_and_grip,right_ignore_collisions,left_trans,left_rot_and_grip_out,left_collision_out), voxel_grid, rendering_loss_dict
-
+        # return split_pred, voxel_grid
+        # return q_trans, q_rot_and_grip, q_ignore_collisions, voxel_grid, rendering_loss_dict
+        # return (right_trans, right_rot_and_grip,right_ignore_collisions,left_trans,left_rot_and_grip_out,left_collision_out), voxel_grid, rendering_loss_dict
+        return split_pred, voxel_grid, rendering_loss_dict
 
     @torch.no_grad()
     def render(self, rgb_pcd, proprio, pcd, 
@@ -369,10 +372,11 @@ class QFunction(nn.Module):
 
         # forward pass 其中上一部分类似，下面不同
         # left_trans,left_rot_and_grip_out,left_collision_out,\
-        right_trans, right_rot_and_grip,right_ignore_collisions,\
-        left_trans,left_rot_and_grip_out,left_collision_out,\
+        # right_trans, right_rot_and_grip,right_ignore_collisions,\
+        # left_trans,left_rot_and_grip_out,left_collision_out,\
+        # multi_scale_voxel_list, \暂时移除
+        split_pred, \
         voxel_grid_feature, \
-        multi_scale_voxel_list, \
         lang_embedd = self._qnet(voxel_grid,
         # q_trans, \
         # q_rot_and_grip,\
@@ -387,7 +391,7 @@ class QFunction(nn.Module):
                                         bounds, 
                                         prev_bounds)
         # new 给两臂合起来
-        voxel_grid_feature = torch.cat((voxel_grid_feature, voxel_grid_feature), dim=1)
+        # voxel_grid_feature = torch.cat((voxel_grid_feature, voxel_grid_feature), dim=1)
         # prepare nerf rendering            准备Nerf渲染?
         # We only use the front camera      我们只使用前置摄像头
         _, ret_dict = self._neural_renderer(
@@ -1209,7 +1213,7 @@ class QAttentionPerActBCAgent(Agent):
 
         # nerf[3]-----
         if self.use_neural_rendering:   # eval default: False; train default: True
-            
+            print("use_neual_rendering and rendering loss start")
             lambda_nerf = self.cfg.neural_renderer.lambda_nerf
             lambda_BC = self.cfg.lambda_bc
 
@@ -1251,6 +1255,7 @@ class QAttentionPerActBCAgent(Agent):
                         }, step=step)
             
         else:   # no neural renderer
+            print("didn't use_neual_rendering and rendering loss didn't start")
             if step % 10 == 0 and rank == 0:
                 lambda_BC = self.cfg.lambda_bc
                 cprint(f'total L: {total_loss.item():.4f} | \
@@ -1290,6 +1295,7 @@ class QAttentionPerActBCAgent(Agent):
         #  判断当前步骤是否应该进行渲染。
         to_render = (step % render_freq == 0 and self.use_neural_rendering and nerf_target_camera_extrinsic is not None)
         if to_render:
+            print("to_render start")
             rgb_render, next_rgb_render, embed_render, gt_embed_render = self._q.render(
                 rgb_pcd=obs,
                 proprio=proprio,
@@ -1382,7 +1388,7 @@ class QAttentionPerActBCAgent(Agent):
 
         # new rendering---
         # TODO: _summaries内容不同相关的肯定要改
-        torch.cuda.empty_cache()
+        # torch.cuda.empty_cache() # Mani中的没有，在bimanual中出现的
         self._summaries = {
             "losses/total_loss": total_loss,
             "losses/trans_loss": q_trans_loss.mean(),
@@ -1421,6 +1427,7 @@ class QAttentionPerActBCAgent(Agent):
 
         if self._lr_scheduler:
             self._scheduler.step()
+            # 记录最新学习率
             self._summaries["learning_rate"] = self._scheduler.get_last_lr()[0]
 
         self._vis_voxel_grid = voxel_grid[0]
@@ -1781,22 +1788,14 @@ class QAttentionPerActBCAgent(Agent):
                 if '_voxelizer' not in k: #and '_neural_renderer' not in k:
                     logging.warning(f"key {k} is found in checkpoint, but not found in current model.")
         # ---bimanual--
-        # if not self._training:
-        #     # reshape voxelizer weights
-        #     b = merged_state_dict["_voxelizer._ones_max_coords"].shape[0]
-        #     merged_state_dict["_voxelizer._ones_max_coords"] = merged_state_dict[
-        #         "_voxelizer._ones_max_coords"
-        #     ][0:1]
-        #     flat_shape = merged_state_dict["_voxelizer._flat_output"].shape[0]
-        #     merged_state_dict["_voxelizer._flat_output"] = merged_state_dict[
-        #         "_voxelizer._flat_output"
-        #     ][0 : flat_shape // b]
-        #     merged_state_dict["_voxelizer._tiled_batch_indices"] = merged_state_dict[
-        #         "_voxelizer._tiled_batch_indices"
-        #     ][0:1]
-        #     merged_state_dict["_voxelizer._index_grid"] = merged_state_dict[
-        #         "_voxelizer._index_grid"
-        #     ][0:1]
+        if not self._training:
+            # reshape voxelizer weights
+            b = merged_state_dict["_voxelizer._ones_max_coords"].shape[0]
+            merged_state_dict["_voxelizer._ones_max_coords"] = merged_state_dict["_voxelizer._ones_max_coords"][0:1]
+            flat_shape = merged_state_dict["_voxelizer._flat_output"].shape[0]
+            merged_state_dict["_voxelizer._flat_output"] = merged_state_dict["_voxelizer._flat_output"][0 : flat_shape // b]
+            merged_state_dict["_voxelizer._tiled_batch_indices"] = merged_state_dict["_voxelizer._tiled_batch_indices"][0:1]
+            merged_state_dict["_voxelizer._index_grid"] = merged_state_dict["_voxelizer._index_grid"][0:1]
         # ---bimanual--
         
         msg = self._q.load_state_dict(merged_state_dict, strict=False)

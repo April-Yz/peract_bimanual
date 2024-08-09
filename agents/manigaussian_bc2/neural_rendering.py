@@ -289,6 +289,7 @@ class NeuralRenderer(nn.Module):
             data = self.gs_model(data)
 
             # Gaussian Render
+            print("data = self.pts2renderdata = self.pts2renderdata = self.pts2renderdata = self.pts2renderdata = self.pts2render")
             data = self.pts2render(data, bg_color=self.bg_color) # default: [0, 0, 0]
 
             # Loss
@@ -390,7 +391,7 @@ class NeuralRenderer(nn.Module):
         return loss_dict, ret_dict
     
     def pts2render(self, data: dict, bg_color=[0,0,0]):
-        '''use render function in GS'''
+        '''use render function in GSZ'''
         bs = data['intr'].shape[0]
         assert bs == 1, "batch size should be 1"
         i = 0
