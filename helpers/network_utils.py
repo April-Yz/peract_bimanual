@@ -353,7 +353,7 @@ class MultiLayer3DEncoderShallow(nn.Module):
         # print("3  Muti network_utils.py: ", x.shape) # [1,8,100,100,100]
         del conv0
         x = self.conv_out(x)
-        print("4  Muti network_utils.py: ", x.shape) # [1,64,100,100,100]
+        # print("4  Muti network_utils.py: ", x.shape) # [1,64,100,100,100]
         return x, voxel_list
 #-------------------------------nerf----------------------------------
 

@@ -836,7 +836,7 @@ class QAttentionPerActBCAgent(Agent):
 
         proprio = torch.cat((right_proprio, left_proprio), dim=1)
 
-        # inference
+        # inference 推理
         (
             right_q_trans,
             right_q_rot_grip,

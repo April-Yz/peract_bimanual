@@ -5,14 +5,15 @@
 # bash scripts/eval.sh BIMANUAL_PERACT 0 test
 
 # some params specified by user
-method_name=$1
+method_name=$1 # ManiGaussian_BC2
 # set the seed number
 seed="0"
 # set the gpu id for evaluation. we use one gpu for parallel evaluation.
 eval_gpu=${2:-"0"}
 
-test_demo_path="/home/zjyang/download/peract/squashfs-root-test"
+# test_demo_path="/home/zjyang/download/peract/squashfs-root-test"
 # "/mnt/disk_1/tengbo/bimanual_data/test"
+test_demo_path="/home/zjyang/program/peract_bimanual/data1/test_data"
 
 addition_info="$(date +%Y%m%d)"
 exp_name=${3:-"${method}_${addition_info}"}

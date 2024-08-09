@@ -164,9 +164,9 @@ class QFunction(nn.Module):
         # use fabric=false时后面可以加上 and  fabric!=None
         if cfg.use_neural_rendering:
             self._neural_renderer = NeuralRenderer(cfg.neural_renderer).to(device)
-            print("use_neural_rendering maybe use ddp")
+            # print("use_neural_rendering maybe use ddp")
             if training and use_ddp:
-                print("useddp--------------")
+                # print("useddp--------------")
                 self._neural_renderer = fabric.setup(self._neural_renderer)
         else:
             self._neural_renderer = None
@@ -252,7 +252,7 @@ class QFunction(nn.Module):
         # new yzj第一行默认用左臂的观察!! 后续要看如何使用左手还是右手
         # right_trans, right_rot_and_grip,right_ignore_collisions,\
         # left_trans,left_rot_and_grip_out,left_collision_out,\
-        print("--- 每次运行 QFunction forward前报告 ---")
+        # print("--- 每次运行 QFunction forward前报告 ---")
         # multi_scale_voxel_list, \ 暂时移除
         split_pred,voxel_grid_feature, \
         lang_embedd = self._qnet(voxel_grid,  # [1,10,100^3]
@@ -270,18 +270,18 @@ class QFunction(nn.Module):
         q_rot_and_grip=torch.cat((right_rot_and_grip, left_rot_and_grip_out), dim=1)
         q_ignore_collisions=torch.cat((right_ignore_collisions, left_collision_out), dim=1)
         # voxel_grid_feature=torch.cat((voxel_grid_feature, voxel_grid_feature),dim=1)
-        print("在qfunction中出现的q_trans=",q_trans.shape) #[1,2,100,100,100]
-        print("q_rot_and_grip=",q_rot_and_grip.shape)     # [1,436]
-        print("q_ignore_collisions=",q_ignore_collisions.shape) # [1,4]
-        print("---------voxel_grid_feature=",voxel_grid_feature.shape) # [1,128,100,100]
+        # print("在qfunction中出现的q_trans=",q_trans.shape) #[1,2,100,100,100]
+        # print("q_rot_and_grip=",q_rot_and_grip.shape)     # [1,436]
+        # print("q_ignore_collisions=",q_ignore_collisions.shape) # [1,4]
+        # print("---------voxel_grid_feature=",voxel_grid_feature.shape) # [1,128,100,100]
         # print("multi_scale_voxel_list=",multi_scale_voxel_list.shape)
-        print("lang_embedd=",lang_embedd.shape)
-        print("voxel_grid=",voxel_grid.shape)
-        print("proprio=",proprio.shape)
-        print("lang_goal_emb=",lang_goal_emb.shape)
-        print("lang_token_embs=",lang_token_embs.shape)
+        # print("lang_embedd=",lang_embedd.shape)
+        # print("voxel_grid=",voxel_grid.shape)
+        # print("proprio=",proprio.shape)
+        # print("lang_goal_emb=",lang_goal_emb.shape)
+        # print("lang_token_embs=",lang_token_embs.shape)
         # 但是好像是None print("-------------prev_layer_voxel_grid=",prev_layer_voxel_grid.shape)
-        print("bounds=",bounds.shape)
+        # print("bounds=",bounds.shape)
         # 但是好像是None print("prev_bounds=",prev_bounds.shape)
         # !!新 ----------------------------------------------------------------
         # neural rendering as an auxiliary loss # 神经渲染作为辅助损失
@@ -303,7 +303,7 @@ class QFunction(nn.Module):
                 depth_0 = depth[0]
                 pcd_0 = pcd[0]
 
-                print("qfunction中的已经开始错了！！！哈哈哈终于找到你了",voxel_grid_feature.shape)
+                # print("qfunction中的已经开始错了！！！哈哈哈终于找到你了",voxel_grid_feature.shape)
                 # render loss（改变）神经渲染
                 rendering_loss_dict, _ = self._neural_renderer(
                     rgb=rgb_0, pcd=pcd_0, depth=depth_0, # 第一个视角下的颜色 点云数据 深度
@@ -518,7 +518,7 @@ class QAttentionPerActBCAgent(Agent):
 
         # 有些不同
         # print(f"qatten mani bc agent build self._perceiver_encoder: {self._perceiver_encoder.shape}")
-        print("type(self._perceiver_encoder)",type(self._perceiver_encoder))
+        # print("type(self._perceiver_encoder)",type(self._perceiver_encoder))
         self._q = QFunction(self._perceiver_encoder,
                             self._voxelizer,
                             self._bounds_offset,
@@ -1213,7 +1213,7 @@ class QAttentionPerActBCAgent(Agent):
 
         # nerf[3]-----
         if self.use_neural_rendering:   # eval default: False; train default: True
-            print("use_neual_rendering and rendering loss start")
+            # print("use_neual_rendering and rendering loss start")
             lambda_nerf = self.cfg.neural_renderer.lambda_nerf
             lambda_BC = self.cfg.lambda_bc
 
@@ -1255,7 +1255,7 @@ class QAttentionPerActBCAgent(Agent):
                         }, step=step)
             
         else:   # no neural renderer
-            print("didn't use_neual_rendering and rendering loss didn't start")
+            # print("didn't use_neual_rendering and rendering loss didn't start")
             if step % 10 == 0 and rank == 0:
                 lambda_BC = self.cfg.lambda_bc
                 cprint(f'total L: {total_loss.item():.4f} | \
@@ -1295,7 +1295,7 @@ class QAttentionPerActBCAgent(Agent):
         #  判断当前步骤是否应该进行渲染。
         to_render = (step % render_freq == 0 and self.use_neural_rendering and nerf_target_camera_extrinsic is not None)
         if to_render:
-            print("to_render start")
+            # print("to_render start")
             rgb_render, next_rgb_render, embed_render, gt_embed_render = self._q.render(
                 rgb_pcd=obs,
                 proprio=proprio,
@@ -1520,6 +1520,7 @@ class QAttentionPerActBCAgent(Agent):
         #                     prev_layer_bounds,
         #                     prev_layer_voxel_grid, 
         #                     use_neural_rendering=False)     # 
+        # 推理
         (
             right_q_trans,
             right_q_rot_grip,
@@ -1562,7 +1563,7 @@ class QAttentionPerActBCAgent(Agent):
                 left_q_ignore_collisions
             )
 
-        # argmax Q predictions
+        # argmax Q predictions 最大参数Q预测
         # coords, \
         # rot_and_grip_indicies, \
         # ignore_collisions = self._q.choose_highest_action(q_trans, q_rot_grip, q_ignore_collisions)

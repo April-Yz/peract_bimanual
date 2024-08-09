@@ -42,11 +42,11 @@ class GeneralizableGSEmbedNet(nn.Module):
         self.cfg = cfg
         self.with_gs_render = with_gs_render
 
-        print(colored(f"[GeneralizableNeRFEmbedNet]de的 with_gs_render参数: {with_gs_render}", "red"))
+        # print(colored(f"[GeneralizableNeRFEmbedNet]de的 with_gs_render参数: {with_gs_render}", "red"))
     
         # 坐标边界
         self.coordinate_bounds = cfg.coordinate_bounds # default: [-0.3, -0.5, 0.6, 0.7, 0.5, 1.6]
-        print(colored(f"[GeneralizableNeRFEmbedNet] coordinate_bounds: {self.coordinate_bounds}", "red"))
+        # print(colored(f"[GeneralizableNeRFEmbedNet] coordinate_bounds: {self.coordinate_bounds}", "red"))
     
         self.use_xyz = cfg.use_xyz
         d_in = 3 if self.use_xyz else 1
@@ -185,17 +185,17 @@ class GeneralizableGSEmbedNet(nn.Module):
         xyz_voxel_space = xyz_voxel_space.unsqueeze(1).unsqueeze(1)   
         # 在第二和第三维度上增加两个维度，使得 xyz_voxel_space 的形状变为 [B, 1, 1, N, 3]
         # xyz_voxel_space: [bs, 1, 1, N, 3]
-        print("def sample_in_canonical_voxel(self, xyz, voxel_feat): xyz_voxel_space.shape=", xyz_voxel_space.shape) # [2,1,1,16384,3]
+        # print("def sample_in_canonical_voxel(self, xyz, voxel_feat): xyz_voxel_space.shape=", xyz_voxel_space.shape) # [2,1,1,16384,3]
         # sample in voxel space 体素空间中的样本
-        print("def sample_in_canonical_voxel(self, xyz, voxel_feat): voxel_feat.shape=", voxel_feat.shape) # [2,1,100,100,100]
+        # print("def sample_in_canonical_voxel(self, xyz, voxel_feat): voxel_feat.shape=", voxel_feat.shape) # [2,1,100,100,100]
         point_feature = F.grid_sample(voxel_feat, xyz_voxel_space, align_corners=True, mode='bilinear')
-        print("point_feature.shape=", point_feature.shape)                                                  # [2,1,1,1,16384]
+        # print("point_feature.shape=", point_feature.shape)                                                  # [2,1,1,1,16384]
         # [bs, 128, 1, 1, N]
         # squeeze back to point cloud shape 
         point_feature = point_feature.squeeze(2).squeeze(2).permute(0, 2, 1)                                                            
         # 使用 squeeze 方法移除第二和第三维度（它们的大小为1），然后使用 permute 方法重新排列张量的形状，使其变为 [B, N, 128]。
         # [bs, N, 128]
-        print("def sample_in_canonical_voxel(self, xyz, voxel_feat): point_feature.shape=", point_feature.shape) # [2,16384,1]
+        # print("def sample_in_canonical_voxel(self, xyz, voxel_feat): point_feature.shape=", point_feature.shape) # [2,16384,1]
 
         return point_feature
 
@@ -236,7 +236,7 @@ class GeneralizableGSEmbedNet(nn.Module):
             z_feature = self.code(z_feature)    # [N, 39]
         
         # ----
-        print("point_latent.shape=",point_latent.shape,"z_feature.shape=",z_feature.shape)     # 输出z_feature张量的形状
+        # print("point_latent.shape=",point_latent.shape,"z_feature.shape=",z_feature.shape)     # 输出z_feature张量的形状
         latent = torch.cat((point_latent, z_feature), dim=-1) # [N, 128+39]
 
         # Camera frustum culling stuff, currently disabled

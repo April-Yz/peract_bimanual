@@ -39,9 +39,26 @@ def eval_seed(
     tasks = eval_cfg.rlbench.tasks
     rg = RolloutGenerator()
 
-    train_cfg.method.robot_name = eval_cfg.method.robot_name
+    # ---------------------------------------------------------
+    # train_cfg.method.robot_name = eval_cfg.method.robot_name
+    # agent = agent_factory.create_agent(train_cfg)
 
-    agent = agent_factory.create_agent(train_cfg)
+        # 根据训练配置中的方法名称创建对应的代理
+    if train_cfg.method.name == 'GNFACTOR_BC':
+        from agents import gnfactor_bc
+        train_cfg.method.use_neural_rendering = False # 当进行评估时，抑制神经渲染
+        agent = gnfactor_bc.launch_utils.create_agent(train_cfg)
+    elif train_cfg.method.name == 'PERACT_BC':
+        from agents import peract_bc
+        agent = peract_bc.launch_utils.create_agent(train_cfg)
+    elif train_cfg.method.name == 'ManiGaussian_BC2':       # 其实都是这个
+        from agents import manigaussian_bc2
+        train_cfg.method.use_neural_rendering = False # 当进行评估时，抑制神经渲染
+        agent = manigaussian_bc2.launch_utils.create_agent(train_cfg)
+    else:
+        raise ValueError('方法 %s 不存在。' % train_cfg.method.name)
+
+    # ---------------------------------------------------------
     stat_accum = SimpleAccumulator(eval_video_fps=30)
 
     cwd = os.getcwd()

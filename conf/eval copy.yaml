@@ -1,5 +1,5 @@
 defaults:
-    - method: ManiGaussian_BC2 # PERACT_BC
+    - method: PERACT_BC
 
 
 rlbench:
@@ -23,8 +23,8 @@ framework:
     tensorboard_logging: True
     csv_logging: True
     gpu: 0
-    logdir: "/home/zjyang/program/peract_bimanual/log-mani/mani"
-    # /mani/ManiGaussian_BC2"
+    logdir: "/home/zjyang/program/peract_bimanual/log-mani/mani/mani"
+    # /ManiGaussian_BC2"
     # '/home/zjyang/program/peract_bimanual/log'
     # /arm_test' 
     # '/tmp/arm_test/'
@@ -39,7 +39,7 @@ framework:
     eval_save_metrics: True
 
 cinematic_recorder:
-    enabled: True # False
+    enabled: False
     camera_resolution: [1280, 720]
     fps: 30
     rotate_speed: 0.005

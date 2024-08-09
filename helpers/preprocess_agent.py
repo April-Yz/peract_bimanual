@@ -113,10 +113,18 @@ class PreprocessAgent(Agent):
     def act(self, step: int, observation: dict, deterministic=False) -> ActResult:
         # observation = {k: torch.tensor(v) for k, v in observation.items()}
         for k, v in observation.items():
+            print(k, v.shape)
             if self._norm_rgb and "rgb" in k:
+                # print("helpers -------norm rgb")
                 observation[k] = self._norm_rgb_(v)
             else:
-                observation[k] = v.float()
+                # print("helpers -------norm rgb else说不定需要try")
+                # observation[k] = v.float()
+                try:
+                    observation[k] = v.float()
+                except:
+                    observation[k] = v
+                    pass # some elements are not tensors/arrays
         act_res = self._pose_agent.act(step, observation, deterministic)
         act_res.replay_elements.update({"demo": False})
         return act_res

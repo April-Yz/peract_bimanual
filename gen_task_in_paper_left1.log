@@ -1,0 +1,20 @@
+###Generating demonstrations for task: coordinated_lift_ball
+task = coordinated_lift_ball
+[08/09/24 19:48:25] INFO     INFO:root:Generating 20 episodes for each tasks ('coordinated_lift_ball',) with image size 128x128                    nerf_dataset_generator_bimanual.py:267
+[08/09/24 19:48:25] INFO     INFO:coordinated_lift_ball:Collecting data for coordinated_lift_ball                                                   nerf_dataset_generator_bimanual.py:97
+[08/09/24 19:48:26] INFO     INFO:coordinated_lift_ball:Using dual panda robot                                                                                         environment.py:117
+                    INFO     INFO:coordinated_lift_ball:Setting control mode for both robots                                                                       arm_action_modes.py:79
+                    WARNING  WARNING:coordinated_lift_ball:not sure how _robot_shapes are used is used.                                                            task_environment.py:58
+                    INFO     INFO:coordinated_lift_ball:Task has 1 possible variations                                                             nerf_dataset_generator_bimanual.py:155
+[NeRFTaskRecorder] num_views: 50
+  0%|          | 0/200 [00:00<?, ?it/s]                    WARNING  WARNING:coordinated_lift_ball:not sure how _robot_shapes are used is used.                                                            task_environment.py:58
+[08/09/24 19:48:27] INFO     INFO:coordinated_lift_ball:total waypoints 8, (right=4, left=4)                                                                                  task.py:368
+[08/09/24 19:48:30] INFO     INFO:coordinated_lift_ball:// Task: coordinated_lift_ball Variation 0 Demo 0                                          nerf_dataset_generator_bimanual.py:183
+                    INFO     INFO:coordinated_lift_ball:1**try nerf data generation1                                                               nerf_dataset_generator_bimanual.py:184
+                    INFO     INFO:coordinated_lift_ball:total waypoints 8, (right=4, left=4)                                                                                  task.py:368
+The X11 connection broke (error 1). Did the X11 server die?
+QMutex: destroying locked mutex
+
+Aborted.
+/home/zjyang/anaconda3/envs/rlbench/lib/python3.8/multiprocessing/resource_tracker.py:216: UserWarning: resource_tracker: There appear to be 1 leaked semaphore objects to clean up at shutdown
+  warnings.warn('resource_tracker: There appear to be %d '

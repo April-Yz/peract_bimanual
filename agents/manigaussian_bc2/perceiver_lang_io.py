@@ -513,8 +513,8 @@ class PerceiverVoxelLangEncoder(nn.Module):
         # print("PerceiverVoxelLangEncoder d1.shape: ", d1.shape)
         # print("multi_scale_voxel_list.shape: ", multi_scale_voxel_list.shape)
         d0 = self.input_preprocess(ins)  # new bimanual # [B,10,100,100,100] -> [B,64,100,100,100]
-        print("ins type======",type(ins),ins.shape)
-        print("PerceiverVoxelLangEncoder d0.shape: ", d0.shape)
+        # print("ins type======",type(ins),ins.shape)
+        # print("PerceiverVoxelLangEncoder d0.shape: ", d0.shape)
         # d0: [1, 128, 100, 100, 100]
         # multi_scale_voxel_list: [torch.Size([1, 10, 100, 100, 100]), torch.Size([1, 32, 25, 25, 25]), torch.Size([1, 16, 50, 50, 50])]
         
@@ -704,13 +704,13 @@ class PerceiverVoxelLangEncoder(nn.Module):
             u_right = self.final(torch.cat([d0, u0_right], dim=1)) # [1, 64, 100, 100, 100]
             u_left = self.final(torch.cat([d0, u0_left], dim=1))   # [1, 64, 100, 100, 100]
 
-        print("u_right.shape", u_right.shape,u_left.shape)
+        # print("u_right.shape", u_right.shape,u_left.shape)
 
         # translation decoder
         # trans = self.trans_decoder(latents) # [1, 1, 100, 100, 100]
         right_trans = self.right_trans_decoder(u_right) # [1, 1, 100, 100, 100]
         left_trans = self.left_trans_decoder(u_left)
-        print("right_trans.shape left_trans.shape",right_trans.shape,left_trans.shape)
+        # print("right_trans.shape left_trans.shape",right_trans.shape,left_trans.shape)
         # rotation, gripper, and collision MLPs
         # rot_and_grip_out = None
         # if self.num_rotation_classes > 0:
@@ -763,14 +763,14 @@ class PerceiverVoxelLangEncoder(nn.Module):
         # return trans, rot_and_grip_out, collision_out, d0, multi_scale_voxel_list, l # 原来的单臂操作
         # concatenated_tensor = torch.cat((tensor1, tensor2), dim=1)
         # logging.info(" right_trans",  right_trans.shape)
-        logging.info(f" right_trans:{right_trans.shape} right_rot_and_grip_out shape: {right_rot_and_grip_out.shape} right_collision_out: {right_collision_out.shape}")
+        # logging.info(f" right_trans:{right_trans.shape} right_rot_and_grip_out shape: {right_rot_and_grip_out.shape} right_collision_out: {right_collision_out.shape}")
         # print(" right_rot_and_grip_out", right_rot_and_grip_out.shape)
         # print(" right_collision_out", right_collision_out.shape)
-        print("d0",d0.shape)
+        # print("d0",d0.shape)
         # print("d1",d1.shape)
-        print("试试在这里拼接?现在有了")
+        # print("试试在这里拼接?现在有了")
         # d0=torch.cat((d0,d0),dim=1)
-        print("--------------------Perceiver output:--------------- ")
+        # print("--------------------Perceiver output:--------------- ")
         return (
             right_trans,
             right_rot_and_grip_out,

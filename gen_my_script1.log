@@ -4266,3 +4266,11 @@ Successfully saved 580 time steps
 2100it [4:59:41,  8.15s/it][A
 2101it [4:59:49,  8.11s/it][A[08/06/24 15:46:36] WARNING  WARNING:bimanual_pick_plate:Bad demo. Error in task bimanual_pick_plate. Demo was completed, but was not successful. Attempts left:  task_environment.py:188
                              0                                                                                                                                                           
+
+The X11 connection broke (error 1). Did the X11 server die?
+Aborted.
+Error in atexit._run_exitfuncs:
+Traceback (most recent call last):
+  File "/home/zjyang/anaconda3/envs/rlbench/lib/python3.8/multiprocessing/popen_fork.py", line 27, in poll
+    pid, sts = os.waitpid(self.pid, flag)
+KeyboardInterrupt

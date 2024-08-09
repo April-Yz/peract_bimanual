@@ -45,7 +45,7 @@ import torch
 @hydra.main(config_name="config", config_path="conf")
 def main(cfg: DictConfig) -> None:
 
-    print("main start")
+    # print("main start")
     cfg_yaml = OmegaConf.to_yaml(cfg)
     logging.info("\n" + cfg_yaml)
 
@@ -67,7 +67,7 @@ def main(cfg: DictConfig) -> None:
     for camera_name in cfg.rlbench.cameras:
         assert("rgb" not in camera_name)
 
-    print("use_depth=cfg.method.use_depth",cfg.method.use_depth)
+    # print("use_depth=cfg.method.use_depth",cfg.method.use_depth)
     obs_config = create_obs_config(
         cfg.rlbench.cameras, cfg.rlbench.camera_resolution, cfg.method.name,
         use_depth=cfg.method.use_depth, # !!! Mani新增的depth
@@ -139,7 +139,7 @@ def main(cfg: DictConfig) -> None:
             # we use fabric DDP 我们使用织物 DDP
             fabric = L.Fabric(devices=world_size, strategy='ddp')
             fabric.launch()
-            print("we  are using ddp ----------问题出在run_seed-----------------")
+            # print("we  are using ddp ----------问题出在run_seed-----------------")
             run_seed_fn.run_seed(
                                 0,  # 多rank, will be overwrited by fabric
                                 cfg,
@@ -150,7 +150,7 @@ def main(cfg: DictConfig) -> None:
                                 world_size,
                                 fabric, 
                                 )
-            print("we  are using ddp ------------end---------------")
+            # print("we  are using ddp ------------end---------------")
         else:
             # use pytorch DDP 
             # "DDP"指的是"Distributed Data Parallel"，即分布式数据并行
