@@ -59,7 +59,7 @@ tasks=[bimanual_pick_laptop,bimanual_push_single_button,coordinated_lift_tray,co
 # for debug
 demo=100
 episode_length=25 # 20 # 4
-
+logfreq=10000
 #########
 
 tmux select-pane -t 0 
@@ -69,6 +69,7 @@ CUDA_VISIBLE_DEVICES=${train_gpu} python train.py method=$method \
         rlbench.task_name=${exp_name} \
         framework.logdir=${logdir} \
         rlbench.demo_path=${train_demo_path} \
+        framework.log_freq=${logfreq} \
         framework.start_seed=${seed} \
         framework.use_wandb=${use_wandb} \
         framework.wandb_group=${exp_name} \

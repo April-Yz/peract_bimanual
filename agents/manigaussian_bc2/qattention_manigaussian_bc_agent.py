@@ -614,6 +614,7 @@ class QAttentionPerActBCAgent(Agent):
             self._q.to(device)
 
     # nerf[6]---
+    #  _preprocess_inputs和下面一模一样，有机会应该删一个的
     def _preprocess_inputs(self, replay_sample, sample_id=None):
         """用于预处理从回放缓冲区获取的输入数据，包括 RGB 图像、深度图、点云、相机内外参等。
         用于预处理从回放缓冲区(eplay buffer)获取的输入数据"""
@@ -681,7 +682,7 @@ class QAttentionPerActBCAgent(Agent):
     # nerf[6]---
 
     def _act_preprocess_inputs(self, observation):
-        """用于预处理来自环境的实时观察数据,以便进行动作选择(acting)"""
+        """Mani中原有方法 用于预处理来自环境的实时观察数据,以便进行动作选择(acting)"""
         obs, depths, pcds, exs, ins = [], [], [], [], []
         for n in self._camera_names:
             rgb = observation['%s_rgb' % n]
@@ -1489,11 +1490,13 @@ class QAttentionPerActBCAgent(Agent):
             right_proprio = right_proprio[0].to(self._device)
             left_proprio = left_proprio[0].to(self._device)
 
+        # for key in observation:
+        #     print(f"key={key}") # 都缺depth
         obs, depth, pcd, extrinsics, intrinsics = self._act_preprocess_inputs(observation)
 
         # correct batch size and device
         obs = [[o[0][0].to(self._device), o[1][0].to(self._device)] for o in obs]
-        proprio = proprio[0].to(self._device)
+        # proprio = proprio[0].to(self._device) # 已经在上面实现了（双臂是两句话）
         pcd = [p[0].to(self._device) for p in pcd]
         lang_goal_emb = lang_goal_emb.to(self._device)
         lang_token_embs = lang_token_embs.to(self._device)
@@ -1520,7 +1523,42 @@ class QAttentionPerActBCAgent(Agent):
         #                     prev_layer_bounds,
         #                     prev_layer_voxel_grid, 
         #                     use_neural_rendering=False)     # 
-        # 推理
+        # 推理 bimanual
+        # (
+        #     right_q_trans,
+        #     right_q_rot_grip,
+        #     right_q_ignore_collisions,
+        #     left_q_trans,
+        #     left_q_rot_grip,
+        #     left_q_ignore_collisions,
+        # ), vox_grid = self._q(
+        #     obs,
+        #     proprio,
+        #     pcd,
+        #     lang_goal_emb,
+        #     lang_token_embs,
+        #     bounds,
+        #     prev_layer_bounds,
+        #     prev_layer_voxel_grid,
+        # )
+        # 两边叫法有些不一样，注意区别
+        q, vox_grid, rendering_loss_dict = self._q(
+            obs,
+            depth, # nerf new
+            proprio,
+            pcd,
+            extrinsics, # nerf new although augmented, not used
+            intrinsics, # nerf new
+            lang_goal_emb,
+            lang_token_embs,
+            bounds,
+            prev_layer_bounds,
+            prev_layer_voxel_grid,
+            # nerf[3]---------------------
+            use_neural_rendering=False
+            # nerf[3]---------------------
+        )
+
         (
             right_q_trans,
             right_q_rot_grip,
@@ -1528,17 +1566,8 @@ class QAttentionPerActBCAgent(Agent):
             left_q_trans,
             left_q_rot_grip,
             left_q_ignore_collisions,
-        ), vox_grid = self._q(
-            obs,
-            proprio,
-            pcd,
-            lang_goal_emb,
-            lang_token_embs,
-            bounds,
-            prev_layer_bounds,
-            prev_layer_voxel_grid,
-        )
-
+            # left_q_collision,
+        ) = q
         # softmax Q predictions
         # q_trans = self._softmax_q_trans(q_trans)
         # q_rot_grip =  self._softmax_q_rot_grip(q_rot_grip) if q_rot_grip is not None else q_rot_grip
@@ -1754,13 +1783,14 @@ class QAttentionPerActBCAgent(Agent):
         #         transforms.ToTensor()(left_visualization),
         #     ),
         # ]
-        return [
-            ImageSummary('%s/act_Qattention' % self._name,
-                         transforms.ToTensor()(visualise_voxel(
-                             self._act_voxel_grid.cpu().numpy(),
-                             self._act_qvalues.cpu().numpy(),
-                             self._act_max_coordinate.cpu().numpy())))]
-        # return []
+        # Mani写法
+        # return [
+        #     ImageSummary('%s/act_Qattention' % self._name,
+        #                  transforms.ToTensor()(visualise_voxel(
+        #                      self._act_voxel_grid.cpu().numpy(),
+        #                      self._act_qvalues.cpu().numpy(),
+        #                      self._act_max_coordinate.cpu().numpy())))]
+        return []
 
 
     def load_weights(self, savedir: str):

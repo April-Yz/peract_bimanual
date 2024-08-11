@@ -113,7 +113,7 @@ class PreprocessAgent(Agent):
     def act(self, step: int, observation: dict, deterministic=False) -> ActResult:
         # observation = {k: torch.tensor(v) for k, v in observation.items()}
         for k, v in observation.items():
-            print(k, v.shape)
+            # print(k, v.shape)
             if self._norm_rgb and "rgb" in k:
                 # print("helpers -------norm rgb")
                 observation[k] = self._norm_rgb_(v)

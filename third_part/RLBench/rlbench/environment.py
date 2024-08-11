@@ -177,7 +177,8 @@ class Environment(object):
             self._pyrep, self._robot, self._scene, task,
             self._action_mode, self._dataset_root, self._obs_config,
             self._static_positions, self._attach_grasped_objects,
-            self._shaped_rewards)
+            self._shaped_rewards # 这个是一个bimanual新的
+            )
 
     @property
     def action_shape(self):

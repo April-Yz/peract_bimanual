@@ -23,6 +23,7 @@ import peract_config
 from functools import partial
 # new
 import lightning as L
+from termcolor import cprint
 # new
 def run_seed(
     rank,
@@ -245,8 +246,8 @@ def run_seed(
     weightsdir = os.path.join(cwd, "seed%d" % seed, "weights")
     logdir = os.path.join(cwd, "seed%d" % seed)
 
-    # yzj打印项目路径
-    # cprint(f'Project path: {weightsdir}', 'cyan')
+    # yzj权重项目路径
+    cprint(f'Project path: {weightsdir}', 'cyan')
 
     # yzj训练器
     train_runner = OfflineTrainRunner(

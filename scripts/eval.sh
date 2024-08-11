@@ -19,24 +19,30 @@ addition_info="$(date +%Y%m%d)"
 exp_name=${3:-"${method}_${addition_info}"}
 
 starttime=`date +'%Y-%m-%d %H:%M:%S'`
-printf 'exp_name = %s\n' "$exp_name"
-printf '%s\n' "$starttime"
-
+# printf 'exp_name = %s\n' "$exp_name"
+# printf '%s\n' "$starttime"
+tasks=[bimanual_pick_laptop,bimanual_push_single_button,coordinated_lift_tray,coordinated_push_box,coordinated_put_bottle_in_fridge,handover_item_medium]
+eval_type='last' # or 'best', 'missing', or 'last'
 # camera=True
-camera=False
+camera=False # 是否录制视频
 gripper_mode='BimanualDiscrete'
 arm_action_mode='BimanualEndEffectorPoseViaPlanning'
 action_mode='BimanualMoveArmThenGripper'
+logdir="/home/zjyang/program/peract_bimanual/log-mani/${exp_name}"
+# printf "logdir = %s\n" "$logdir"
+# printf "${logdir}"
 
 CUDA_VISIBLE_DEVICES=${eval_gpu} xvfb-run -a python eval.py \
     rlbench.task_name=${exp_name} \
     rlbench.demo_path=${test_demo_path} \
     framework.start_seed=${seed} \
+    framework.eval_type=${eval_type} \
     cinematic_recorder.enabled=${camera} \
     rlbench.gripper_mode=${gripper_mode} \
     rlbench.arm_action_mode=${arm_action_mode} \
-    rlbench.action_mode=${action_mode}
-
+    rlbench.action_mode=${action_mode} \
+    framework.logdir=${logdir} \
+    rlbench.tasks=${tasks} 
 
 endtime=`date +'%Y-%m-%d %H:%M:%S'`
 start_seconds=$(date --date="$starttime" +%s);

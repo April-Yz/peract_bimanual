@@ -32,22 +32,33 @@ ROBOT_STATE_KEYS = ['joint_velocities', 'joint_positions', 'joint_forces',
 def _extract_obs_bimanual(obs: BimanualObservation, channels_last: bool, observation_config: ObservationConfig):
     obs_dict = vars(obs)
     obs_dict = {k: v for k, v in obs_dict.items() if v is not None}
+    # for key in obs_dict:
+        # print(f"key: {key}")  # perception_data task_low_dim_state misc right left  
 
     right_robot_state = obs.get_low_dim_data(obs.right)
     left_robot_state = obs.get_low_dim_data(obs.left)
 
     obs_dict = {k: v for k, v in obs_dict.items()
             if k not in ROBOT_STATE_KEYS}
-
+    # for key in obs_dict:
+        # print(f"key inrlenv: {key}") # ouput=precetion_data
+    # for key, v in obs.perception_data.items():
+        # print(f"key in perception_data: {key} {v}") 
+    
     if not channels_last:
+        # print("运行的上面所说的的无depth")
         # Swap channels from last dim to 1st dim
         obs_dict = {k: np.transpose(v, [2, 0, 1]) if v.ndim == 3 else np.expand_dims(v, 0)
                     for k, v in obs.perception_data.items() if v is not None}
     else:
-        # Add extra dim to depth data
+        # print("运行的下面有depth")
+        # Add extra dim to depth data 为深度数据添加额外的暗淡
         obs_dict = {k: v if v.ndim == 3 else np.expand_dims(v, -1)
                     for k, v in obs.perception_data.items() if v is not None}
-        
+
+    # for key in obs_dict.keys():
+        # print(f"_extract_obs_bimanual返回时无depth key={key}")        
+
     if observation_config.robot_name == 'right':
         obs_dict['low_dim_state'] = right_robot_state.astype(np.float32)
         obs_dict['ignore_collisions'] = np.array([obs.right.ignore_collisions], dtype=np.float32)
@@ -68,6 +79,8 @@ def _extract_obs_bimanual(obs: BimanualObservation, channels_last: bool, observa
         if config.point_cloud:
             obs_dict[f'{camera_name}_camera_extrinsics'] = obs.misc[f'{camera_name}_camera_extrinsics']
             obs_dict[f'{camera_name}_camera_intrinsics'] = obs.misc[f'{camera_name}_camera_intrinsics']
+    # for key in obs_dict.keys():
+    #     print(f"_extract_obs_bimanual返回时无depth key={key}")
     return obs_dict
     
 
@@ -182,7 +195,7 @@ class RLBenchEnv(Env):
                  observation_config: ObservationConfig,
                  action_mode: ActionMode,
                  dataset_root: str = '',
-                 channels_last=False,
+                 channels_last=False,      # 原来是False为了Mani改的，多了depth信息 False,
                  headless=True,
                  include_lang_goal_in_obs=False):
         super(RLBenchEnv, self).__init__()
@@ -202,7 +215,9 @@ class RLBenchEnv(Env):
 
 
     def extract_obs(self, obs: Observation):
+        # 改nerf
         if isinstance(obs, BimanualObservation):
+            # print("到了这里还是双臂桀桀桀")
             extracted_obs = _extract_obs_bimanual(obs, self._channels_last, self._observation_config)
         else:
             extracted_obs = _extract_obs_unimanual(obs, self._channels_last, self._observation_config)

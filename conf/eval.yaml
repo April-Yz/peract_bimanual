@@ -39,7 +39,7 @@ framework:
     eval_save_metrics: True
 
 cinematic_recorder:
-    enabled: True # False
+    enabled: False
     camera_resolution: [1280, 720]
     fps: 30
     rotate_speed: 0.005

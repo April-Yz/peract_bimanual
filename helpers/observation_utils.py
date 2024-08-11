@@ -253,6 +253,8 @@ def extract_obs_bimanual(
     obs.left.gripper_matrix = left_grip_mat
     obs.left.joint_positions = left_joint_pos
     obs.left.gripper_pose = left_grip_pose
+    # for key in right_grip_mat:
+    #     print("helpers observation_utils.py --- right_grip_mat[key]", right_grip_mat[key])
 
     # Mani NERF 新增----------------------------------
     obs_dict['nerf_multi_view_rgb'] = nerf_multi_view_rgb
@@ -283,7 +285,7 @@ def create_obs_config(
     camera_names: List[str],
     camera_resolution: List[int],
     method_name: str,
-    use_depth:bool,
+    use_depth:bool = True,
     robot_name: str = "bimanual"
 ):
     unused_cams = CameraConfig()
@@ -292,13 +294,14 @@ def create_obs_config(
         rgb=True,
         point_cloud=True,
         mask=False,
-        depth=False,
+        depth=use_depth, #mani 特有 元False,
         image_size=camera_resolution,
         render_mode=RenderMode.OPENGL,
     )
 
     camera_configs = {camera_name: used_cams for camera_name in camera_names}
-
+    # for keys in camera_configs:
+        # print("camera_configs",keys) # over_shoulder_left等相机
     # Some of these obs are only used for keypoint detection.
     obs_config = ObservationConfig(
         camera_configs=camera_configs,
@@ -313,4 +316,7 @@ def create_obs_config(
         gripper_joint_positions=True,
         robot_name=robot_name
     )
+    # for key in obs_config:
+        # print("obs_config",key)
+    # print(obs_config) # <rlbench.observation_config.ObservationConfig object at 0x72d49f1cb340>
     return obs_config

@@ -181,6 +181,7 @@ class OfflineTrainRunner():
             existing_weights = sorted([int(f) for f in os.listdir(self._weightsdir)])
             if (not self._load_existing_weights) or len(existing_weights) == 0:
                 # 新加一行
+                logging.info('No existing weights found, starting from scratch')
                 self._save_model(0)
                 start_iter = 0
             else:

@@ -222,6 +222,7 @@ class Scene(object):
                           get_pcd: bool, rgb_noise: NoiseModel,
                           depth_noise: NoiseModel, depth_in_meters: bool):
             rgb = depth = pcd = None
+            # print("get_rgb_depth depth:",get_depth)
             if sensor is not None and (get_rgb or get_depth):
                 sensor.handle_explicitly()
                 if get_rgb:
@@ -231,6 +232,7 @@ class Scene(object):
                     rgb = np.clip((rgb * 255.).astype(np.uint8), 0, 255)
                 if get_depth or get_pcd:
                     depth = sensor.capture_depth(depth_in_meters)
+                    # print(depth.shape)
                     if depth_noise is not None:
                         depth = depth_noise.apply(depth)
                 if get_pcd:
@@ -252,7 +254,7 @@ class Scene(object):
             return mask
 
         for camera_name, camera_config in self._obs_config.camera_configs.items():            
-
+            # print(self.camera_sensors[camera_name],camera_name)
             rgb_data, depth_data, pcd_data = get_rgb_depth(self.camera_sensors[camera_name], camera_config.rgb, camera_config.depth, camera_config.point_cloud,
             camera_config.rgb_noise, camera_config.depth_noise, camera_config.depth_in_meters)
 

@@ -138,17 +138,20 @@ class TaskEnvironment(object):
             if self._dataset_root is None or len(self._dataset_root) == 0:
                 raise RuntimeError(
                     "Can't ask for stored demo when no dataset root provided.")
+            # print("taskEnvironment get_demos case1")
             demos = utils.get_stored_demos(
                 amount, image_paths, self._dataset_root, self._variation_number,
                 self._task.get_name(), self._obs_config,
                 random_selection, from_episode_number)
         elif not self._robot.is_bimanual:
+            # print("taskEnvironment get_demos case2")
             ctr_loop = self._robot.arm.joints[0].is_control_loop_enabled()
             self._robot.arm.set_control_loop_enabled(True)
             demos = self._get_live_demos(
                 amount, callable_each_step, max_attempts)
             self._robot.arm.set_control_loop_enabled(ctr_loop)
         elif self._robot.is_bimanual:
+            # print("taskEnvironment get_demos case3")
             # logging.info("11**try self._robot.is_bimanual **11")
             ctr_loop_right = self._robot.right_arm.joints[0].is_control_loop_enabled()
             ctr_loop_left = self._robot.left_arm.joints[0].is_control_loop_enabled()
@@ -160,7 +163,9 @@ class TaskEnvironment(object):
             # logging.info("13**try self._robot.is_bimanual **13")
             self._robot.right_arm.set_control_loop_enabled(ctr_loop_right)
             self._robot.left_arm.set_control_loop_enabled(ctr_loop_left)
-
+        # for key,v in demos[0][1].perception_data.items():
+        #     if key.endswith("_depth"): # 在这里还有depth
+        #         print("taskenvironment",key,v.shape)   # 还是有数据的
         return demos
 
     def _get_live_demos(self, amount: int,

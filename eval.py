@@ -64,6 +64,7 @@ def eval_seed(
     cwd = os.getcwd()
     weightsdir = os.path.join(logdir, "weights")
 
+    print("ready to independent_env_runner")
     env_runner = IndependentEnvRunner(
         train_env=None,
         agent=agent,
@@ -84,7 +85,7 @@ def eval_seed(
         multi_task=multi_task,
     )
 
-    env_runner._on_thread_start = peract_config.config_logging
+    env_runner._on_thread_start = peract_config.config_logging # ?bimanual
 
     manager = mp.Manager()
     save_load_lock = manager.Lock()
@@ -146,7 +147,7 @@ def eval_seed(
         weight_folders = [weight_folders[-1]]
         print("Last weight:", weight_folders)
 
-    elif eval_cfg.framework.eval_type == "all":
+    elif eval_cfg.framework.eval_type == "all": # 多的
         weight_folders = os.listdir(weightsdir)
         weight_folders = sorted(map(int, weight_folders))
 
@@ -251,7 +252,7 @@ def main(eval_cfg: DictConfig) -> None:
         eval_cfg.method.name,
         eval_cfg.method.robot_name
     )
-
+    print("obs_config=",obs_config) # obs_config= <rlbench.observation_config.ObservationConfig object at 0x72d49f1cb340>
     if eval_cfg.cinematic_recorder.enabled:
         obs_config.record_gripper_closing = True
 
@@ -267,6 +268,7 @@ def main(eval_cfg: DictConfig) -> None:
 
     # single-task or multi-task
     if multi_task:
+        print("mutitask")
         env_config = (
             task_classes,
             obs_config,
@@ -280,6 +282,7 @@ def main(eval_cfg: DictConfig) -> None:
             eval_cfg.framework.record_every_n,
         )
     else:
+        print("singletask")
         env_config = (
             task_classes[0],
             obs_config,

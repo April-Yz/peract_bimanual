@@ -30,7 +30,9 @@ class RolloutGenerator(object):
         else:
             env.set_variation(eval_demo_seed)
             obs = env.reset(novel_command=novel_command)
-
+        # 好吧，可能还是在上面那个novel的问题
+        # for key in obs:
+            # print(f"key={key}") # 都缺depth
         if cam_view_change:
             cam_placeholder = Dummy('cam_cinematic_base')
             cam_front = VisionSensor('cam_front')
@@ -55,6 +57,8 @@ class RolloutGenerator(object):
             # previous in nerf mani
             # prepped_data = {k:torch.tensor([v], device=self._env_device) for k, v in obs_history.items()}
             # now in mani nerf
+            # for key in obs_history:
+            #     print(f"key={key}") # 都缺depth
             prepped_data = {k:torch.tensor(np.array([v]), device=self._env_device) for k, v in obs_history.items()}
             # new for nerf mani
             prepped_data['lang_goal'] = lang_goal # new for nerf mani

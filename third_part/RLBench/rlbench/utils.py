@@ -51,20 +51,21 @@ def get_stored_demos(amount: int, image_paths: bool, dataset_root: str,
                      obs_config: ObservationConfig,
                      random_selection: bool = True,
                      from_episode_number: int = 0) -> List[Demo]:
-
+    # print("激动地心颤抖的手，给我eval干到train一样的出错位置来了，depth错误train也是再这里解决的") # 在此处问题已解决，注释
     task_root = join(dataset_root, task_name)
     if not exists(task_root):
         raise RuntimeError("Can't find the demos for %s at: %s" % (
             task_name, task_root))
 
     if variation_number == -1:
-        # All variations
+        # All variations 所有变体
         examples_path = join(
             task_root, VARIATIONS_ALL_FOLDER,
             EPISODES_FOLDER)
         examples = listdir(examples_path)
     else:
         # Sample an amount of examples for the variation of this task
+        # 对此任务的变化进行示例数量的抽样
         examples_path = join(
             task_root, VARIATIONS_FOLDER % variation_number,
             EPISODES_FOLDER)
@@ -186,8 +187,8 @@ def get_stored_demos(amount: int, image_paths: bool, dataset_root: str,
                     image = np.array(_resize_if_needed(Image.open(image_path), camera_config.image_size))
                     obs[i].perception_data[f"{camera_name}_rgb"] = image
                 
-                if camera_config.depth:
-                    print("--------------camera_config.depth------------")
+                # if camera_config.depth:
+                    # print("--------------camera_config.depth------------")
                 
                 if camera_config.depth or camera_config.point_cloud:
                     # print("-------------- camera_config.point_cloud camera_config.depth------------")
@@ -198,12 +199,15 @@ def get_stored_demos(amount: int, image_paths: bool, dataset_root: str,
                     # -----------------------------------try-----------------------------------
                     # if camera_config.depth:
                     if camera_config.depth_in_meters:
+                        # print("depth case 1")
                         near = obs[i].misc[f'{camera_name}_camera_near']
                         far = obs[i].misc[f'{camera_name}_camera_far']
                         depth_image_m = near + image * (far - near)
                         obs[i].perception_data[f"{camera_name}_depth"] = camera_config.depth_noise.apply(depth_image_m)
-                    else:                        
+                    else:                      
                         obs[i].perception_data[f"{camera_name}_depth"] = camera_config.depth_noise.apply(image)
+                        # print(f"depth case 2 {camera_name}_depth ")
+                        # print(obs[i].perception_data[f"{camera_name}_depth"].shape) # [128,128]没毛病啊  
 
                     # if camera_config.point_cloud:
                     near = obs[i].misc[f'{camera_name}_camera_near']
@@ -459,6 +463,14 @@ def get_stored_demos(amount: int, image_paths: bool, dataset_root: str,
         #                     obs_config.front_camera.image_size)))
         # # ----------------------------------mani--------------------------------------------------    
         demos.append(obs)
+        # eval问题中depth缺失，在task_environment中也有depth，所以全部注释
+        # for key in obs[1].perception_data:
+            # for i in key:
+            # print("obs in get_stored_demos",key)
+        # for key,v in obs[1].perception_data.items(): # 在这里也还有depth
+            # if key.endswith("_depth"):
+                # print("Cusrim_rlbench_env.py CustomRLBenchEnv",key,v) # 坏了全部出在这，都是None
+        # print(type(obs))
     return demos
 
 

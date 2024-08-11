@@ -6,13 +6,15 @@ from typing import Union
 from yarr.agents.agent import Agent
 from yarr.envs.env import Env
 from yarr.replay_buffer.replay_buffer import ReplayBuffer
-from yarr.runners._independent_env_runner import _IndependentEnvRunner
+from yarr.runners._independent_env_runner_novel_command import _IndependentEnvRunner
 from yarr.utils.rollout_generator import RolloutGenerator
 from yarr.utils.stat_accumulator import StatAccumulator, SimpleAccumulator
 from yarr.agents.agent import Summary
 from helpers.custom_rlbench_env import CustomRLBenchEnv, CustomMultiTaskRLBenchEnv
 
 from yarr.runners.env_runner import EnvRunner
+
+from termcolor import cprint
 
 
 class IndependentEnvRunner(EnvRunner):
@@ -71,23 +73,16 @@ class IndependentEnvRunner(EnvRunner):
 
         return summaries
 
-    # serialized evaluator for individual tasks 单个任务的序列化评估器
+    # serialized evaluator for individual tasks
     def start(self, weight,
               save_load_lock, writer_lock,
               env_config,
               device_idx,
               save_metrics,
               cinematic_recorder_cfg,
-              novel_command=None, # new mani
-              use_eval_demo=True  #new mani 
-              ):
-        print("independentenc_env_runner.py --- start function")
-        # bimanual特有的两行
-        if hasattr(self, "_on_thread_start"):
-            self._on_thread_start()
-            
+              novel_command=None,
+              use_eval_demo=True):
         multi_task = isinstance(env_config[0], list)
-        print("multi_task: ", multi_task) # false
         if multi_task:
             eval_env = CustomMultiTaskRLBenchEnv(
                 task_classes=env_config[0],
@@ -101,7 +96,6 @@ class IndependentEnvRunner(EnvRunner):
                 time_in_state=env_config[8],
                 record_every_n=env_config[9])
         else:
-            print("independent signle task")
             eval_env = CustomRLBenchEnv(
                 task_class=env_config[0],
                 observation_config=env_config[1],
@@ -126,14 +120,17 @@ class IndependentEnvRunner(EnvRunner):
             num_eval_runs=self._num_eval_runs)
 
         stat_accumulator = SimpleAccumulator(eval_video_fps=30)
-        USE_EVAL_DEMO = use_eval_demo # new in mani
+        USE_EVAL_DEMO = use_eval_demo
+        # USE_EVAL_DEMO = False
+
         self._internal_env_runner._run_eval_independent('eval_env',
                                                         stat_accumulator,
                                                         weight,
                                                         writer_lock,
-                                                        USE_EVAL_DEMO, # True, # replace
+                                                        USE_EVAL_DEMO,
                                                         device_idx,
                                                         save_metrics,
                                                         cinematic_recorder_cfg,
-                                                        novel_command # new 
-                                                        )
+                                                        novel_command)
+    
+        

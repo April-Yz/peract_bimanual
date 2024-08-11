@@ -17,11 +17,11 @@ from yarr.envs.env import Env
 from yarr.utils.rollout_generator import RolloutGenerator
 from yarr.utils.log_writer import LogWriter
 from yarr.utils.process_str import change_case
-from yarr.utils.video_utils import CircleCameraMotion, TaskRecorder
+from yarr.utils.video_utils import CircleCameraMotion, TaskRecorder, StaticCameraMotion
 
 from pyrep.objects.dummy import Dummy
 from pyrep.objects.vision_sensor import VisionSensor
-from pyrep.const import RenderMode # new for mani
+from pyrep.const import RenderMode
 
 from yarr.runners._env_runner import _EnvRunner
 
@@ -118,8 +118,7 @@ class _IndependentEnvRunner(_EnvRunner):
                               device_idx=0,
                               save_metrics=True,
                               cinematic_recorder_cfg=None,
-                              novel_command=None # new mani
-                              ):
+                              novel_command=None):
 
         self._name = name
         self._save_metrics = save_metrics
@@ -127,9 +126,10 @@ class _IndependentEnvRunner(_EnvRunner):
 
         self._agent = copy.deepcopy(self._agent)
 
-        device = torch.device('cuda:%d' % device_idx) if torch.cuda.device_count() > 1 else torch.device('cuda:0')
-        print("Device count: %d" % torch.cuda.device_count()) # new mani
-        print('Using device: %s' % device)                    # new mani
+        # device = torch.device('cuda:%d' % device_idx) if torch.cuda.device_count() > 1 else torch.device('cuda:0')
+        device = torch.device('cuda:%d' % device_idx)
+        print("Device count: %d" % torch.cuda.device_count())
+        print('Using device: %s' % device)
 
         with writer_lock: # hack to prevent multiple CLIP downloads ... argh should use a separate lock
             self._agent.build(training=False, device=device)
@@ -147,29 +147,30 @@ class _IndependentEnvRunner(_EnvRunner):
         # initialize cinematic recorder if specified
         rec_cfg = cinematic_recorder_cfg
         if rec_cfg.enabled:
+            
+            # cam = VisionSensor.create(rec_cfg.camera_resolution, render_mode=RenderMode.OPENGL)
+            # cam.set_pose(cam_placeholder.get_pose())
+            
+            
+            cam = VisionSensor('cam_front')
             cam_placeholder = Dummy('cam_cinematic_placeholder')
-            # new mani
-            cam = VisionSensor.create(rec_cfg.camera_resolution, render_mode=RenderMode.OPENGL)
-            # cam = VisionSensor.create(rec_cfg.camera_resolution)
-            cam.set_pose(cam_placeholder.get_pose())
-            # cam.set_pose(cam_front.get_pose())
-            cam.set_parent(cam_placeholder)
+            cam.set_parent(cam_placeholder) # key to make cam moves
 
-            cam_motion = CircleCameraMotion(cam, Dummy('cam_cinematic_base'), rec_cfg.rotate_speed)
-            tr = TaskRecorder(env, cam_motion, fps=rec_cfg.fps)
+            # cam_motion = StaticCameraMotion(cam, Dummy('cam_cinematic_base'), rec_cfg.rotate_speed)
+            rotate_speed=0.005
+            # !! 旋转
+            cam_motion = CircleCameraMotion(cam, Dummy('cam_cinematic_base'), speed=rotate_speed)
 
-            for _ in range(200): # new for nerf mani
-                tr._cam_motion.step()
-            tr._cam_motion.save_pose()
+            task_recorder = TaskRecorder(env, cam_motion, fps=rec_cfg.fps)
 
-            env.env._action_mode.arm_action_mode.set_callable_each_step(tr.take_snap)
+            env.env._action_mode.arm_action_mode.set_callable_each_step(task_recorder.take_snap)
 
         if not os.path.exists(self._weightsdir):
             raise Exception('No weights directory found.')
 
         # to save or not to save evaluation metrics (set as False for recording videos)
         if self._save_metrics:
-            csv_file = 'eval_data.csv' if not self._is_test_set else 'test_data.csv'
+            csv_file = 'eval_data_cam_view.csv' if not self._is_test_set else 'test_data.csv'
             writer = LogWriter(self._logdir, True, True,
                                env_csv=csv_file)
 
@@ -187,7 +188,7 @@ class _IndependentEnvRunner(_EnvRunner):
 
         for n_eval in range(self._num_eval_runs):
             if rec_cfg.enabled:
-                tr._cam_motion.save_pose()
+                task_recorder._cam_motion.save_pose()
 
             # best weight for each task (used for test evaluation)
             if type(weight) == dict:
@@ -207,28 +208,25 @@ class _IndependentEnvRunner(_EnvRunner):
 
                 # the current task gets reset after every M episodes
                 episode_rollout = []
+
                 generator = self._rollout_generator.generator(
                     self._step_signal, env, self._agent,
                     self._episode_length, self._timesteps,
                     eval, eval_demo_seed=eval_demo_seed,
                     record_enabled=rec_cfg.enabled,
-                    novel_command=novel_command # new mani
-                    )
+                    novel_command=novel_command,
+                    cam_view_change=True)
                 try:
-                    # print("run_eval 0")
                     for replay_transition in generator:
                         while True:
-                            # print("run_eval 1")
                             if self._kill_signal.value:
                                 env.shutdown()
                                 return
-                            # print("run_eval 2")
                             if (eval or self._target_replay_ratio is None or
                                     self._step_signal.value <= 0 or (
                                             self._current_replay_ratio.value >
                                             self._target_replay_ratio)):
                                 break
-                            print("run_eval 3")
                             time.sleep(1)
                             logging.debug(
                                 'Agent. Waiting for replay_ratio %f to be more than %f' %
@@ -241,6 +239,8 @@ class _IndependentEnvRunner(_EnvRunner):
                                 for s in self._agent.act_summaries():
                                     self.agent_summaries.append(s)
                         episode_rollout.append(replay_transition)
+                        # print("len(episode_rollout): ", len(episode_rollout))
+                        
                 except StopIteration as e:
                     continue
                 except Exception as e:
@@ -256,13 +256,15 @@ class _IndependentEnvRunner(_EnvRunner):
                         stats_accumulator.step(transition, eval)
                         current_task_id = transition.info['active_task_id']
 
+
                 self._num_eval_episodes_signal.value += 1
 
                 task_name, _ = self._get_task_name()
                 reward = episode_rollout[-1].reward
                 lang_goal = env._lang_goal
-                print(f"Evaluating {task_name} | Episode {ep} | Score: {reward} | Lang Goal: {lang_goal}")
-
+                time_cost = time.time() - start_time
+                print(f"Evaluating {task_name} | Episode {ep} | Score: {reward} | Lang Goal: {lang_goal} | Time: {time_cost:.2f}s")
+                
                 # save recording
                 if rec_cfg.enabled:
                     success = reward > 0.99
@@ -274,8 +276,8 @@ class _IndependentEnvRunner(_EnvRunner):
 
                     lang_goal = self._eval_env._lang_goal
 
-                    tr.save(record_file, lang_goal, reward)
-                    tr._cam_motion.restore_pose()
+                    task_recorder.save(record_file, lang_goal, reward)
+                    task_recorder._cam_motion.restore_pose()
 
             # report summaries
             summaries = []

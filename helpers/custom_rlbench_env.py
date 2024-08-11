@@ -106,7 +106,8 @@ class CustomRLBenchEnv(RLBenchEnv):
             )
 
         obs_dict = super(CustomRLBenchEnv, self).extract_obs(obs)
-
+        # for key in obs_dict:
+            # print(f"key in obs dict: {key}")
         if self._time_in_state:
             time = (
                 1.0 - ((self._i if t is None else t) / float(self._episode_length - 1))
@@ -135,6 +136,9 @@ class CustomRLBenchEnv(RLBenchEnv):
         obs_dict['left_gripper_joint_positions'] = obs.left.gripper_joint_positions
         obs_dict['right_joint_positions'] = obs.right.joint_positions
         obs_dict['right_gripper_joint_positions'] = obs.right.gripper_joint_positions
+
+        # for key in obs_dict:
+            # print("obs_dict",key)
 
         return obs_dict
 
@@ -185,7 +189,7 @@ class CustomRLBenchEnv(RLBenchEnv):
             self._record_cam.set_pose(cam_placeholder.get_pose())
             self._record_cam.set_render_mode(RenderMode.OPENGL)
 
-    def reset(self) -> dict:
+    def reset(self, novel_command=None) -> dict:
         self._i = 0
         self._previous_obs_dict = super(CustomRLBenchEnv, self).reset()
         self._record_current_episode = (
@@ -193,6 +197,7 @@ class CustomRLBenchEnv(RLBenchEnv):
         )
         self._episode_index += 1
         self._recorded_images.clear()
+        self._lang_goal = self._task.get_task_descriptions()[0] if novel_command is None else novel_command # new for mani nerf
         return self._previous_obs_dict
 
     def register_callback(self, func):
@@ -268,7 +273,7 @@ class CustomRLBenchEnv(RLBenchEnv):
             )
         return Transition(obs, reward, terminal, summaries=summaries)
 
-    def reset_to_demo(self, i):
+    def reset_to_demo(self, i, novel_command=None):
         self._i = 0
         # super(CustomRLBenchEnv, self).reset()
 
@@ -277,11 +282,24 @@ class CustomRLBenchEnv(RLBenchEnv):
             1, live_demos=False, random_selection=False, from_episode_number=i
         )
 
-        self._task.set_variation(d.variation_number)
-        _, obs = self._task.reset_to_demo(d)
-        self._lang_goal = self._task.get_task_descriptions()[0]
+        # for key,v in d[0].perception_data.items(): # 在这里还有depth
+            # if key.endswith("depth"):
+                # print("Cusrim_rlbench_env.py CustomRLBenchEnv",key,v.shape)
 
+        self._task.set_variation(d.variation_number)
+        _, obs = self._task.reset_to_demo(d)  #战犯？
+        # print("reset to demo运行过 d",d) # <rlbench.demo.Demo object at 0x7f8e1549b2e0>
+        # for key,v in obs.perception_data.items(): # 在这里也还有depth
+            # if key.endswith("_depth"):
+                # print("Cusrim_rlbench_env.py CustomRLBenchEnv",key,v) # 坏了全部出在这，都是None
+
+        self._lang_goal = self._task.get_task_descriptions()[0] if novel_command is None else novel_command
+        # print("分割线-----以下有问题就说明是 self._previous_obs_dict = self.extract_obs(obs)的问题")
         self._previous_obs_dict = self.extract_obs(obs)
+        # print("reset to demo运行过")
+
+        # for key in self._previous_obs_dict:
+            # print(f"reset to  demo key={key}") # 缺depth
         self._record_current_episode = (
             self.eval and self._episode_index % self._record_every_n == 0
         )
@@ -540,7 +558,9 @@ class CustomMultiTaskRLBenchEnv(MultiTaskRLBenchEnv):
             )
         return Transition(obs, reward, terminal, summaries=summaries)
 
-    def reset_to_demo(self, i, variation_number=-1):
+    def reset_to_demo(self, i, variation_number=-1, 
+                      novel_command=None # new 
+                      ):
         if self._episodes_this_task == self._swap_task_every:
             self._set_new_task()
             self._episodes_this_task = 0
@@ -561,9 +581,15 @@ class CustomMultiTaskRLBenchEnv(MultiTaskRLBenchEnv):
 
         self._task.set_variation(d.variation_number)
         _, obs = self._task.reset_to_demo(d)
-        self._lang_goal = self._task.get_task_descriptions()[0]
+        self._lang_goal = self._task.get_task_descriptions()[0] if novel_command is None else novel_command
 
         self._previous_obs_dict = self.extract_obs(obs)
+        # 运行的是上面不带muti的
+        # print("reset to demo运行过")
+        # for key in obs:
+        #     print(f"reset to  demo key={key}") # 都缺depth
+        # for key in self._previous_obs_dict:
+        #     print(f"reset to  demo key={key}") # 都缺depth
         self._record_current_episode = (
             self.eval and self._episode_index % self._record_every_n == 0
         )
