@@ -166,6 +166,7 @@ class OfflineTrainRunner():
         if hasattr(self, "_on_thread_start"):
             self._on_thread_start()
         else:
+            print("---------正常情况  (和Mani一样)---------")
             logging.getLogger().setLevel(self._logging_level)
          
         self._agent = copy.deepcopy(self._agent)
@@ -186,6 +187,7 @@ class OfflineTrainRunner():
                 start_iter = 0
             else:
                 resume_iteration = existing_weights[-1]
+                print("---- Loading existing weights from 加载  weight ########################")
                 self._agent.load_weights(os.path.join(self._weightsdir, str(resume_iteration)))
                 start_iter = resume_iteration + 1
                 if self._rank == 0:
@@ -267,7 +269,7 @@ class OfflineTrainRunner():
                 if log_iteration:
                     logging.info(f"Train Step {i:06d} | Loss: {loss:0.5f} | Step time: {step_time:0.4f} | CWD: {os.getcwd()}")
                     
-                if i % self._save_freq == 0 and self._weightsdir is not None:
+                if (i % self._save_freq == 0 or i == self._iterations - 1) and self._weightsdir is not None:
                     self._save_model(i)
 
         if self._rank == 0 and self._writer is not None:

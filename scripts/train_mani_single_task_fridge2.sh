@@ -21,7 +21,7 @@ use_wandb=True
 # cur_dir=$(pwd)
 # train_demo_path="/mnt/disk_1/tengbo/bimanual_data/train"
 # "/home/zjyang/download/peract/squashfs-root-train"
-train_demo_path="/home/zjyang/program/peract_bimanual/data1/train_data"
+train_demo_path="/home/zjyang/program/peract_bimanual/data2/train_data"
 
 # we set experiment name as method+date. you could specify it as you like.
 addition_info="$(date +%Y%m%d)"
@@ -53,13 +53,15 @@ batch_size=1 # 1 #4 # 2
 # 原单臂tasks=[bimanual_pick_laptop,bimanual_pick_plate,bimanual_straighten_rope,coordinated_lift_ball,coordinated_lift_tray,coordinated_push_box,coordinated_put_bottle_in_fridge,dual_push_buttons,handover_item,bimanual_sweep_to_dustpan,handover_item_easy]
 # tasks=[coordinated_push_box,bimanual_push_single_button]
 # 已有6个task
-tasks=[bimanual_pick_laptop,bimanual_push_single_button,coordinated_lift_tray,coordinated_push_box,coordinated_put_bottle_in_fridge,handover_item_medium]
+tasks=[coordinated_put_bottle_in_fridge]
+# ,bimanual_push_single_button,coordinated_lift_tray,bimanual_pick_laptop,coordinated_put_bottle_in_fridge,handover_item_medium]
 # demo=100
 # episode_length=25
 # for debug
 demo=100
 episode_length=25 # 20 # 4
-save_freq=1000
+save_freq=5000
+camera_resolution="[256,256]"
 #########
 
 tmux select-pane -t 0 
@@ -79,7 +81,8 @@ CUDA_VISIBLE_DEVICES=${train_gpu} python train.py method=$method \
         ddp.master_port=${port} \
         rlbench.tasks=${tasks} \
         rlbench.demos=${demo} \
-        rlbench.episode_length=${episode_length}
+        rlbench.episode_length=${episode_length} \
+        rlbench.camera_resolution=${camera_resolution}
 
 "
 # remove 0.ckpt

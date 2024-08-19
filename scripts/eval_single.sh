@@ -17,12 +17,13 @@ test_demo_path="/home/zjyang/program/peract_bimanual/data1/test_data"
 
 addition_info="$(date +%Y%m%d)"
 exp_name=${3:-"${method}_${addition_info}"}
-
+tasks=${4:-"None"}
 starttime=`date +'%Y-%m-%d %H:%M:%S'`
 # printf 'exp_name = %s\n' "$exp_name"
 # printf '%s\n' "$starttime"
-tasks=[bimanual_pick_laptop,bimanual_push_single_button,coordinated_lift_tray,coordinated_push_box,coordinated_put_bottle_in_fridge,handover_item_medium]
-eval_type='all' # or 'best', 'missing', or 'last' or 'all'
+# tasks=[bimanual_pick_laptop,bimanual_push_single_button,coordinated_lift_tray,coordinated_push_box,coordinated_put_bottle_in_fridge,handover_item_medium]
+
+eval_type='last' # or 'best', 'missing', or 'last' or 'all'
 camera=False
 eval_episodes=20 #25 #eval每个task的轮数
 # camera=False # 是否录制视频

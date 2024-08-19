@@ -1795,6 +1795,7 @@ class QAttentionPerActBCAgent(Agent):
 
     def load_weights(self, savedir: str):
         """加载模型权重"""
+        print("### ###  bc agent中的load weight  ### ### ")
         device = self._device if not self._training else torch.device('cuda:%d' % self._device)
         # if device is str, convert it to torch.device
         # 如果 device 为 str，则将其转换为 torch.device
@@ -1809,16 +1810,27 @@ class QAttentionPerActBCAgent(Agent):
         # 代码检查并合并当前模型的状态字典与从文件中加载的状态字典，以确保只加载模型中存在的键。
         # 存储合并后的状态字典
         merged_state_dict = self._q.state_dict()
-        for k, v in state_dict.items():
+        for k, v in state_dict.items(): # 遍历存储的状态
             if not self._training:
                 k = k.replace('_qnet.module', '_qnet')
                 k = k.replace('_neural_renderer.module', '_neural_renderer')
+            # else:   
+            # 继续训练也有这个问题
+                # print("training")
+                # k = k.replace('_qnet', '_qnet._forward_module.module') # (old,new)
+                # k = k.replace('_neural_renderer.module', '_neural_renderer')
+            
             if k in merged_state_dict:
+                k1 = k.replace('_qnet', '_qnet._forward_module.module') # (old,new)
+                k2 = k.replace('_qnet', '_qnet._original_module')
+                # print("key in statr_dict:",k,"--------- ----------",k1 )
                 merged_state_dict[k] = v
+                merged_state_dict[k1] = v
+                merged_state_dict[k2] = v # 这一步可能没什么用
             else:
                 if '_voxelizer' not in k: #and '_neural_renderer' not in k:
                     logging.warning(f"key {k} is found in checkpoint, but not found in current model.")
-        # ---bimanual--
+        # ---bimanual 特有，要不要加呢--
         if not self._training:
             # reshape voxelizer weights
             b = merged_state_dict["_voxelizer._ones_max_coords"].shape[0]
@@ -1829,20 +1841,25 @@ class QAttentionPerActBCAgent(Agent):
             merged_state_dict["_voxelizer._index_grid"] = merged_state_dict["_voxelizer._index_grid"][0:1]
         # ---bimanual--
         
-        msg = self._q.load_state_dict(merged_state_dict, strict=False)
+        msg = self._q.load_state_dict(merged_state_dict, strict=False) # 运行时一直是这个，按照严格的形式debug
         # msg = self._q.load_state_dict(merged_state_dict, strict=True)
         if msg.missing_keys:
-            print("missing some keys...")
+            print("missing some keys...") # True
+            # for key in msg.missing_keys:
+                # print("Missing key:", key)  # 打印每一个缺失的键
         if msg.unexpected_keys:
-            print("unexpected some keys...")
+            print("unexpected some keys...")  # True
+            # for key in msg.unexpected_keys:
+                # print("Unexpected key:", key) 
         print("loaded weights from %s" % weight_file)
 
 
     def save_weights(self, savedir: str):
         """保存模型的权重到文件"""
-        torch.save(
-            self._q.state_dict(), os.path.join(savedir, '%s.pt' % self._name))
-    
+        torch.save(self._q.state_dict(), os.path.join(savedir, '%s.pt' % self._name))
+        # unexpect?
+        # torch.save(self._qnet.state_dict(), os.path.join(savedir, '%s_qnet.pt' % self._name))
+        # torch.save(self._neural_renderer.state_dict(), os.path.join(savedir, '%s_neural_renderer.pt' % self._name))
     
     def load_clip(self):
         """!! 前面出现过，还嫌他啰嗦 加载 CLIP(Contrastive Language-Image Pre-trainin)模型"""

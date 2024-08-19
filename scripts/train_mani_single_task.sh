@@ -53,13 +53,14 @@ batch_size=1 # 1 #4 # 2
 # 原单臂tasks=[bimanual_pick_laptop,bimanual_pick_plate,bimanual_straighten_rope,coordinated_lift_ball,coordinated_lift_tray,coordinated_push_box,coordinated_put_bottle_in_fridge,dual_push_buttons,handover_item,bimanual_sweep_to_dustpan,handover_item_easy]
 # tasks=[coordinated_push_box,bimanual_push_single_button]
 # 已有6个task
-tasks=[bimanual_pick_laptop,bimanual_push_single_button,coordinated_lift_tray,coordinated_push_box,coordinated_put_bottle_in_fridge,handover_item_medium]
+tasks=[bimanual_pick_laptop]
+# ,bimanual_push_single_button,coordinated_lift_tray,coordinated_push_box,coordinated_put_bottle_in_fridge,handover_item_medium]
 # demo=100
 # episode_length=25
 # for debug
 demo=100
 episode_length=25 # 20 # 4
-save_freq=1000
+save_freq=4999
 #########
 
 tmux select-pane -t 0 

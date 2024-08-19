@@ -128,6 +128,7 @@ class _EnvRunner(object):
                     if self._previous_loaded_weight_folder != weight_folders[-1]:
                         self._previous_loaded_weight_folder = weight_folders[-1]
                         d = os.path.join(self._weightsdir, str(weight_folders[-1]))
+                        print("--- ---  在envrunner中出现的loadweight  --- ---")
                         try:
                             self._agent.load_weights(d)
                         except FileNotFoundError:

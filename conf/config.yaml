@@ -38,14 +38,14 @@ evaluation: # for online evaluation
     eval_episodes: 25
     time_in_state: True
     record_every_n: 10000
-    episode_length: 15  # default
+    episode_length: 25  # default
     # episode_length: 25
     gpu: 0
 #  new
 
 framework:
     log_freq: 100
-    save_freq: 100 # 10000
+    save_freq: 10000 # 10000
     train_envs: 1
     replay_ratio: ${replay.batch_size}
     transitions_before_train: 200

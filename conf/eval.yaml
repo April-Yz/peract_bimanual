@@ -26,8 +26,6 @@ framework:
     logdir: "/home/zjyang/program/peract_bimanual/log-mani/mani"
     # /mani/ManiGaussian_BC2"
     # '/home/zjyang/program/peract_bimanual/log'
-    # /arm_test' 
-    # '/tmp/arm_test/'
     # logdir: '/tmp/arm_test/'
     start_seed: 0
     record_every_n: 5
@@ -41,6 +39,6 @@ framework:
 cinematic_recorder:
     enabled: False
     camera_resolution: [1280, 720]
-    fps: 30
+    fps: 15 # 30
     rotate_speed: 0.005
     save_path: '/tmp/videos/'

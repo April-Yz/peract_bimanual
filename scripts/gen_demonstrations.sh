@@ -23,7 +23,7 @@ xvfb-run -a python dataset_generator_bimanual.py --tasks=${task} \
                             --image_size=128x128 \
                             --episodes_per_task=20 
                             # \
-                            # --all_variations=True
+                            # --all_variations=True   # default is True
                             # --processes=1 \
                             # --renderer=opengl \
                             # --episodes_per_task=20 \   #25 \

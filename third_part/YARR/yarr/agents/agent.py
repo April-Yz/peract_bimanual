@@ -193,6 +193,7 @@ class BimanualAgent(Agent):
 
     
     def load_weights(self, savedir: str) -> None:
+        print("--- ---  在agent.py中出现的loadweight  --- ---")
         self.right_agent.load_weights(savedir)
         self.left_agent.load_weights(savedir)
 

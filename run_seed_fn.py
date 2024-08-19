@@ -56,11 +56,10 @@ def run_seed(
     )
 
     # !!这行是不是能去掉？创建agent agent_type = leader_follower领头跟随 /or/ independent 独立 /or/ bimanual 双手  /or/ unimanual 单手
-    agent = agent_factory.create_agent(cfg)
-
-    if not agent:
-        print("Unable to create agent")
-        return
+    # agent = agent_factory.create_agent(cfg)
+    # if not agent:
+    #     print("Unable to create agent")
+    #     return
 
     if cfg.method.name == "ARM":
         raise NotImplementedError("ARM is not supported yet")
