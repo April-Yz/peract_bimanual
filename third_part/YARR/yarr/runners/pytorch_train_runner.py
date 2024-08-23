@@ -174,7 +174,7 @@ class PyTorchTrainRunner(TrainRunner):
                 start_iter = 0
             else:
                 resume_iteration = existing_weights[-1]
-                print("--- ---  在Pytorchrunner中出现的loadweight  --- ---")
+                # print("--- ---  在Pytorchrunner中出现的loadweight  --- ---")
                 self._agent.load_weights(os.path.join(self._weightsdir, str(resume_iteration)))
                 start_iter = resume_iteration + 1
                 print(f"Resuming training from iteration {resume_iteration} ...")

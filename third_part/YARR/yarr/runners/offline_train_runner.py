@@ -166,7 +166,7 @@ class OfflineTrainRunner():
         if hasattr(self, "_on_thread_start"):
             self._on_thread_start()
         else:
-            print("---------正常情况  (和Mani一样)---------")
+            # print("---------正常情况  (和Mani一样)---------")
             logging.getLogger().setLevel(self._logging_level)
          
         self._agent = copy.deepcopy(self._agent)

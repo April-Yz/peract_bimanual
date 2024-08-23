@@ -1795,7 +1795,7 @@ class QAttentionPerActBCAgent(Agent):
 
     def load_weights(self, savedir: str):
         """加载模型权重"""
-        print("### ###  bc agent中的load weight  ### ### ")
+        # print("### ###  bc agent中的load weight  ### ### ")
         device = self._device if not self._training else torch.device('cuda:%d' % self._device)
         # if device is str, convert it to torch.device
         # 如果 device 为 str，则将其转换为 torch.device
@@ -1821,12 +1821,14 @@ class QAttentionPerActBCAgent(Agent):
                 # k = k.replace('_neural_renderer.module', '_neural_renderer')
             
             if k in merged_state_dict:
-                k1 = k.replace('_qnet', '_qnet._forward_module.module') # (old,new)
-                k2 = k.replace('_qnet', '_qnet._original_module')
                 # print("key in statr_dict:",k,"--------- ----------",k1 )
                 merged_state_dict[k] = v
-                merged_state_dict[k1] = v
-                merged_state_dict[k2] = v # 这一步可能没什么用
+                # new for continue training
+                # if self._training:
+                #     k1 = k.replace('_qnet', '_qnet._forward_module.module') # (old,new)
+                #     k2 = k.replace('_qnet', '_qnet._original_module')
+                #     merged_state_dict[k1] = v
+                #     merged_state_dict[k2] = v # 这一步可能没什么用
             else:
                 if '_voxelizer' not in k: #and '_neural_renderer' not in k:
                     logging.warning(f"key {k} is found in checkpoint, but not found in current model.")

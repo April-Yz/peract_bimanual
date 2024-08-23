@@ -100,7 +100,7 @@ lambda_bc: 1.0
 neural_renderer:
   # Gaussian Splatting (GS)
   visdom: False
-  render_freq: 2000 #1000
+  render_freq: 2000000 # 暂时处理这个报错#2000 #1000
 
   use_clip: False
 

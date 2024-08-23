@@ -53,7 +53,7 @@ batch_size=1 # 1 #4 # 2
 # 原单臂tasks=[bimanual_pick_laptop,bimanual_pick_plate,bimanual_straighten_rope,coordinated_lift_ball,coordinated_lift_tray,coordinated_push_box,coordinated_put_bottle_in_fridge,dual_push_buttons,handover_item,bimanual_sweep_to_dustpan,handover_item_easy]
 # tasks=[coordinated_push_box,bimanual_push_single_button]
 # 已有6个task
-tasks=[handover_item_easy]
+tasks=[coordinated_lift_tray]
 # ,bimanual_push_single_button,coordinated_lift_tray,bimanual_pick_laptop,coordinated_put_bottle_in_fridge,handover_item_medium]
 # demo=100
 # episode_length=25
@@ -67,7 +67,7 @@ camera_resolution="[256,256]"
 tmux select-pane -t 0 
 # peract rlbench
 tmux send-keys "conda activate rlbench; 
-CUDA_VISIBLE_DEVICES=${train_gpu} QT_AUTO_SCREEN_SCALE_FACTOR=0 python train.py method=$method \
+CUDA_VISIBLE_DEVICES=${train_gpu}  QT_AUTO_SCREEN_SCALE_FACTOR=0 python train.py method=$method \
         rlbench.task_name=${exp_name} \
         framework.logdir=${logdir} \
         rlbench.demo_path=${train_demo_path} \
@@ -86,6 +86,7 @@ CUDA_VISIBLE_DEVICES=${train_gpu} QT_AUTO_SCREEN_SCALE_FACTOR=0 python train.py 
 
 "
 # remove 0.ckpt
-rm -rf logs/${exp_name}/seed${seed}/weights/0
+# rm -rf logs/${exp_name}/seed${seed}/weights/0
+rm -rf log-mani/${exp_name}/${exp_name}/${method}/seed${seed}/weights/0
 
 tmux -2 attach-session -t ${exp_name}

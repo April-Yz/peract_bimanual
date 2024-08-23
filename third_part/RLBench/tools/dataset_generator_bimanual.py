@@ -125,9 +125,17 @@ def run_all_variations(task_name, headless, save_path, episodes_per_task, image_
         episodes_path = os.path.join(variation_path, EPISODES_FOLDER)
         os.makedirs(episodes_path, exist_ok=True)
 
+        # -------------------------continue generation-------------------------
+        file_names = os.listdir(episodes_path)
+        import re
+        episode_files = [f for f in file_names if f.startswith('episode') and re.match(r'episode\d+', f)]
+        episode_numbers = [int(f[len('episode'):]) for f in episode_files]
+        max_episode_number = max(episode_numbers) if episode_numbers else 0
+        # print("max_episode_number", max_episode_number)
+        # -------------------------continue generation-------------------------
 
         abort_variation = False
-        for ex_idx in range(episodes_per_task):
+        for ex_idx in range(max_episode_number+1,episodes_per_task):
             attempts = 10
             while attempts > 0:
                 try:
