@@ -5,7 +5,8 @@ name: 'BIMANUAL_PERACT'
 # Agent
 robot_name: 'bimanual'
 agent_type: 'bimanual'
-
+use_depth: False # new from mani(不然好像跑不了了)
+use_fabric: False # new from mani(不然好像跑不了了)
 
 # Voxelization
 image_crop_size: 64

@@ -21,13 +21,13 @@ use_wandb=True
 # cur_dir=$(pwd)
 # train_demo_path="/mnt/disk_1/tengbo/bimanual_data/train"
 # "/home/zjyang/download/peract/squashfs-root-train"
-train_demo_path="/home/zjyang/program/peract_bimanual/data2/train_data"
+train_demo_path="/data1/zjyang/program/peract_bimanual/data2/train_data"
 
 # we set experiment name as method+date. you could specify it as you like.
 addition_info="$(date +%Y%m%d)"
 exp_name=${4:-"${method}_${addition_info}"}
 # logdir="/mnt/disk_1/tengbo/peract_bimanual/log"
-logdir="/home/zjyang/program/peract_bimanual/log-mani/${exp_name}"
+logdir="/data1/zjyang/program/peract_bimanual/log-mani/${exp_name}"
 # replay_dir="/home/zjyang/program/peract_bimanual/replay/${exp_name}"
 
 # create a tmux window for training
@@ -58,8 +58,8 @@ tasks=[dual_push_buttons]
 # demo=100
 # episode_length=25
 # for debug
-demo=100
-episode_length=25 # 20 # 4
+demo=2 # 100
+episode_length=2 #25 # 20 # 4
 save_freq=5000
 camera_resolution="[256,256]"
 #########

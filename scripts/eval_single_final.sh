@@ -13,7 +13,7 @@ eval_gpu=${2:-"0"}
 
 # test_demo_path="/home/zjyang/download/peract/squashfs-root-test"
 # "/mnt/disk_1/tengbo/bimanual_data/test"
-test_demo_path="/home/zjyang/program/peract_bimanual/data2/test_data_formal"
+test_demo_path="/data1/zjyang/program/peract_bimanual/data2/test_data_formal"
 
 addition_info="$(date +%Y%m%d)"
 exp_name=${3:-"${method}_${addition_info}"}
@@ -30,7 +30,7 @@ eval_episodes=100 #25 #eval每个task的轮数
 gripper_mode='BimanualDiscrete'
 arm_action_mode='BimanualEndEffectorPoseViaPlanning'
 action_mode='BimanualMoveArmThenGripper'
-logdir="/home/zjyang/program/peract_bimanual/log-mani/${exp_name}"
+logdir="/data1/zjyang/program/peract_bimanual/log-mani/${exp_name}"
 camera_resolution="[256,256]"
 # printf "logdir = %s\n" "$logdir"
 # printf "${logdir}"

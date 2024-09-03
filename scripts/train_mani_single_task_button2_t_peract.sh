@@ -16,7 +16,7 @@ train_gpu_list=(${train_gpu//,/ })
 # set the port for ddp training.
 port=${3:-"12345"}
 # you could enable/disable wandb by this.
-use_wandb=True
+use_wandb=Ture
 
 # cur_dir=$(pwd)
 # train_demo_path="/mnt/disk_1/tengbo/bimanual_data/train"
@@ -53,7 +53,7 @@ batch_size=1 # 1 #4 # 2
 # 原单臂tasks=[bimanual_pick_laptop,bimanual_pick_plate,bimanual_straighten_rope,coordinated_lift_ball,coordinated_lift_tray,coordinated_push_box,coordinated_put_bottle_in_fridge,dual_push_buttons,handover_item,bimanual_sweep_to_dustpan,handover_item_easy]
 # tasks=[coordinated_push_box,bimanual_push_single_button]
 # 已有6个task
-tasks=[handover_item_easy]
+tasks=[dual_push_buttons]
 # ,bimanual_push_single_button,coordinated_lift_tray,bimanual_pick_laptop,coordinated_put_bottle_in_fridge,handover_item_medium]
 # demo=100
 # episode_length=25
@@ -62,6 +62,7 @@ demo=100
 episode_length=25 # 20 # 4
 save_freq=5000
 camera_resolution="[256,256]"
+use_neural_rendering=False
 #########
 
 tmux select-pane -t 0 
@@ -82,9 +83,11 @@ CUDA_VISIBLE_DEVICES=${train_gpu}  QT_AUTO_SCREEN_SCALE_FACTOR=0 python train.py
         rlbench.tasks=${tasks} \
         rlbench.demos=${demo} \
         rlbench.episode_length=${episode_length} \
-        rlbench.camera_resolution=${camera_resolution}
+        rlbench.camera_resolution=${camera_resolution} 
+        
 
 "
+#\use_neural_rendering=${use_neural_rendering}
 # remove 0.ckpt
 # rm -rf logs/${exp_name}/seed${seed}/weights/0
 rm -rf log-mani/${exp_name}/${exp_name}/${method}/seed${seed}/weights/0

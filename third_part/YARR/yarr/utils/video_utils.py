@@ -154,10 +154,10 @@ class NeRFTaskRecorder(object):
         # all_poses.append(self._cam_motion.cam.get_matrix())
         # all_intrinsics.append(self._cam_motion.cam.get_intrinsic_matrix())
 
-        for i in range(self._num_views):
+        for i in range(self._num_views): # num views=50 转一圈，其中有50步，保存其中20-40之间的图片
             self._cam_motion.step()
 
-            # sparse sampling along views
+            # sparse sampling along views 沿景观稀疏取样
             if i < 20 or i > 40:
                 continue
             # if i%2 == 0: # squeeze to 10 views

@@ -68,6 +68,7 @@ def main(cfg: DictConfig) -> None:
         assert("rgb" not in camera_name)
 
     # print("use_depth=cfg.method.use_depth",cfg.method.use_depth)
+    # if cfg.method.name.startswith("ManiGaussian_BC2") #搞错了，use
     obs_config = create_obs_config(
         cfg.rlbench.cameras, cfg.rlbench.camera_resolution, cfg.method.name,
         use_depth=cfg.method.use_depth, # !!! Mani新增的depth
@@ -168,11 +169,11 @@ def main(cfg: DictConfig) -> None:
             mp.spawn(run_seed_fn.run_seed,
                     args=(cfg,
                         obs_config,
-                        # cfg.rlbench.cameras,
-                        # multi_task,
+                        cfg.rlbench.cameras,
+                        multi_task,
                         seed,
                         world_size,
-                        # None,   # fabric
+                        None,   # fabric
                         ),
                     nprocs=world_size,
                     join=True)

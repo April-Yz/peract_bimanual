@@ -65,6 +65,7 @@ class OfflineTrainRunner():
         self._rank = rank
         self._world_size = world_size
         self._fabric = fabric
+        # self.method_name = cfg.method.name
 
         # self.tqdm_mininterval = cfg.framework.tqdm_mininterval # tqdm 库来显示一个进度条
         self.use_wandb = cfg.framework.use_wandb
@@ -122,6 +123,7 @@ class OfflineTrainRunner():
     def preprocess_data(self, data_iter, SILENT=True):
         # try:
         # 选择下一个视角
+        # print("self.method_name=",self.method_name)
         sampled_batch = next(data_iter) # may raise StopIteration
         # print error and restart data iter
         # except Exception as e:
@@ -132,6 +134,7 @@ class OfflineTrainRunner():
         # !! 随机选择一个视角
         # tensor移动到GPU上
         batch = {k: v.to(self._train_device) for k, v in sampled_batch.items() if type(v) == torch.Tensor}
+        # if self.method_name == 'ManiGaussian_BC2': # 后续可以加
         batch['nerf_multi_view_rgb'] = sampled_batch['nerf_multi_view_rgb'] # [bs, 1, 21]
         batch['nerf_multi_view_depth'] = sampled_batch['nerf_multi_view_depth']
         batch['nerf_multi_view_camera'] = sampled_batch['nerf_multi_view_camera'] # must!!!

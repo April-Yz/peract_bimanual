@@ -10,7 +10,8 @@ rlbench:
     tasks: [open_drawer,slide_block_to_color_target]
     demos: 100
     # demo_path: /my/demo/path
-    demo_path: /home/zjyang/download/peract/squashfs-root-train
+    demo_path: /data1/zjyang/download/peract/squashfs-root-train
+    # demo_path: /home/zjyang/download/peract/squashfs-root-train
     episode_length: 25
     cameras: ["over_shoulder_left", "over_shoulder_right", "overhead", "wrist_right", "wrist_left", "front"]
     camera_resolution: [128, 128]
@@ -28,7 +29,8 @@ replay:
     prioritisation: False
     task_uniform: True # uniform sampling of tasks for multi-task buffers
     use_disk: True
-    path: '/home/zjyang/program/peract_bimanual/log/arm/replay' 
+    path: '/data1/zjyang/program/peract_bimanual/log/arm/replay' 
+    # path: '/home/zjyang/program/peract_bimanual/log/arm/replay' 
     # path: '/tmp/arm/replay' # only used when use_disk is True.
     max_parallel_processes: 32 # 1 # 32
 
@@ -51,10 +53,11 @@ framework:
     transitions_before_train: 200
     tensorboard_logging: True
     csv_logging: True
-    training_iterations: 100000 #100000
+    training_iterations: 100002 #100000
     gpu: 0
     env_gpu: 0
-    logdir: '/home/zjyang/program/peract_bimanual/log/arm_test' # '/tmp/arm_test/'
+    logdir: '/data1/zjyang/program/peract_bimanual/log/arm_test' # '/tmp/arm_test/'
+    # logdir: '/home/zjyang/program/peract_bimanual/log/arm_test' # '/tmp/arm_test/'
     # logdir: '/tmp/arm_test/'
     logging_level: 20 # https://docs.python.org/3/library/logging.html#levels
     seeds: 1

@@ -191,11 +191,14 @@ class NeuralRenderer(nn.Module):
 
         # novel pose
         data['novel_view'] = {}
+        # Target Intrinsic Parameters目标内在参数
         data['intr'] = tgt_intrinsic
+        # 目标姿势
         data['extr'] = tgt_pose
         data['xyz'] = einops.rearrange(pcd, 'b c h w -> b (h w) c')
 
         # use extrinsic pose to generate gaussain parameters
+        # 使用外在姿势生成高斯参数
         if data['intr'] is not None:
             data_novel = self.get_novel_calib(data)
             data['novel_view'].update(data_novel)
@@ -214,10 +217,11 @@ class NeuralRenderer(nn.Module):
 
     def get_novel_calib(self, data):
         """
+        从 gt_pose 获取高斯渲染器的可读相机状态
         get readable camera state for gaussian renderer from gt_pose
         :param data: dict
-        :param data['intr']: intrinsic matrix
-        :param data['extr']: c2w matrix
+        :param data['intr']: intrinsic matrix 本征矩阵
+        :param data['extr']: c2w matrix        c2w矩阵
 
         :return: dict
         """
@@ -225,18 +229,25 @@ class NeuralRenderer(nn.Module):
         device = data['intr'].device
         fovx_list, fovy_list, world_view_transform_list, full_proj_transform_list, camera_center_list = [], [], [], [], []
         for i in range(bs):
+            # 将内参和外参从Tensor转换为NumPy数组
             intr = data['intr'][i, ...].cpu().numpy()
             extr = data['extr'][i, ...].cpu().numpy()
+            #  保存的外部条件 extrinsic 实际上是 cam2world 矩阵，因此将其转为 world2cam 矩阵
             extr = np.linalg.inv(extr)  # the saved extrinsic is actually cam2world matrix, so turn it to world2cam matrix
 
             width, height = self.W, self.H
             R = np.array(extr[:3, :3], np.float32).reshape(3, 3).transpose(1, 0)    # inverse
             T = np.array(extr[:3, 3], np.float32)
+            # 计算相机的视场角（Field of View, FovX 和 FovY）
             FovX = focal2fov(intr[0, 0], width)
             FovY = focal2fov(intr[1, 1], height)
+            # 计算投影矩阵（projection_matrix）
             projection_matrix = getProjectionMatrix(znear=self.znear, zfar=self.zfar, K=intr, h=height, w=width).transpose(0, 1)
+            # 计算世界到视图的变换矩阵（world_view_transform）
             world_view_transform = torch.tensor(getWorld2View2(R, T, np.array(self.trans), self.scale)).transpose(0, 1) # [4, 4], w2c
+            # 计算完整的投影变换矩阵（full_proj_transform）
             full_proj_transform = (world_view_transform.unsqueeze(0).bmm(projection_matrix.unsqueeze(0))).squeeze(0)    # [4, 4]
+            # 计算相机中心点（camera_center）
             camera_center = world_view_transform.inverse()[3, :3]   # inverse is c2w
 
             fovx_list.append(FovX)
@@ -262,10 +273,10 @@ class NeuralRenderer(nn.Module):
                 next_gt_pose=None, next_gt_intrinsic=None, next_gt_rgb=None, step=None, action=None,
                 training=True):
         '''
-        main forward function
+        main forward function  主前进函数 
         Return:
-        :loss_dict: dict, loss values
-        :ret_dict: dict, rendered images
+        :loss_dict: dict, loss values 
+        :ret_dict: dict, rendered images 渲染图像
         '''
         bs = rgb.shape[0]
         # print("dec_fts.shape=",dec_fts.shape)
@@ -347,7 +358,8 @@ class NeuralRenderer(nn.Module):
 
             # next frame prediction 下一帧预测 Ldyna(optional)
             if self.use_dynamic_field and (next_gt_rgb is not None) and ('xyz_maps' in data['next']):
-                data['next'] = self.pts2render(data['next'], bg_color=self.bg_color)
+                data['next'] = self.pts2render(data['next'], bg_color=self.bg_color) 
+                #就是上一步pts2render中渲染得到的新数据简单加工（说明render里面还有猫腻）
                 next_render_novel = data['next']['novel_view']['img_pred'].permute(0, 2, 3, 1)
                 # loss_dyna = l1_loss(next_render_novel, next_gt_rgb)
                 loss_dyna = l2_loss(next_render_novel, next_gt_rgb)
@@ -424,7 +436,7 @@ class NeuralRenderer(nn.Module):
         feature_i = data['sh_maps'][i, :, :, :] # [16384, 4, 3]
         rot_i = data['rot_maps'][i, :, :]
         scale_i = data['scale_maps'][i, :, :]
-        opacity_i = data['opacity_maps'][i, :, :]
+        opacity_i = data['opacity_maps'][i, :, :]           # 不透明度
         feature_language_i = data['feature_maps'][i, :, :]
 
         # 渲染返回字典  render应该是用来渲染的  from agents.manigaussian_bc2.gaussian_renderer import render

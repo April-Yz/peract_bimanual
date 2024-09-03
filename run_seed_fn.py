@@ -178,6 +178,12 @@ def run_seed(
 
     elif cfg.method.name.startswith("BIMANUAL_PERACT") or cfg.method.name.startswith("RVT") or cfg.method.name.startswith("PERACT_BC"):
 
+        print("Staring BIMANUAL_PERACT in run_seed_fn.py")
+        agent = agent_factory.create_agent(cfg)
+        if not agent:
+            print("Unable to create agent")
+            return
+        # ------new
         replay_buffer = replay_utils.create_replay(cfg, replay_path)
         
         replay_utils.fill_multi_task_replay(
@@ -198,7 +204,7 @@ def run_seed(
         #replay_buffer = replay_utils.create_replay(cfg, replay_path)
         #replay_utils.fill_multi_task_replay(cfg, obs_config, rank, replay_buffer, tasks)
         import logging
-        logging.info("run_seed_fn.py: create_replay")
+        # logging.info("run_seed_fn.py: create_replay")
         from agents import manigaussian_bc2
         # 和双臂的一样（除了导入的c2farm_lingunet_bc）
         # !!双臂这边只需要cfg和replay_path就行

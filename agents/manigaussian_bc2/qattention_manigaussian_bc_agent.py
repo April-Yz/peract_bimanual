@@ -235,6 +235,7 @@ class QFunction(nn.Module):
         flat_imag_features = torch.cat(
             [p.permute(0, 2, 3, 1).reshape(b, -1, feat_size) for p in rgb], 1)  # [1, 16384, 3]
 
+        # print("coord_bounds",bounds) # tensor([[-0.3000, -0.5000,  0.6000,  0.7000,  0.5000,  1.6000]],device='cuda:0')
         # construct voxel grid 构建体元网格
         voxel_grid, voxel_density = self._voxelizer.coords_to_bounding_voxel_grid(
             pcd_flat, coord_features=flat_imag_features, coord_bounds=bounds, return_density=True)
@@ -304,7 +305,8 @@ class QFunction(nn.Module):
                 pcd_0 = pcd[0]
 
                 # print("qfunction中的已经开始错了！！！哈哈哈终于找到你了",voxel_grid_feature.shape)
-                # render loss（改变）神经渲染
+                # render loss（改变）神经渲染 后面是一些相关数据字典通过dotmap处理后的数据，可用.访问，但是无用
+                # 所以就是在这里加入grounded sam结果了
                 rendering_loss_dict, _ = self._neural_renderer(
                     rgb=rgb_0, pcd=pcd_0, depth=depth_0, # 第一个视角下的颜色 点云数据 深度
                     language=lang_embedd, # 语言目标
@@ -466,6 +468,7 @@ class QAttentionPerActBCAgent(Agent):
         self._collision_loss_weight = collision_loss_weight
         self._include_low_dim_state = include_low_dim_state
         self._image_resolution = image_resolution or [128, 128]
+        # print("image_resolution",image_resolution)
         self._voxel_size = voxel_size
         self._camera_names = camera_names
         self._num_cameras = len(camera_names)
@@ -507,6 +510,11 @@ class QAttentionPerActBCAgent(Agent):
             device = torch.device('cpu')
 
         print(f"device: {device}")
+
+        # print("qattention_peract_bc_agent max_num_coords",np.prod(self._image_resolution) * self._num_cameras)  # 98304 (在mani里39316)
+        # print("np.prod(self._image_resolution)",np.prod(self._image_resolution)) # 16384 （65536）
+        # print("self._num_cameras",self._num_cameras) # 6 （6）
+
         self._voxelizer = VoxelGrid(
             coord_bounds=self._coordinate_bounds.cpu() if isinstance(self._coordinate_bounds, torch.Tensor) else self._coordinate_bounds,
             voxel_size=self._voxel_size,

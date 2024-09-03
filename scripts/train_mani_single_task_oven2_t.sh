@@ -53,7 +53,7 @@ batch_size=1 # 1 #4 # 2
 # 原单臂tasks=[bimanual_pick_laptop,bimanual_pick_plate,bimanual_straighten_rope,coordinated_lift_ball,coordinated_lift_tray,coordinated_push_box,coordinated_put_bottle_in_fridge,dual_push_buttons,handover_item,bimanual_sweep_to_dustpan,handover_item_easy]
 # tasks=[coordinated_push_box,bimanual_push_single_button]
 # 已有6个task
-tasks=[handover_item_easy]
+tasks=[coordinated_take_tray_out_of_oven]
 # ,bimanual_push_single_button,coordinated_lift_tray,bimanual_pick_laptop,coordinated_put_bottle_in_fridge,handover_item_medium]
 # demo=100
 # episode_length=25

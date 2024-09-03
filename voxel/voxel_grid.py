@@ -212,9 +212,13 @@ class VoxelGrid(nn.Module):
         voxel_values = coords
         if coord_features is not None:
             voxel_values = torch.cat([voxel_values, coord_features], -1)
-
+        # print("coord_features",coord_features.shape) # [1,393216,3]
+        # print("voxel_values",voxel_values.shape)     # [1,NC=393216,6]
         _, num_coords, _ = voxel_indices.shape
         # BS x N x (num_batch_dims + 2)
+        # print(" num_coords=",num_coords) # 393216
+        # print("voxel_indices.shape",voxel_indices.shape) # [1,393216,3] BS=1 x N=393216 x (num_batch_dims=1 + 2)
+        # print("self._tiled_batch_indices",self._tiled_batch_indices.shape) # torch.Size([1, 98304, 1])
         all_indices = torch.cat(
             [self._tiled_batch_indices[:, :num_coords], voxel_indices], -1
         )

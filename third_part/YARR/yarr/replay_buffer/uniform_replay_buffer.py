@@ -375,6 +375,7 @@ class UniformReplayBuffer(ReplayBuffer):
                 with open(join(self._save_dir, '%d.replay' % i), 'rb') as f:
                     d = pickle.load(f)
                     for k, v in d.items():
+                        # print("k={}, v={}, i={}".format(k, v, i))
                         store[k][i] = v
         else:
             for i in range(end_index - start_index):
@@ -390,12 +391,14 @@ class UniformReplayBuffer(ReplayBuffer):
 
         Args:
           *args: Args whose types need to be validated.
+          signature: Signature of the storage存储的.
 
         Raises:
           ValueError: If args have wrong shape or dtype.
         """
 
         if (len(kwargs)) != len(signature):
+        # if (len(kwargs)) < len(signature):
             expected = str(natsort.natsorted([e.name for e in signature]))
             actual = str(natsort.natsorted(list(kwargs.keys())))
             error_list = '\nList of expected:\n{}\nList of actual:\n{}'.format(

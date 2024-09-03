@@ -286,7 +286,8 @@ def create_obs_config(
     camera_resolution: List[int],
     method_name: str,
     use_depth:bool = True,
-    robot_name: str = "bimanual"
+    robot_name: str = "bimanual",
+    #nerf_multi_view: bool = True,
 ):
     unused_cams = CameraConfig()
     unused_cams.set_all(False)
@@ -297,6 +298,7 @@ def create_obs_config(
         depth=use_depth, #mani 特有 元False,
         image_size=camera_resolution,
         render_mode=RenderMode.OPENGL,
+        #nerf_multi_view =nerf_multi_view, # 为了同时跑peract新增
     )
 
     camera_configs = {camera_name: used_cams for camera_name in camera_names}
