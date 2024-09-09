@@ -77,9 +77,7 @@ def create_bimanual_replay(
 
     # low_dim_state
     observation_elements = []
-    observation_elements.append(
-        ObservationElement("right_low_dim_state", (LOW_DIM_SIZE,), np.float32)
-    )
+    observation_elements.append(ObservationElement("right_low_dim_state", (LOW_DIM_SIZE,), np.float32))
     # ---------------------------------------
     # for store_element in observation_elements:
     #     if store_element.name == "right_low_dim_state":
@@ -88,9 +86,7 @@ def create_bimanual_replay(
     #         print("store_element=",store_element)
     #         print("store_element.shape=",store_element.shape)
     #----------------------------------------
-    observation_elements.append(
-        ObservationElement("left_low_dim_state", (LOW_DIM_SIZE,), np.float32)
-    )
+    observation_elements.append(ObservationElement("left_low_dim_state", (LOW_DIM_SIZE,), np.float32))
 
     # rgb, depth, point cloud, intrinsics, extrinsics
     for cname in cameras:
@@ -628,7 +624,7 @@ def fill_multi_task_replay(
     clip_model=None,
 ):
 
-    tasks = cfg.rlbench.tasks
+    tasks = cfg.rlbench.tasks # 那不是上面传了个寂寞
 
     manager = Manager()
     store = manager.dict()

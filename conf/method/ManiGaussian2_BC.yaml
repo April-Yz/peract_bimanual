@@ -1,11 +1,11 @@
 # @package _group_
 # 具体可以看隔壁GNFACTOR_BC
-
-name: 'ManiGaussian_BC2'
+# leaderfollower结构
+name: 'ManiGaussian2_BC'
 
 # ---------------bimanual新加的-----------
 # Agent
-agent_type: 'bimanual'
+agent_type: 'leader_follower'
 robot_name: 'bimanual'
 # ---------------bimanual新加的-----------
 
@@ -62,7 +62,7 @@ lambda_weight_l2: 0.000001  # weight_decay
 
 # BC loss coeffs 
 # 少了几行 克隆（Behavioral Cloning)损失行数
-# lambda_weight_l2: 0.000001 # mibanual特有（在上面写了一遍了...）
+# lambda_weight_l2: 0.000001 # mibanual特有
 trans_loss_weight: 1.0
 rot_loss_weight: 1.0
 grip_loss_weight: 1.0

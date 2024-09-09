@@ -190,10 +190,9 @@ class NeuralRenderer(nn.Module):
         data['lang'] = lang
         data['action'] = action
         # maniaction 不确定rl那个在前
-        right_action, left_action = torch.split(action, split_size_or_sections=8, dim=1)
-        # right_action, left_action = action.chunk(2, dim=2) # agent写法
-        print("\033[0;31;40mactionr in neural_rendering.py\033[0m",right_action)
-        print("\033[0;31;40mactionl in neural_rendering.py\033[0m",left_action)
+        # actionr, actionl = torch.split(action, split_size_or_sections=8, dim=1)
+        # print("\033[0;31;40mactionr in neural_rendering.py\033[0m",actionr)
+        # print("\033[0;31;40mactionl in neural_rendering.py\033[0m",actionl)
         # print("\033[0;31;40maction in neural_rendering.py\033[0m",action)
         # tensor([[ 
         #   1.8244e-01, -1.2036e-01,  7.7095e-01,
@@ -208,16 +207,11 @@ class NeuralRenderer(nn.Module):
 
         # novel pose
         data['novel_view'] = {}
-        data['intr'] = tgt_intrinsic # 相机内参通常包括焦距、主点坐标等，用于将3D坐标转换为2D图像坐标。
-        data['extr'] = tgt_pose     # 相机外参通常包括旋转矩阵和平移向量，用于将世界坐标转换为相机坐标。相机外参定义了相机在世界坐标系中的位置和方向。
+        data['intr'] = tgt_intrinsic
+        data['extr'] = tgt_pose
         data['xyz'] = einops.rearrange(pcd, 'b c h w -> b (h w) c')
-        #  einops.rearrange 函数重新排列点云数据 pcd
-        # 'b c h w -> b (h w) c' 是一个重组操作的模式，它将输入张量
-        # 从四维格式（可能表示 [batch_size, channels, height, width]）转换为三维格式，
-        # 其中高度和宽度被合并为一个维度。这通常用于将3D点云数据从图像格式转换为列表格式，
 
         # use extrinsic pose to generate gaussain parameters
-        # 使用 extrinsic pose(外部姿态) 生成 Gaussain 参数
         if data['intr'] is not None:
             data_novel = self.get_novel_calib(data)
             data['novel_view'].update(data_novel)
@@ -231,32 +225,12 @@ class NeuralRenderer(nn.Module):
             if data['next']['intr'] is not None:
                 data_novel = self.get_novel_calib(data['next'])
                 data['next']['novel_view'].update(data_novel)
-            # ------------------------------------------------------------------------------
-            # data['right_next'] = {
-            #     'extr': next_tgt_pose,
-            #     'intr': next_tgt_intrinsic,
-            #     'novel_view': {},
-            # }
-            # if data['right_next']['intr'] is not None:
-            #     data_novel = self.get_novel_calib(data['right_next'])
-            #     data['right_next']['novel_view'].update(data_novel)
-
-            # data['left_next'] = {
-            #     'extr': next_tgt_pose,
-            #     'intr': next_tgt_intrinsic,
-            #     'novel_view': {},
-            # }
-            # if data['left_next']['intr'] is not None:
-            #     data_novel = self.get_novel_calib(data['left_next'])
-            #     data['left_next']['novel_view'].update(data_novel)
-            # ------------------------------------------------------------------------------
 
         return data
 
     def get_novel_calib(self, data):
         """
         get readable camera state for gaussian renderer from gt_pose
-        从 gt_pose 获取 Gaussian Renderer 的可读摄像机状态
         :param data: dict
         :param data['intr']: intrinsic matrix
         :param data['extr']: c2w matrix
@@ -336,7 +310,6 @@ class NeuralRenderer(nn.Module):
             # Gaussian Generator 高斯生成器
             # print("Gaussian Generator self.gs_model这里的data已经不对了",data["dec_fts"].shape)
             # gs regress (g) 应该也不用改
-            # 这里也有数据处理（一直落下了）
             data = self.gs_model(data) # GeneralizableGSEmbedNet(cfg, with_gs_render=True)
 
             # Gaussian Render
@@ -344,19 +317,17 @@ class NeuralRenderer(nn.Module):
             data = self.pts2render(data, bg_color=self.bg_color) # default: [0, 0, 0]
 
             # Loss L(GEO) 当前场景一致性损失 Current Scence Consistency Loss
-            # permute置换  将张量的维度从原来的顺序重新排列为新的顺序  
-            # predicetion预测: [1, 3, 128, 128] -> [1, 128, 128, 3]
+            # permute置换  将张量的维度从原来的顺序重新排列为新的顺序
             render_novel = data['novel_view']['img_pred'].permute(0, 2, 3, 1)   # [1, 128, 128, 3]
 
-            # visdom 视界(可视化数据用的) Manigaussian2 中是False bash中好像也没有指定
+            # visdom 视界 Manigaussian2 中是False bash中好像也没有指定
             if self.cfg.visdom: # False
                 vis = visdom.Visdom()
                 rgb_vis = data['img'][0].detach().cpu().numpy() * 0.5 + 0.5
                 vis.image(rgb_vis, win='front_rgb', opts=dict(title='front_rgb'))
 
                 depth_vis = data['depth'][0].detach().cpu().numpy()#/255.0
-                # convert 128x128 0-255 depth map to 3x128x128 0-1 colored map 
-                # 将 128x128 0-255 深度贴图转换为 3x128x128 0-1 彩色贴图
+                # convert 128x128 0-255 depth map to 3x128x128 0-1 colored map
                 vis.image(depth_vis, win='front_depth', opts=dict(title='front_depth'))
                 vis.image(render_novel[0].permute(2, 0, 1).detach().cpu().numpy(), win='render_novel', opts=dict(title='render_novel'))
                 vis.image(gt_rgb[0].permute(2, 0, 1).detach().cpu().numpy(), win='gt_novel', opts=dict(title='gt_novel'))
@@ -410,14 +381,6 @@ class NeuralRenderer(nn.Module):
                 #     loss += lambda_reg * loss_reg
 
                 # TODO: local rigid loss 局部刚性损失
-                # -------------------------------------------------------------------------------------------------
-                # data['next'] = self.pts2render(data['next'], bg_color=self.bg_color)
-                # next_render_novel = data['next']['novel_view']['img_pred'].permute(0, 2, 3, 1)
-                # loss_dyna = l2_loss(next_render_novel, next_gt_rgb)
-                # lambda_dyna = self.cfg.lambda_dyna if step >= self.cfg.next_mlp.warm_up else 0.
-                # loss += lambda_dyna * loss_dyna
-                # loss_reg = torch.tensor(0.)
-                # -------------------------------------------------------------------------------------------------------
 
             else:
                 loss_dyna = torch.tensor(0.)

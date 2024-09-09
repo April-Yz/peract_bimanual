@@ -187,6 +187,7 @@ class NeuralRenderer(nn.Module):
         data['depth'] = depth
         data['lang'] = lang
         data['action'] = action
+        # data['left_action'] = action[]
         data['step'] = step
 
         # novel pose
@@ -391,7 +392,7 @@ class NeuralRenderer(nn.Module):
                 'l1': Ll1.item(),
                 'psnr': psnr.item(),
                 }
-        else: # not training
+        else: # not training(inference)
             # 无真实数据，渲染（推理）
             # no ground-truth given, rendering (inference) 
             with torch.no_grad():

@@ -236,6 +236,8 @@ class LeaderFollowerAgent(Agent):
         leader_observation["action"] = right_action
         follower_observation["action"] = left_action
 
+        # 就是文件夹下的create agent创建而来的
+        # 这是一个loss {total_loss prev_layer_voxel_grid prev_layer_bounds}
         leader_update_dict = self.leader_agent.update(step, leader_observation)
         import torch
         follower_observation['low_dim_state'] = torch.cat([follower_observation['low_dim_state'],

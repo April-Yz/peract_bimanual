@@ -23,9 +23,9 @@ starttime=`date +'%Y-%m-%d %H:%M:%S'`
 # printf '%s\n' "$starttime"
 # tasks=[bimanual_pick_laptop,bimanual_push_single_button,coordinated_lift_tray,coordinated_push_box,coordinated_put_bottle_in_fridge,handover_item_medium]
 
-eval_type='last' # or 'best', 'missing', or 'last' or 'all'
+eval_type=all #'last' # or 'best', 'missing', or 'last' or 'all'
 camera=False
-eval_episodes=100 #25 #eval每个task的轮数
+eval_episodes=25 #25 #eval每个task的轮数
 # camera=False # 是否录制视频
 gripper_mode='BimanualDiscrete'
 arm_action_mode='BimanualEndEffectorPoseViaPlanning'

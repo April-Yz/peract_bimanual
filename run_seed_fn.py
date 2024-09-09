@@ -30,7 +30,7 @@ def run_seed(
     cfg: DictConfig,
     obs_config: ObservationConfig,
     cams, # y7.26
-    multi_task, # y7.26
+    multi_task, # y7.26 T/F
     seed,
     world_size,
     fabric: L.Fabric = None, # yzj7.26 
@@ -185,7 +185,6 @@ def run_seed(
             return
         # ------new
         replay_buffer = replay_utils.create_replay(cfg, replay_path)
-        
         replay_utils.fill_multi_task_replay(
             cfg,
             obs_config,
@@ -203,7 +202,7 @@ def run_seed(
         ## 7.16yzj 上面是PERACT_BC做法，下面是ManiGaussian_BC做法的改动
         #replay_buffer = replay_utils.create_replay(cfg, replay_path)
         #replay_utils.fill_multi_task_replay(cfg, obs_config, rank, replay_buffer, tasks)
-        import logging
+        # import logging
         # logging.info("run_seed_fn.py: create_replay")
         from agents import manigaussian_bc2
         # 和双臂的一样（除了导入的c2farm_lingunet_bc）
@@ -238,7 +237,46 @@ def run_seed(
         )
 
         agent = manigaussian_bc2.launch_utils.create_agent(cfg)
-# --------------------------------传参改动结束----------------------------------------------
+
+    elif cfg.method.name == "ManiGaussian2_BC":
+        # leader follow版本
+        print("Staring leaderfollower")
+        from agents import manigaussian2_bc
+        agent = agent_factory.create_agent(cfg)
+        # agent = manigaussian2_bc.launch_utils.create_agent(cfg)
+        if not agent:
+            print("Unable to create agent")
+            return
+        # ------new
+        # replay_buffer = replay_utils.create_replay(cfg, replay_path)
+        replay_buffer = manigaussian2_bc.launch_utils.create_replay(cfg, replay_path)
+        # replay_utils.fill_multi_task_replay(
+        #     cfg,
+        #     obs_config,
+        #     rank,
+        #     replay_buffer,
+        #     tasks
+        # )
+        manigaussian2_bc.launch_utils.fill_multi_task_replay(
+            cfg, 
+            obs_config, 
+            0,  # 双臂是rank
+            replay_buffer, 
+            tasks, 
+            cfg.rlbench.demos,
+            cfg.method.demo_augmentation, 
+            cfg.method.demo_augmentation_every_n,
+            cams, 
+            cfg.rlbench.scene_bounds,
+            cfg.method.voxel_sizes, 
+            cfg.method.bounds_offset,
+            cfg.method.rotation_resolution, 
+            cfg.method.crop_augmentation,
+            keypoint_method=cfg.method.keypoint_method,
+            fabric=fabric,  # 暂时不用分布式 
+        )
+    # --------------------------------传参改动结束----------------------------------------------
+    
     else:
         raise ValueError("Method %s does not exists." % cfg.method.name)
 

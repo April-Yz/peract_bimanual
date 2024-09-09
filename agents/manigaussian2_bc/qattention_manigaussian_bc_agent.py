@@ -105,18 +105,16 @@ def parse_camera_file(file_path):
     with open(file_path, 'r') as f:
         lines = f.readlines()
 
-    # 外参矩阵是一个 4x4 矩阵，表示相机在世界坐标系中的位置和方向
     camera_extrinsic = []
-    for x in lines[0:4]: # 循环遍历前四行
+    for x in lines[0:4]:
         camera_extrinsic += [float(y) for y in x.split()]
     camera_extrinsic = np.array(camera_extrinsic).reshape(4, 4)
 
     camera_intrinsic = []
     for x in lines[5:8]:
         camera_intrinsic += [float(y) for y in x.split()]
-    camera_intrinsic = np.array(camera_intrinsic).reshape(3, 3) # 内参矩阵是一个 3x3 矩阵，包含焦距、主点坐标等信息
+    camera_intrinsic = np.array(camera_intrinsic).reshape(3, 3)
 
-    # 提取焦距（Focal Length）
     focal = camera_intrinsic[0, 0]
 
     return camera_extrinsic, camera_intrinsic, focal
@@ -309,8 +307,8 @@ class QFunction(nn.Module):
                 # print("qfunction中的已经开始错了！！！哈哈哈终于找到你了",voxel_grid_feature.shape)
                 # render loss（改变）神经渲染 后面是一些相关数据字典通过dotmap处理后的数据，可用.访问，但是无用
                 # 所以就是在这里加入grounded sam结果了
-                # print("\033[0;32;40maction in bc agent.py\033[0m",action) [1,16]
-                # print(action.shape) # torch.Size([1, 16])
+                print("\033[0;32;40maction in bc agent.py\033[0m",action)
+                print(action.shape) # torch.Size([1, 16])
 
                 rendering_loss_dict, _ = self._neural_renderer(
                     rgb=rgb_0, pcd=pcd_0, depth=depth_0, # 第一个视角下的颜色 点云数据 深度
@@ -808,8 +806,6 @@ class QAttentionPerActBCAgent(Agent):
         prev_layer_bounds = replay_sample.get("prev_layer_bounds", None)
         lang_goal = replay_sample['lang_goal'] # mani
         action_gt = replay_sample['action'] # [bs, 8] # mani
-        # new?
-        # right_action_gt, left_action_gt = action_gt.chunk(2, dim=2)
         device = self._device
 
         rank = device
@@ -1018,12 +1014,12 @@ class QAttentionPerActBCAgent(Agent):
             right_action_rot_grip,
             right_action_ignore_collisions,
         )
-        # print(" ### in update  ###  ")
-        # print("right_action_trans", right_action_trans) # tensor([[55, 51, 27]], device='cuda:0'
-        # print("right_action_rot_grip", right_action_rot_grip) #  tensor([[ 0, 36,  6,  0]], device='cuda:0')
-        # print("right_action", right_action) # 连接起来 ignore collision (tensor([[1]], device='cuda:0', dtype=torch.int32)
+        print(" ### in update  ###  ")
+        print("right_action_trans", right_action_trans) # tensor([[55, 51, 27]], device='cuda:0'
+        print("right_action_rot_grip", right_action_rot_grip) #  tensor([[ 0, 36,  6,  0]], device='cuda:0')
+        print("right_action", right_action) # 连接起来 ignore collision (tensor([[1]], device='cuda:0', dtype=torch.int32)
         # print("right_action.shape",right_action.shape)
-        # print(" ")
+        print(" ")
         left_action = (
             left_action_trans,
             left_action_rot_grip,
@@ -1087,11 +1083,11 @@ class QAttentionPerActBCAgent(Agent):
         ) = self._q.choose_highest_action(
             right_q_trans, right_q_rot_grip, right_q_collision
         )
-        # print(" ")
-        # print("\033[0;32;40mright_coords\033[0m",right_coords) #[41,58,21]
-        # print("right_rot_and_grip_indicies",right_rot_and_grip_indicies) #[0,36,70,0]
-        # print("right_ignore_collision_indicies",right_ignore_collision_indicies) #[[1]]
-        # print(" ")
+        print(" ")
+        print("\033[0;32;40mright_coords\033[0m",right_coords) #[41,58,21]
+        print("right_rot_and_grip_indicies",right_rot_and_grip_indicies) #[0,36,70,0]
+        print("right_ignore_collision_indicies",right_ignore_collision_indicies) #[[1]]
+        print(" ")
 
         (
             left_coords,

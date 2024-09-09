@@ -77,7 +77,6 @@ class ResnetFC(nn.Module):
         use_spade=False,
     ):
         """
-        FC全连接?
         :param d_in input size
         :param d_out output size
         :param n_blocks number of Resnet blocks

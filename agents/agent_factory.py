@@ -9,7 +9,7 @@ from yarr.agents.agent import LeaderFollowerAgent
 from yarr.agents.agent import Agent
 
 
-supported_agents = {"leader_follower": ("PERACT_BC", "RVT"), 
+supported_agents = {"leader_follower": ("PERACT_BC", "RVT", "ManiGaussian2_BC"), 
                     "independent" : ("PERACT_BC", "RVT"),
                     "bimanual": ("BIMANUAL_PERACT", "ACT_BC_LANG","ManiGaussian_BC2"),
                     "unimanual": ()}
@@ -17,7 +17,7 @@ supported_agents = {"leader_follower": ("PERACT_BC", "RVT"),
 
 def create_agent(cfg: DictConfig) -> Agent:
 
-    method_name = cfg.method.name
+    method_name = cfg.method.name # ManiGaussian2_BC
     agent_type = cfg.method.agent_type
 
     logging.info("Using method %s with type %s", method_name, agent_type)
@@ -27,8 +27,8 @@ def create_agent(cfg: DictConfig) -> Agent:
     agent_fn = agent_fn_by_name(method_name)
     
     if agent_type == "leader_follower":
-        checkpoint_name_prefix = cfg.framework.checkpoint_name_prefix
-        cfg.method.robot_name = "right"
+        checkpoint_name_prefix = cfg.framework.checkpoint_name_prefix # "checkpoint"
+        cfg.method.robot_name = "right" # lower 小写
         cfg.framework.checkpoint_name_prefix = f"{checkpoint_name_prefix}_{method_name.lower()}_leader"
         leader_agent = agent_fn(cfg)
 
@@ -102,5 +102,9 @@ def agent_fn_by_name(method_name: str) -> Agent:
         from agents import manigaussian_bc2
 
         return manigaussian_bc2.launch_utils.create_agent    
+    
+    elif method_name.startswith("ManiGaussian2_BC"):
+        from agents import manigaussian2_bc
+        return manigaussian2_bc.launch_utils.create_agent        
     else:
         raise ValueError("Method %s does not exists." % method_name)

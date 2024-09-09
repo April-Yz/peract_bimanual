@@ -333,6 +333,7 @@ def rand_discrete(size, min=0, max=1):
 
 
 def split_list(lst, n):
+    # lst 要分割的列表 n 每个子列表的长度
     for i in range(0, len(lst), n):
         yield lst[i : i + n]
 

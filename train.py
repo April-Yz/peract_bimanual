@@ -146,7 +146,7 @@ def main(cfg: DictConfig) -> None:
                                 cfg,
                                 obs_config,
                                 cfg.rlbench.cameras,    #多
-                                multi_task,
+                                multi_task, # T/F
                                 seed,
                                 world_size,
                                 fabric, 

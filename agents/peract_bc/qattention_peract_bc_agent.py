@@ -89,7 +89,7 @@ class QFunction(nn.Module):
         lang_token_embs,
         bounds=None,
         prev_bounds=None,
-        prev_layer_voxel_grid=None,
+        prev_layer_voxel_grid=None, # prev可能表示 先前
     ):
         # rgb_pcd will be list of list (list of [rgb, pcd])
         b = rgb_pcd[0][0].shape[0]
@@ -102,7 +102,7 @@ class QFunction(nn.Module):
             [p.permute(0, 2, 3, 1).reshape(b, -1, feat_size) for p in rgb], 1
         )
 
-        # construct voxel grid
+        # construct voxel grid # Mani中多了两个
         voxel_grid = self._voxelizer.coords_to_bounding_voxel_grid(
             pcd_flat, coord_features=flat_imag_features, coord_bounds=bounds
         )
