@@ -17,7 +17,7 @@ from rlbench.observation_config import ObservationConfig
 
 _DT = 0.05
 _MAX_RESET_ATTEMPTS = 40
-_MAX_DEMO_ATTEMPTS = 10
+_MAX_DEMO_ATTEMPTS = 50 # 10  only for lift ball
 
 
 class TaskEnvironment(object):

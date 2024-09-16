@@ -32,6 +32,9 @@ class TaskUniformReplayBuffer(UniformReplayBuffer):
 
         Args:
           kwargs: All the elements in a transition.
+        内部添加方法，用于添加到存储阵列。
+        参数：
+          kwargs： 过渡中的所有元素。
         """
         with self._lock:
             cursor = self.cursor()
@@ -73,7 +76,46 @@ class TaskUniformReplayBuffer(UniformReplayBuffer):
             self.invalid_range = invalid_range(
                 self.cursor(), self._replay_capacity, self._timesteps,
                 self._update_horizon)
+    # ---------------------------------------------------------------------
+    def load_add(self, kwargs: dict):
+        """Method to add data to buffer without saving to disk.
 
+        Args:
+          kwargs: All the elements in a transition.
+        """
+        with self._lock:
+            cursor = self.cursor()
+            term = self._store[TERMINAL]
+            term[cursor] = kwargs[TERMINAL]
+            self._store[TERMINAL] = term
+
+
+            ## reduce size
+            for k, v in kwargs.items():
+                # print(k)
+                try:
+                    if 'float' in v.dtype.name and v.size > 100:
+                        v = v.astype(np.float16)
+                        kwargs[k] = v
+                        # print(k)
+                except:
+                    pass
+            
+            # If first add, then pad for correct wrapping
+            if self._add_count.value == 0:
+                self._add_initial_to_disk(kwargs)
+            with self._add_count.get_lock():
+                task = kwargs[TASK]
+                if task not in self._task_idxs:
+                    self._task_idxs[task] = [cursor]
+                else:
+                    self._task_idxs[task] = self._task_idxs[task] + [cursor]
+                self._add_count.value += 1
+
+            self.invalid_range = invalid_range(
+                self.cursor(), self._replay_capacity, self._timesteps,
+                self._update_horizon)
+    # ---------------------------------------------------------------------
     def sample_index_batch(self,
                            batch_size):
         """Returns a batch of valid indices sampled uniformly.

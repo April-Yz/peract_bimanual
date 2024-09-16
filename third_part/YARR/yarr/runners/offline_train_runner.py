@@ -190,7 +190,7 @@ class OfflineTrainRunner():
                 start_iter = 0
             else:
                 resume_iteration = existing_weights[-1]
-                print("---- Loading existing weights from 加载  weight ########################")
+                # print("---- Loading existing weights from 加载  weight ########################")
                 self._agent.load_weights(os.path.join(self._weightsdir, str(resume_iteration)))
                 start_iter = resume_iteration + 1
                 if self._rank == 0:

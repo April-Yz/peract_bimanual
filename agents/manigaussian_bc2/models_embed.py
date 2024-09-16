@@ -70,8 +70,8 @@ class GeneralizableGSEmbedNet(nn.Module):
         self.d_latent = d_latent = cfg.d_latent # 128 (要不要改成256？)
         self.d_lang = d_lang = cfg.d_lang   # 128
         self.d_out = sum(split_dimensions)
-        print(colored(f"self.d_in {self.d_in}", "red"))  # 
-        print(colored(f"self.d_out {self.d_out}", "red"))  # 26
+        # print(colored(f"self.d_in {self.d_in}", "red"))  # 
+        # print(colored(f"self.d_out {self.d_out}", "red"))  # 26
 
         self.encoder = ResnetFC(
                 d_in=d_in, # xyz                    # 39
@@ -99,46 +99,72 @@ class GeneralizableGSEmbedNet(nn.Module):
 
         # we move xyz, rot
         self.use_dynamic_field = cfg.use_dynamic_field
+        self.field_type = cfg.field_type
         self.warm_up = cfg.next_mlp.warm_up
         self.use_action = cfg.next_mlp.use_action
         cprint(f"[GeneralizableGSEmbedNet] Using dynamic field: {self.use_dynamic_field}", "red")
         if self.use_dynamic_field:
-            self.use_semantic_feature = (cfg.foundation_model_name == 'diffusion')
-            cprint(f"[GeneralizableGSEmbedNet] Using action input: {self.use_action}", "red")
-            cprint(f"[GeneralizableGSEmbedNet] Using semantic feature: {self.use_semantic_feature}", "red")
-            # if self.leader:
-            next_d_in = self.d_out + self.d_in
-            cprint(f"next_d_in = self.d_out + self.d_in: {next_d_in}", "Green")
-            next_d_in = next_d_in + 8 if self.use_action else next_d_in  # action: 8 dim # new theta_right=8(还是16呢)
-            cprint(f"next_d_in = next_d_in + 8 if self.use_action else next_d_in {next_d_in}", "Green")
-            next_d_in = next_d_in if self.use_semantic_feature else next_d_in - 3
-            cprint(f" next_d_in = next_d_in if self.use_semantic_feature else next_d_in - 3 {next_d_in}", "Green")
-            self.gs_deformation_field = ResnetFC(
-                    d_in=next_d_in, # all things despite volumetric representation (26 + 39 + 8 -3 = 70) 尽管有体积表示
-                    d_latent=self.d_latent,
-                    d_lang=self.d_lang,
-                    d_out=3 + 4,    # xyz, rot
-                    d_hidden=cfg.next_mlp.d_hidden, 
-                    n_blocks=cfg.next_mlp.n_blocks, 
-                    combine_layer=cfg.next_mlp.combine_layer,
-                    beta=cfg.next_mlp.beta, use_spade=cfg.next_mlp.use_spade,
-                )
-            # -------------------------------for Follower ------------------------------
-            # else:
-            # self.use_semantic_feature = (cfg.foundation_model_name == 'diffusion')
-            next_d_in = self.d_out + self.d_in # 有问题
-            next_d_in = next_d_in + 8 + 8 if self.use_action else next_d_in  # action: 8 再加上8 dim # new theta_right=8(还是16呢)
-            next_d_in = next_d_in if self.use_semantic_feature else next_d_in - 3
-            self.gs_deformation_field_follower = ResnetFC(
-                    d_in=next_d_in, # all things despite volumetric representation (26 + 39 + 8 -3 = 70) 尽管有体积表示
-                    d_latent=self.d_latent,
-                    d_lang=self.d_lang,
-                    d_out=3 + 4,    # xyz, rot   # ？
-                    d_hidden=cfg.next_mlp.d_hidden, 
-                    n_blocks=cfg.next_mlp.n_blocks, 
-                    combine_layer=cfg.next_mlp.combine_layer,
-                    beta=cfg.next_mlp.beta, use_spade=cfg.next_mlp.use_spade,
-                )
+            if self.field_type !='LF':
+                self.use_semantic_feature = (cfg.foundation_model_name == 'diffusion')
+                cprint(f"[GeneralizableGSEmbedNet] Using action input: {self.use_action}", "red")
+                cprint(f"[GeneralizableGSEmbedNet] Using semantic feature: {self.use_semantic_feature}", "red")
+                # if self.leader:
+                next_d_in = self.d_out + self.d_in      #39+26=65
+                # cprint(f"65 next_d_in = self.d_out + self.d_in: {next_d_in}", "green") 
+                next_d_in = next_d_in + 16 if self.use_action else next_d_in  # 73->81 action: 8->16 dim # new theta_right=8(还是16呢)
+                # cprint(f"73 next_d_in = next_d_in + 8 if self.use_action else next_d_in {next_d_in}", "green")
+                next_d_in = next_d_in if self.use_semantic_feature else next_d_in - 3   # 70->78
+                # cprint(f"70 next_d_in = next_d_in if self.use_semantic_feature else next_d_in - 3 {next_d_in}", "green")
+                self.gs_deformation_field = ResnetFC(
+                        d_in=next_d_in, # all things despite volumetric representation (26 + 39 + 8 -3 = 70) 尽管有体积表示
+                        d_latent=self.d_latent,
+                        d_lang=self.d_lang,
+                        d_out=3 + 4,    # xyz, rot
+                        d_hidden=cfg.next_mlp.d_hidden, 
+                        n_blocks=cfg.next_mlp.n_blocks, 
+                        combine_layer=cfg.next_mlp.combine_layer,
+                        beta=cfg.next_mlp.beta, use_spade=cfg.next_mlp.use_spade,
+                    )
+
+                # -------------------------------for Follower ------------------------------
+                # if self.field_type =='LF':
+            else:
+                self.use_semantic_feature = (cfg.foundation_model_name == 'diffusion')
+                cprint(f"[GeneralizableGSEmbedNet] Using action input: {self.use_action}", "red")
+                cprint(f"[GeneralizableGSEmbedNet] Using semantic feature: {self.use_semantic_feature}", "red")
+                # if self.leader:
+                next_d_in = self.d_out + self.d_in      #39+26=65
+                # cprint(f"65 next_d_in = self.d_out + self.d_in: {next_d_in}", "green") 
+                next_d_in = next_d_in + 8 if self.use_action else next_d_in  # 73 action: 8 dim # new theta_right=8(还是16呢)
+                # cprint(f"73 next_d_in = next_d_in + 8 if self.use_action else next_d_in {next_d_in}", "green")
+                next_d_in = next_d_in if self.use_semantic_feature else next_d_in - 3   # 70
+                # cprint(f"70 next_d_in = next_d_in if self.use_semantic_feature else next_d_in - 3 {next_d_in}", "green")
+                # with torch.no_grad():
+                self.gs_deformation_field_leader = ResnetFC(
+                        d_in=next_d_in, # all things despite volumetric representation (26 + 39 + 8 -3 = 70) 尽管有体积表示
+                        d_latent=self.d_latent,
+                        d_lang=self.d_lang,
+                        d_out=3 + 4,    # xyz, rot
+                        d_hidden=cfg.next_mlp.d_hidden, 
+                        n_blocks=cfg.next_mlp.n_blocks, 
+                       combine_layer=cfg.next_mlp.combine_layer,
+                        beta=cfg.next_mlp.beta, use_spade=cfg.next_mlp.use_spade,
+                    )
+                # else:
+                # self.use_semantic_feature = (cfg.foundation_model_name == 'diffusion')
+                next_d_in = self.d_out + self.d_in # 有问题
+                next_d_in = next_d_in + 8 + 8 if self.use_action else next_d_in  # action: 8 再加上8 dim # new theta_right=8(还是16呢)
+                next_d_in = next_d_in if self.use_semantic_feature else next_d_in - 3
+                self.gs_deformation_field_follower = ResnetFC(
+                        d_in=next_d_in, # all things despite volumetric representation (26 + 39 + 8 -3 = 70) 尽管有体积表示
+                        d_latent=self.d_latent,
+                        d_lang=self.d_lang,
+                        d_out=3 + 4,    # xyz, rot   # ？
+                        d_hidden=cfg.next_mlp.d_hidden, 
+                        n_blocks=cfg.next_mlp.n_blocks, 
+                        combine_layer=cfg.next_mlp.combine_layer,
+                        beta=cfg.next_mlp.beta, use_spade=cfg.next_mlp.use_spade,
+                    )
             # -------------------------------for Follower ------------------------------
 
     def _get_splits_and_inits(self, cfg):
@@ -302,7 +328,7 @@ class GeneralizableGSEmbedNet(nn.Module):
         scale_maps = self.scaling_activation(scale_maps)    # exp   [1, 65536, 3]
         # print("scale_maps = ",scale_maps.shape)  # 输出scale_maps张量的形状 [1, 65536, 3]
         scale_maps = torch.clamp_max(scale_maps, 0.05) # [1, 65536, 3]
-        print("scale_maps = ",scale_maps.shape)  # 输出scale_maps张量的形状 [1, 65536, 3]
+        # print("scale_maps = ",scale_maps.shape)  # 输出scale_maps张量的形状 [1, 65536, 3]
 
         data['xyz_maps'] = data['xyz'] + xyz_maps   # [B, N, 3]           [1, 65536, 3]
         data['sh_maps'] = sh_out    # [B, N, 4, 3]                        [1, 65536, 4, 3]        
@@ -347,26 +373,73 @@ class GeneralizableGSEmbedNet(nn.Module):
 
             # voxel embedding, stop gradient (gaussian xyz), (128+39)+3=170
             # 体素嵌入，停止梯度（高斯 XYZ），（128+39）+3=170
-            if self.use_action:
-                dyna_input = torch.cat((dyna_input, data['action'].repeat(N, 1)), dim=-1)   # action detach
-                cprint(f"dyna_input.shape: {dyna_input.shape}", "red")
+            if self.field_type !='LF':
+                if self.use_action:
+                    dyna_input = torch.cat((dyna_input, data['action'].repeat(N, 1)), dim=-1)   # action detach
+                    # cprint(f"dyna_input.shape: {dyna_input.shape}", "red") 
 
-            next_split_network_outputs, _ = self.gs_deformation_field(
-                dyna_input,
-                combine_inner_dims=(self.num_views_per_obj, N),
-                combine_index=combine_index,
-                dim_size=dim_size,
-                language_embed=data['lang'],
-                batch_size=SB,
-                )
-            next_xyz_maps, next_rot_maps = next_split_network_outputs.split([3, 4], dim=-1)
+                next_split_network_outputs, _ = self.gs_deformation_field(
+                    dyna_input,
+                    combine_inner_dims=(self.num_views_per_obj, N),
+                    combine_index=combine_index,
+                    dim_size=dim_size,
+                    language_embed=data['lang'],
+                    batch_size=SB,
+                    )
+                next_xyz_maps, next_rot_maps = next_split_network_outputs.split([3, 4], dim=-1)
+                
+                data['next']['xyz_maps'] = data['xyz_maps'].detach() + next_xyz_maps
+                data['next']['sh_maps'] = data['sh_maps'].detach()
+                data['next']['rot_maps'] = self.rotation_activation(data['rot_maps'].detach() + next_rot_maps, dim=-1)
+                data['next']['scale_maps'] = data['scale_maps'].detach()
+                data['next']['opacity_maps'] = data['opacity_maps'].detach()
+                data['next']['feature_maps'] = data['feature_maps'].detach()
+            else:
+                # -------------------------------------------------------------------------------------------------
+                if self.use_action:
+                    dyna_input = torch.cat((dyna_input, data['right_action'].repeat(N, 1)), dim=-1)   # action detach [65536, 206]
+                    # cprint(f"dyna_input.shape: {dyna_input.shape}", "red") # [65536, 206]
 
-            data['next']['xyz_maps'] = data['xyz_maps'].detach() + next_xyz_maps
-            data['next']['sh_maps'] = data['sh_maps'].detach()
-            data['next']['rot_maps'] = self.rotation_activation(data['rot_maps'].detach() + next_rot_maps, dim=-1)
-            data['next']['scale_maps'] = data['scale_maps'].detach()
-            data['next']['opacity_maps'] = data['opacity_maps'].detach()
-            data['next']['feature_maps'] = data['feature_maps'].detach()
+                    # with torch.no_grad():
+                    next_split_network_outputs_leader, _ = self.gs_deformation_field_leader(
+                         dyna_input,
+                        combine_inner_dims=(self.num_views_per_obj, N),
+                        combine_index=combine_index,
+                        dim_size=dim_size,
+                        language_embed=data['lang'],
+                        batch_size=SB,
+                       )
+                    # 这部分要不要缩进呢
+                    next_xyz_maps, next_rot_maps = next_split_network_outputs_leader.split([3, 4], dim=-1)   
+                    data['right_next']['xyz_maps'] = data['xyz_maps'].detach() + next_xyz_maps    # [1, 65536, 3]?
+                    # print("data['right_next']['xyz_maps'].shape: ", data['right_next']['xyz_maps'].shape) # [1, 65536, 3]
+                    data['right_next']['sh_maps'] = data['sh_maps'].detach()
+                    data['right_next']['rot_maps'] = self.rotation_activation(data['rot_maps'].detach() + next_rot_maps, dim=-1)  # [1, 65536, 4]
+                    # print("data['right_next']['rot_maps'].shape: ", data['right_next']['rot_maps'].shape,"next_rot_maps",next_rot_maps) # torch.Size([1, 65536, 4]) next_rot_maps tensor([[[ 3.3136e-01, -7.9674e-01,  1.2806e+00,  3.1690e-01],很长的一列
+                    data['right_next']['scale_maps'] = data['scale_maps'].detach()
+                    data['right_next']['opacity_maps'] = data['opacity_maps'].detach()
+                    data['right_next']['feature_maps'] = data['feature_maps'].detach()
+            
+                    # if self.use_action:
+                    dyna_input = torch.cat((dyna_input, data['left_action'].repeat(N, 1)), dim=-1)   # action detach
+                    # cprint(f"dyna_input.shape: {dyna_input.shape}", "red")
 
+                    next_split_network_outputs_follower, _ = self.gs_deformation_field_follower(
+                        dyna_input,
+                        combine_inner_dims=(self.num_views_per_obj, N),
+                        combine_index=combine_index,
+                        dim_size=dim_size,
+                        language_embed=data['lang'],
+                        batch_size=SB,
+                        )
+                    next_xyz_maps, next_rot_maps = next_split_network_outputs_follower.split([3, 4], dim=-1)   
+                    data['left_next']['xyz_maps'] = data['xyz_maps'].detach() + next_xyz_maps
+                    data['left_next']['sh_maps'] = data['sh_maps'].detach()
+                    data['left_next']['rot_maps'] = self.rotation_activation(data['rot_maps'].detach() + next_rot_maps, dim=-1)
+                    data['left_next']['scale_maps'] = data['scale_maps'].detach()
+                    data['left_next']['opacity_maps'] = data['opacity_maps'].detach()
+                    data['left_next']['feature_maps'] = data['feature_maps'].detach()
+
+                # -------------------------------------------------------------------------------------------------
         return data
     

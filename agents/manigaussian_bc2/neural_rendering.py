@@ -72,7 +72,7 @@ class NeuralRenderer(nn.Module):
             self.diffusion_preprocess = T.Resize(512, antialias=True)
             cprint("diffusion feature dims: "+str(self.feature_extractor.feature_dims), "yellow")
         elif self.model_name == "dinov2":
-            from agents.manigaussian_bc.dino_extractor import VitExtractor
+            from agents.manigaussian_bc2.dino_extractor import VitExtractor
             import torchvision.transforms as T
             self.feature_extractor = VitExtractor(
                 model_name='dinov2_vitl14',
@@ -91,6 +91,7 @@ class NeuralRenderer(nn.Module):
         print(colored(f"[NeuralRenderer] rgb loss weight: {self.lambda_rgb}", "cyan"))
 
         self.use_dynamic_field = cfg.use_dynamic_field
+        self.field_type = cfg.field_type
 
     def _embed_loss_fn(self, render_embed, gt_embed):
         """
@@ -191,19 +192,18 @@ class NeuralRenderer(nn.Module):
         data['action'] = action
         # maniaction 不确定rl那个在前
         right_action, left_action = torch.split(action, split_size_or_sections=8, dim=1)
+        # print("self.field_type=",self.field_type)
+        # if self.cfg.method.field_type == 'bimanual_LF':
+        data['right_action'] = right_action
+        data['left_action'] = left_action
         # right_action, left_action = action.chunk(2, dim=2) # agent写法
-        print("\033[0;31;40mactionr in neural_rendering.py\033[0m",right_action)
-        print("\033[0;31;40mactionl in neural_rendering.py\033[0m",left_action)
+        # print("\033[0;31;40mactionr in neural_rendering.py\033[0m",right_action)
+        # print("\033[0;31;40mactionl in neural_rendering.py\033[0m",left_action)
         # print("\033[0;31;40maction in neural_rendering.py\033[0m",action)
         # tensor([[ 
-        #   1.8244e-01, -1.2036e-01,  7.7095e-01,
-        #   6.9350e-05,  1.0000e+00,  2.3808e-04,
-        #  -1.1926e-03,  0.0000e+00,
-        #   
-        #   2.8597e-01,  3.3652e-01,  7.7093e-01,
-        #  -9.3490e-05,  1.0000e+00,  7.0034e-04,
-        #   1.0216e-03,  0.0000e+00]], device='cuda:0')
-        print(action.shape) # torch.Size([1, 16])
+        #   1.8244e-01, -1.2036e-01,  7.7095e-01, 6.9350e-05,  1.0000e+00,  2.3808e-04, -1.1926e-03,  0.0000e+00, 
+        #   2.8597e-01,  3.3652e-01,  7.7093e-01, -9.3490e-05, 1.0000e+00,  7.0034e-04, 1.0216e-03,  0.0000e+00]], device='cuda:0')
+        # print(action.shape) # torch.Size([1, 16])
         data['step'] = step
 
         # novel pose
@@ -223,32 +223,34 @@ class NeuralRenderer(nn.Module):
             data['novel_view'].update(data_novel)
 
         if self.use_dynamic_field:
-            data['next'] = {
-                'extr': next_tgt_pose,
-                'intr': next_tgt_intrinsic,
-                'novel_view': {},
-            }
-            if data['next']['intr'] is not None:
-                data_novel = self.get_novel_calib(data['next'])
-                data['next']['novel_view'].update(data_novel)
+            if self.field_type !='LF':
+                data['next'] = {
+                    'extr': next_tgt_pose,
+                    'intr': next_tgt_intrinsic,
+                    'novel_view': {},
+                }
+                if data['next']['intr'] is not None:
+                    data_novel = self.get_novel_calib(data['next'])
+                    data['next']['novel_view'].update(data_novel)
             # ------------------------------------------------------------------------------
-            # data['right_next'] = {
-            #     'extr': next_tgt_pose,
-            #     'intr': next_tgt_intrinsic,
-            #     'novel_view': {},
-            # }
-            # if data['right_next']['intr'] is not None:
-            #     data_novel = self.get_novel_calib(data['right_next'])
-            #     data['right_next']['novel_view'].update(data_novel)
+            else:
+                data['right_next'] = {
+                    'extr': next_tgt_pose,
+                    'intr': next_tgt_intrinsic,
+                    'novel_view': {},
+                }
+                if data['right_next']['intr'] is not None:
+                    data_novel = self.get_novel_calib(data['right_next'])
+                    data['right_next']['novel_view'].update(data_novel)
 
-            # data['left_next'] = {
-            #     'extr': next_tgt_pose,
-            #     'intr': next_tgt_intrinsic,
-            #     'novel_view': {},
-            # }
-            # if data['left_next']['intr'] is not None:
-            #     data_novel = self.get_novel_calib(data['left_next'])
-            #     data['left_next']['novel_view'].update(data_novel)
+                data['left_next'] = {
+                    'extr': next_tgt_pose,
+                    'intr': next_tgt_intrinsic,
+                    'novel_view': {},
+                }
+                if data['left_next']['intr'] is not None:
+                    data_novel = self.get_novel_calib(data['left_next'])
+                    data['left_next']['novel_view'].update(data_novel)
             # ------------------------------------------------------------------------------
 
         return data
@@ -331,6 +333,7 @@ class NeuralRenderer(nn.Module):
             # 提取基础模型特征 # Diffusion or dinov2
             gt_embed = self.extract_foundation_model_feature(gt_rgb, lang_goal)
 
+        # print("training=",training)
         # if gt_rgb is not None:
         if training:
             # Gaussian Generator 高斯生成器
@@ -391,37 +394,66 @@ class NeuralRenderer(nn.Module):
                 loss_embed = torch.tensor(0.)
 
             # next frame prediction 下一帧预测 Ldyna(optional)
-            if self.use_dynamic_field and (next_gt_rgb is not None) and ('xyz_maps' in data['next']):
-                data['next'] = self.pts2render(data['next'], bg_color=self.bg_color)
-                next_render_novel = data['next']['novel_view']['img_pred'].permute(0, 2, 3, 1)
-                # loss_dyna = l1_loss(next_render_novel, next_gt_rgb)
-                loss_dyna = l2_loss(next_render_novel, next_gt_rgb)
-                # 预热步数（3000步以后算上了）
-                lambda_dyna = self.cfg.lambda_dyna if step >= self.cfg.next_mlp.warm_up else 0.
-                # Step 3 Loss(LGeo? + L embed/L sem + L dyna) = loss_rgb + self.cfg.lambda_embed * loss_embed + lambda_dyna * loss_dyna
-                loss += lambda_dyna * loss_dyna
+            if self.field_type != 'LF':
+                if self.use_dynamic_field and (next_gt_rgb is not None) and ('xyz_maps' in data['next']):
+                    data['next'] = self.pts2render(data['next'], bg_color=self.bg_color)
+                    next_render_novel = data['next']['novel_view']['img_pred'].permute(0, 2, 3, 1)
+                    # loss_dyna = l1_loss(next_render_novel, next_gt_rgb)
+                    loss_dyna = l2_loss(next_render_novel, next_gt_rgb)
+                    # 预热步数（3000步以后算上了）
+                    lambda_dyna = self.cfg.lambda_dyna if step >= self.cfg.next_mlp.warm_up else 0.
+                    # Step 3 Loss(LGeo? + L embed/L sem + L dyna) = loss_rgb + self.cfg.lambda_embed * loss_embed + lambda_dyna * loss_dyna
+                    loss += lambda_dyna * loss_dyna
 
-                loss_reg = torch.tensor(0.)
-                # TODO: regularization on deformation 
-                # 考虑加入一些正则化项来处理形变（deformation）
-                # if self.cfg.lambda_reg > 0:
-                #     loss_reg = l2_loss(data['next']['xyz_maps'], data['xyz_maps'].detach()) #detach不追踪梯度的张量？
-                #     lambda_reg = self.cfg.lambda_reg if step >= self.cfg.next_mlp.warm_up else 0.
-                #     loss += lambda_reg * loss_reg
+                    loss_reg = torch.tensor(0.)
+                    # TODO: regularization on deformation 
+                    # 考虑加入一些正则化项来处理形变（deformation）
+                    # if self.cfg.lambda_reg > 0:
+                    #     loss_reg = l2_loss(data['next']['xyz_maps'], data['xyz_maps'].detach()) #detach不追踪梯度的张量？
+                    #     lambda_reg = self.cfg.lambda_reg if step >= self.cfg.next_mlp.warm_up else 0.
+                    #     loss += lambda_reg * loss_reg
 
-                # TODO: local rigid loss 局部刚性损失
-                # -------------------------------------------------------------------------------------------------
-                # data['next'] = self.pts2render(data['next'], bg_color=self.bg_color)
-                # next_render_novel = data['next']['novel_view']['img_pred'].permute(0, 2, 3, 1)
-                # loss_dyna = l2_loss(next_render_novel, next_gt_rgb)
-                # lambda_dyna = self.cfg.lambda_dyna if step >= self.cfg.next_mlp.warm_up else 0.
-                # loss += lambda_dyna * loss_dyna
-                # loss_reg = torch.tensor(0.)
-                # -------------------------------------------------------------------------------------------------------
+                    # TODO: local rigid loss 局部刚性损失
+                else:
+                    loss_dyna = torch.tensor(0.)
+                    loss_reg = torch.tensor(0.)
+            else:    
+                if self.use_dynamic_field and (next_gt_rgb is not None):
+                    # # 是不是leader要注释？？？
+                    if ('xyz_maps' in data['right_next']):
+                        # with torch.no_grad():  ？
+                        data['right_next'] = self.pts2render(data['right_next'], bg_color=self.bg_color)
+                        next_render_novel = data['right_next']['novel_view']['img_pred'].permute(0, 2, 3, 1)
+                        loss_dyna = l1_loss(next_render_novel, next_gt_rgb)
+                        loss_dyna_leader = l2_loss(next_render_novel, next_gt_rgb)
+                    # loss_dyna_leader = 0
 
-            else:
-                loss_dyna = torch.tensor(0.)
-                loss_reg = torch.tensor(0.)
+                    if ('xyz_maps' in data['left_next']):
+                        data['left_next'] = self.pts2render(data['left_next'], bg_color=self.bg_color)
+                        next_render_novel = data['left_next']['novel_view']['img_pred'].permute(0, 2, 3, 1)
+                        # loss_dyna = l1_loss(next_render_novel, next_gt_rgb)
+                        loss_dyna_follower = l2_loss(next_render_novel, next_gt_rgb)
+                    
+                    loss_dyna = loss_dyna_leader * 0.01 + loss_dyna_follower *0.99
+                    # 预热步数（3000步以后算上了）
+                    lambda_dyna = self.cfg.lambda_dyna if step >= self.cfg.next_mlp.warm_up else 0.                    
+                    
+                    # Step 3 Loss(LGeo? + L embed/L sem + L dyna) = loss_rgb + self.cfg.lambda_embed * loss_embed + lambda_dyna * loss_dyna
+                    loss += lambda_dyna * loss_dyna
+
+                    loss_reg = torch.tensor(0.)
+                    # TODO: regularization on deformation 
+                    # 考虑加入一些正则化项来处理形变（deformation）
+                    # if self.cfg.lambda_reg > 0:
+                    #     loss_reg = l2_loss(data['next']['xyz_maps'], data['xyz_maps'].detach()) #detach不追踪梯度的张量？
+                    #     lambda_reg = self.cfg.lambda_reg if step >= self.cfg.next_mlp.warm_up else 0.
+                    #     loss += lambda_reg * loss_reg
+
+                    # TODO: local rigid loss 局部刚性损失
+
+                else:
+                    loss_dyna = torch.tensor(0.)
+                    loss_reg = torch.tensor(0.)                    
 
             loss_dict = {
                 'loss': loss,
@@ -432,7 +464,7 @@ class NeuralRenderer(nn.Module):
                 'l1': Ll1.item(),
                 'psnr': psnr.item(),
                 }
-        else: # not training
+        else: # not training （第0次是走这边的）
             # 无真实数据，渲染（推理）
             # no ground-truth given, rendering (inference) 
             with torch.no_grad():
@@ -446,9 +478,14 @@ class NeuralRenderer(nn.Module):
                 render_embed = data['novel_view']['embed_pred'].permute(0, 2, 3, 1)
                 
                 # 未来预测
-                if self.use_dynamic_field and 'xyz_maps' in data['next']:
-                    data['next'] = self.pts2render(data['next'], bg_color=self.bg_color)
-                    next_render_novel = data['next']['novel_view']['img_pred'].permute(0, 2, 3, 1)
+                if self.field_type != 'LF':
+                    if self.use_dynamic_field and 'xyz_maps' in data['next']:
+                        data['next'] = self.pts2render(data['next'], bg_color=self.bg_color)
+                        next_render_novel = data['next']['novel_view']['img_pred'].permute(0, 2, 3, 1)
+                else:
+                    if self.use_dynamic_field and ('xyz_maps' in data['left_next']):
+                        data['left_next'] = self.pts2render(data['left_next'], bg_color=self.bg_color)
+                        next_render_novel = data['left_next']['novel_view']['img_pred'].permute(0, 2, 3, 1)                
 
                 loss_dict = {
                     'loss': 0.,

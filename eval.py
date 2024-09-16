@@ -155,8 +155,16 @@ def eval_seed(
     elif type(eval_cfg.framework.eval_type) == int:
         weight_folders = [int(eval_cfg.framework.eval_type)]
         print("Weight:", weight_folders)
+    # 新增为了多个指定模型（使用list的形式）
+    # elif eval_cfg.framework.eval_type.startswith('['):
+    # elif type(eval_cfg.framework.eval_type) == list:
+    elif isinstance(eval_cfg.framework.eval_type, ListConfig):
+        weight_folders = eval_cfg.framework.eval_type
+        print("Weight:", weight_folders)
 
     else:
+        print(type(eval_cfg.framework.eval_type))
+        print(eval_cfg.framework.eval_type)
         raise Exception("Unknown eval type")
 
     if len(weight_folders) == 0:

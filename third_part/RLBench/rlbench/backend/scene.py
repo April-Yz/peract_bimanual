@@ -450,10 +450,14 @@ class Scene(object):
         left_waypoints = self.task.left_waypoints
 
         for i, right_point in enumerate(right_waypoints.copy()):
+            # 获取其扩展属性
             ext = right_point.get_ext()
             if 'repeat' in ext:
+                # 从扩展属性的字符串中从右边开始分割，最多分割一次，得到包含重复次数的字符串。
                 j = ext.rsplit('_', maxsplit=1)
+                # 重复次数的字符串转换为整数
                 j = int(j[-1])
+                # 重复插入 right_point 到 right_waypoints 列表
                 for _ in range(j):
                     right_waypoints.insert(i, right_point)
 
@@ -476,6 +480,7 @@ class Scene(object):
         while True:
             success = False
             self._ignore_collisions_for_current_waypoint = False
+            # ..fixme：： 由于 zip -> 添加虚拟路径点，可能会跳过一些路径点
             # ..fixme:: some waypoints might be skipped due to zip -> add dummy waypoints
             for i, (right_point, left_point) in enumerate(zip(right_waypoints, left_waypoints)):
                 # 忽略当前航点的碰撞
@@ -506,7 +511,8 @@ class Scene(object):
                 
                 [s.set_collidable(False) for s in colliding_shapes]
                 try:
-                    right_path = right_point.get_path()
+                    right_path = right_point.get_path() 
+                    # lift ball 会在这里报错（来自/data1/zjyang/program/peract_bimanual/third_part/pyrep/build/lib.linux-x86_64-cpython-311/pyrep/robots/arms/arm.py）
                     left_path = left_point.get_path()
                 except ConfigurationPathError as e:
                     logging.error("Unable to get path %s", e)

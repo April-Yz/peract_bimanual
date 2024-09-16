@@ -12,6 +12,8 @@ from rlbench import CameraConfig, ObservationConfig
 from yarr.replay_buffer.wrappers.pytorch_replay_buffer import PyTorchReplayBuffer
 from yarr.runners.offline_train_runner import OfflineTrainRunner
 from yarr.utils.stat_accumulator import SimpleAccumulator
+# for load_add
+from yarr.replay_buffer.task_uniform_replay_buffer import TaskUniformReplayBuffer
 
 from helpers.custom_rlbench_env import CustomRLBenchEnv, CustomMultiTaskRLBenchEnv
 import torch.distributed as dist
@@ -24,7 +26,9 @@ from functools import partial
 # new
 import lightning as L
 from termcolor import cprint
+from tqdm import tqdm
 # new
+
 def run_seed(
     rank,
     cfg: DictConfig,
@@ -207,6 +211,13 @@ def run_seed(
         from agents import manigaussian_bc2
         # 和双臂的一样（除了导入的c2farm_lingunet_bc）
         # !!双臂这边只需要cfg和replay_path就行
+        # print(replay_path)
+        # if os.path.exists(replay_path)and os.listdir(replay_path):
+        #     print("Replay files found. Loading...")
+        #     # 初始化 Replay Buffer
+        #     # replay_buffer = TaskUniformReplayBuffer()
+        #     # ####################################################################    
+        #     replay_buffer = replay_utils.create_replay(cfg, replay_path)
         replay_buffer = manigaussian_bc2.launch_utils.create_replay(
             cfg.replay.batch_size,
             cfg.replay.timesteps,
@@ -216,25 +227,73 @@ def run_seed(
             cams, cfg.method.voxel_sizes,
             cfg.rlbench.camera_resolution,
             cfg=cfg)
-
+        #     # ####################################################################
+        #     # 加载所有的 Replay 文件
+        #     replay_files = [os.path.join(replay_path, f) for f in os.listdir(replay_path) if f.endswith('.replay')]
+        #     for replay_file in tqdm(replay_files, desc="Processing files"):
+        #         with open(replay_file, 'rb') as f:
+        #             try:
+        #                 replay_data = pickle.load(f)
+        #                 replay_buffer.load_add(replay_data)
+        #             except pickle.UnpicklingError as e:
+        #                 print(f"Error unpickling file {replay_file}: {e}")
+        # else:
+        #     print("No replay files found. Creating replay...")
+        #     replay_buffer = replay_utils.create_replay(cfg, replay_path)
+        #     # replay_utils.fill_multi_task_replay(
+        #     #     cfg,
+        #     #     obs_config,
+        #     #     rank,
+        #     #     replay_buffer,
+        #     #     tasks
+        #     # )
         manigaussian_bc2.launch_utils.fill_multi_task_replay(
-            cfg, 
-            obs_config, 
-            0,  # 双臂是rank
-            replay_buffer, 
-            tasks, 
-            cfg.rlbench.demos,
-            cfg.method.demo_augmentation, 
-            cfg.method.demo_augmentation_every_n,
-            cams, 
-            cfg.rlbench.scene_bounds,
-            cfg.method.voxel_sizes, 
-            cfg.method.bounds_offset,
-            cfg.method.rotation_resolution, 
-            cfg.method.crop_augmentation,
-            keypoint_method=cfg.method.keypoint_method,
-            fabric=fabric,  # 暂时不用分布式 
-        )
+                cfg, 
+                obs_config, 
+                0,  # 双臂是rank
+                replay_buffer, 
+                tasks, 
+                cfg.rlbench.demos,
+                cfg.method.demo_augmentation, 
+                cfg.method.demo_augmentation_every_n,
+                cams, 
+                cfg.rlbench.scene_bounds,
+                cfg.method.voxel_sizes, 
+                cfg.method.bounds_offset,
+                cfg.method.rotation_resolution, 
+                cfg.method.crop_augmentation,
+                keypoint_method=cfg.method.keypoint_method,
+                fabric=fabric,  # 暂时不用分布式 
+            )
+
+        # replay_buffer = manigaussian_bc2.launch_utils.create_replay(
+        #     cfg.replay.batch_size,
+        #     cfg.replay.timesteps,
+        #     cfg.replay.prioritisation,
+        #     cfg.replay.task_uniform,
+        #     replay_path if cfg.replay.use_disk else None,
+        #     cams, cfg.method.voxel_sizes,
+        #     cfg.rlbench.camera_resolution,
+        #     cfg=cfg)
+
+        # manigaussian_bc2.launch_utils.fill_multi_task_replay(
+        #     cfg, 
+        #     obs_config, 
+        #     0,  # 双臂是rank
+        #     replay_buffer, 
+        #     tasks, 
+        #     cfg.rlbench.demos,
+        #     cfg.method.demo_augmentation, 
+        #     cfg.method.demo_augmentation_every_n,
+        #     cams, 
+        #     cfg.rlbench.scene_bounds,
+        #     cfg.method.voxel_sizes, 
+        #     cfg.method.bounds_offset,
+        #     cfg.method.rotation_resolution, 
+        #     cfg.method.crop_augmentation,
+        #     keypoint_method=cfg.method.keypoint_method,
+        #     fabric=fabric,  # 暂时不用分布式 
+        # )
 
         agent = manigaussian_bc2.launch_utils.create_agent(cfg)
 

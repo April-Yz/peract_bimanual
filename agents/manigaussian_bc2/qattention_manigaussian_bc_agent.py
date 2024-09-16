@@ -1323,7 +1323,7 @@ class QAttentionPerActBCAgent(Agent):
         to_render = (step % render_freq == 0 and self.use_neural_rendering and nerf_target_camera_extrinsic is not None)
         if to_render:
             # print("to_render start")
-            print("\033[0;33;40maction_gt\033[0m",action_gt)
+            # print("\033[0;33;40maction_gt\033[0m",action_gt)
             rgb_render, next_rgb_render, embed_render, gt_embed_render = self._q.render(
                 rgb_pcd=obs,
                 proprio=proprio,
@@ -1345,10 +1345,10 @@ class QAttentionPerActBCAgent(Agent):
                 action=action_gt,
                 )
             
-            # NOTE: [1, h, w, 3]
+            # NOTE: [1, h, w, 3]  # 均为图片质量
             rgb_gt = nerf_target_rgb[0]
             rgb_render = rgb_render[0]
-            psnr = PSNR_torch(rgb_render, rgb_gt)
+            psnr = PSNR_torch(rgb_render, rgb_gt) 
             if next_rgb_render is not None:
                 next_rgb_gt = nerf_next_target_rgb[0]
                 next_rgb_render = next_rgb_render[0]
@@ -1357,13 +1357,13 @@ class QAttentionPerActBCAgent(Agent):
             # 创建目录 'recon' 用于保存可视化结果。 
             os.makedirs('recon', exist_ok=True)
             import matplotlib.pyplot as plt
-            # plot three images in one row with subplots:
+            # plot three images in one row with subplots: 用子图在一行中绘制三个图像：
             # src, tgt, pred
             rgb_src =  obs[0][0].squeeze(0).permute(1, 2, 0)  / 2 + 0.5
             # 绘制源图像（rgb_src）、目标图像（rgb_gt）、渲染图像（rgb_render）、
             # 特征嵌入（embed_render 和 gt_embed_render）
             # 以及下一步骤的图像（next_rgb_gt 和 next_rgb_render）。
-            fig, axs = plt.subplots(1, 7, figsize=(15, 3))
+            fig, axs = plt.subplots(1, 7, figsize=(15, 3))   # 使用 matplotlib 创建一个包含7个子图的图形
             # src
             axs[0].imshow(rgb_src.cpu().numpy())    # 在子图 axs[0] 上显示名为 rgb_src 的图像数
             axs[0].title.set_text('src')            # 设置子图 axs[0] 的标题为 'src'，这可能代表“源图像”（source image）
@@ -1396,23 +1396,27 @@ class QAttentionPerActBCAgent(Agent):
                 ax.axis('off')
             plt.tight_layout()
             
+            # 如果是主进程
             if rank == 0:
-                if self.cfg.use_wandb:
-                    # save to buffer and write to wandb
-                    buf = io.BytesIO()
-                    plt.savefig(buf, format='png')
-                    buf.seek(0)
+                # if self.cfg.use_wandb:
+                #     # save to buffer and write to wandb
+                #     buf = io.BytesIO()
+                #     plt.savefig(buf, format='png')
+                #     buf.seek(0)
 
-                    image = Image.open(buf)
-                    wandb.log({"eval/recon_img": wandb.Image(image)}, step=step)
+                #     image = Image.open(buf)
+                #     wandb.log({"eval/recon_img": wandb.Image(image)}, step=step)
 
-                    buf.close()
-                    workdir = os.getcwd()
-                    cprint(f'Saved {workdir}/recon/{step}_rgb.png to wandb', 'cyan')
-                else:
-                    plt.savefig(f'recon/{step}_rgb.png')
-                    workdir = os.getcwd()
-                    cprint(f'Saved {workdir}/recon/{step}_rgb.png locally', 'cyan')
+                #     buf.close()
+                #     workdir = os.getcwd()
+                #     cprint(f'Saved {workdir}/recon/{step}_rgb.png to wandb', 'cyan')
+                # else:
+                #     plt.savefig(f'recon/{step}_rgb.png')
+                #     workdir = os.getcwd()
+                #     cprint(f'Saved {workdir}/recon/{step}_rgb.png locally', 'cyan')
+                plt.savefig(f'recon/{step}_rgb.png')
+                workdir = os.getcwd()
+                cprint(f'Saved {workdir}/recon/{step}_rgb.png locally', 'cyan')
 
         # new rendering---
         # TODO: _summaries内容不同相关的肯定要改

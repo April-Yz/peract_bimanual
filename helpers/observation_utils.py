@@ -3,7 +3,7 @@ from rlbench.backend.observation import Observation
 
 from rlbench.backend.observation import BimanualObservation
 from rlbench import CameraConfig, ObservationConfig
-from pyrep.const import RenderMode
+from pyrep.const import RenderMode # 渲染模式
 from typing import List
 
 REMOVE_KEYS = [
@@ -289,7 +289,7 @@ def create_obs_config(
     robot_name: str = "bimanual",
     #nerf_multi_view: bool = True,
 ):
-    unused_cams = CameraConfig()
+    unused_cams = CameraConfig() # rlbench中
     unused_cams.set_all(False)
     used_cams = CameraConfig(
         rgb=True,

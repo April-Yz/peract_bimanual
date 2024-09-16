@@ -44,22 +44,22 @@ class ObservationConfig(object):
     
     def __init__(self,
                  camera_configs: Dict[str, CameraConfig] = None,
-                 joint_velocities=True,
-                 joint_velocities_noise: NoiseModel=Identity(),
-                 joint_positions=True,
-                 joint_positions_noise: NoiseModel=Identity(),
-                 joint_forces=True,
+                 joint_velocities=True, # for nerf                  # 是否记录机器人关节的速度
+                 joint_velocities_noise: NoiseModel=Identity(),     # 噪声模型对象，用于给关节速度数据添加噪声。默认为 Identity()，表示不添加噪声。
+                 joint_positions=True,                              # 是否记录机器人关节的位置
+                 joint_positions_noise: NoiseModel=Identity(),      # 噪声模型对象，用于给关节位置数据添加噪声
+                 joint_forces=True,                                 # 是否记录机器人关节的力
                  joint_forces_noise: NoiseModel=Identity(),
-                 gripper_open=True,
-                 gripper_pose=True,
-                 gripper_matrix=False,
-                 gripper_joint_positions=False,
-                 gripper_touch_forces=False,
-                 wrist_camera_matrix=False,
-                 record_gripper_closing=False,
-                 task_low_dim_state=True,
-                 record_ignore_collisions=True,
-                 robot_name='',
+                 gripper_open=True,                                 # 可能指示是否记录夹爪的开合状态
+                 gripper_pose=True,                                 # 是否记录夹爪的姿态                                
+                 gripper_matrix=False,                              # 是否记录夹爪的变换矩阵       
+                 gripper_joint_positions=False,                     # 是否记录夹爪关节的位置
+                 gripper_touch_forces=False,                        # 是否记录夹爪的接触力
+                 wrist_camera_matrix=False,                         # 是否记录手腕相机的变换矩阵
+                 record_gripper_closing=False,                      # 是否记录夹爪关闭的状态
+                 task_low_dim_state=True,                           # 是否记录任务的低维状态
+                 record_ignore_collisions=True,                     # 是否记录忽略碰撞的状态
+                 robot_name='',                                     # 指定机器人的名称        
                  nerf_multi_view=True, # for nerf（Mani）
                  ):
         # -------还有一下左右臂的设置没有改-----------nerf mani------------------------------------------------------------
