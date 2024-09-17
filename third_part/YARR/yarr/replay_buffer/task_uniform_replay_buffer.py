@@ -92,7 +92,7 @@ class TaskUniformReplayBuffer(UniformReplayBuffer):
 
             ## reduce size
             for k, v in kwargs.items():
-                # print(k)
+                # print("k=",k)
                 try:
                     if 'float' in v.dtype.name and v.size > 100:
                         v = v.astype(np.float16)

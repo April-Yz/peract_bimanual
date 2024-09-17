@@ -134,6 +134,10 @@ class OfflineTrainRunner():
         # !! 随机选择一个视角
         # tensor移动到GPU上
         batch = {k: v.to(self._train_device) for k, v in sampled_batch.items() if type(v) == torch.Tensor}
+        
+        # for k, v in sampled_batch.items():
+            # print("batch k v =",k, v)
+
         # if self.method_name == 'ManiGaussian_BC2': # 后续可以加
         batch['nerf_multi_view_rgb'] = sampled_batch['nerf_multi_view_rgb'] # [bs, 1, 21]
         batch['nerf_multi_view_depth'] = sampled_batch['nerf_multi_view_depth']

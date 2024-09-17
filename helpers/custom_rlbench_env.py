@@ -104,6 +104,8 @@ class CustomRLBenchEnv(RLBenchEnv):
             obs.left.gripper_joint_positions = np.clip(
                 obs.left.gripper_joint_positions, 0.0, 0.04
             )
+        # print("obs.right.gripper_joint_positions",obs.right.gripper_joint_positions)
+        # print("obs.left.gripper_joint_positions",obs.left.gripper_joint_positions)
 
         obs_dict = super(CustomRLBenchEnv, self).extract_obs(obs)
         # for key in obs_dict:
@@ -136,6 +138,8 @@ class CustomRLBenchEnv(RLBenchEnv):
         obs_dict['left_gripper_joint_positions'] = obs.left.gripper_joint_positions
         obs_dict['right_joint_positions'] = obs.right.joint_positions
         obs_dict['right_gripper_joint_positions'] = obs.right.gripper_joint_positions
+        # print("obs.right.gripper_joint_positions",obs_dict['right_gripper_joint_positions'])
+        # print("obs.left.gripper_joint_positions",obs_dict['left_gripper_joint_positions'])
 
         # for key in obs_dict:
             # print("obs_dict",key)
@@ -394,6 +398,8 @@ class CustomMultiTaskRLBenchEnv(MultiTaskRLBenchEnv):
             obs.left.gripper_joint_positions = np.clip(
                 obs.left.gripper_joint_positions, 0.0, 0.04
             )
+        # print("obs.right.gripper_joint_positions",obs.right.gripper_joint_positions)
+        # print("obs.left.gripper_joint_positions",obs.left.gripper_joint_positions)
 
         obs_dict = super(CustomMultiTaskRLBenchEnv, self).extract_obs(obs)
 
@@ -420,6 +426,9 @@ class CustomMultiTaskRLBenchEnv(MultiTaskRLBenchEnv):
         obs_dict['right_joint_positions'] = obs.right.joint_positions
         obs_dict['right_gripper_joint_positions'] = obs.right.gripper_joint_positions
 
+        # print("obs.right.gripper_joint_positions",obs_dict['right_gripper_joint_positions'])
+        # print("obs.left.gripper_joint_positions",obs_dict['left_gripper_joint_positions'])
+
         return obs_dict
 
     def extract_obs_unimanual(self, obs: Observation, t=None, prev_action=None):
@@ -436,6 +445,7 @@ class CustomMultiTaskRLBenchEnv(MultiTaskRLBenchEnv):
             obs.gripper_joint_positions = np.clip(
                 obs.gripper_joint_positions, 0.0, 0.04
             )
+        print("obs.gripper_joint_positions",obs.gripper_joint_positions)
 
         obs_dict = super(CustomMultiTaskRLBenchEnv, self).extract_obs(obs)
 

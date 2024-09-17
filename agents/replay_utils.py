@@ -12,7 +12,7 @@ from yarr.replay_buffer.replay_buffer import ReplayBuffer
 from helpers import demo_loading_utils, utils
 from helpers import observation_utils
 from helpers.clip.core.clip import tokenize
-
+from yarr.replay_buffer.uniform_replay_buffer_single_process import UniformReplayBufferSingleProcess
 
 from yarr.replay_buffer.prioritized_replay_buffer import ObservationElement
 from yarr.replay_buffer.replay_buffer import ReplayElement
@@ -23,7 +23,7 @@ import torch
 from torch.multiprocessing import Process, Value, Manager
 from helpers.clip.core.clip import build_model, load_clip
 from omegaconf import DictConfig
-
+from termcolor import colored, cprint
 
 REWARD_SCALE = 100.0
 LOW_DIM_SIZE = 4
@@ -32,16 +32,32 @@ LOW_DIM_SIZE = 4
 def create_replay(cfg, replay_path):
     
     if cfg.method.robot_name == "bimanual":
-        return create_bimanual_replay(            
-            cfg.replay.batch_size,
-            cfg.replay.timesteps,
-            cfg.replay.prioritisation,
-            cfg.replay.task_uniform,
-            replay_path if cfg.replay.use_disk else None,
-            cfg.rlbench.cameras,
-            cfg.method.voxel_sizes,
-            cfg.rlbench.camera_resolution,
-        )
+        if cfg.method.name == "ManiGaussian_BC2":
+            print("ManiGaussian_BC2 in create replay")
+            return create_bimanual_replay_mani(            
+                cfg.replay.batch_size,
+                cfg.replay.timesteps,
+                cfg.replay.prioritisation,
+                cfg.replay.task_uniform,
+                replay_path if cfg.replay.use_disk else None,
+                # cfg.rlbench.cameras,
+                cfg.method.voxel_sizes,
+                cfg.rlbench.camera_resolution,
+                cfg=cfg
+            )
+        else:
+            # print("Not a mani-bimanual method")
+            return create_bimanual_replay(            
+                cfg.replay.batch_size,
+                cfg.replay.timesteps,
+                cfg.replay.prioritisation,
+                cfg.replay.task_uniform,
+                replay_path if cfg.replay.use_disk else None,
+                cfg.rlbench.cameras,
+                cfg.method.voxel_sizes,
+                cfg.rlbench.camera_resolution,
+                # cfg=cfg
+            )            
     else:
         return create_unimanual_replay(            
             cfg.replay.batch_size,
@@ -193,8 +209,6 @@ def create_bimanual_replay(
     return replay_buffer
 
 
-
-
 def create_unimanual_replay(
     batch_size: int,
     timesteps: int,
@@ -301,6 +315,172 @@ def create_unimanual_replay(
     return replay_buffer
 
 
+def create_bimanual_replay_mani(batch_size: int, timesteps: int,
+                  prioritisation: bool, task_uniform: bool,
+                  save_dir: str, cameras: list,
+                  voxel_sizes,
+                  image_size=[128, 128],
+                  replay_size=3e5,
+                  single_process=False,
+                  cfg=None,):
+
+    trans_indicies_size = 3 * len(voxel_sizes)
+    rot_and_grip_indicies_size = (3 + 1)
+    gripper_pose_size = 7
+    ignore_collisions_size = 1
+    max_token_seq_len = 77
+    lang_feat_dim = 1024
+    lang_emb_dim = cfg.method.language_model_dim # !!(原来是512)要不要改成512
+    # 绿色输出[create_replay] lang_emb_dim:值
+    cprint(f"[create_replay] lang_emb_dim: {lang_emb_dim}", "green")
+
+    # !! --Gaussian特有---------------------------------------------
+    num_view_for_nerf = cfg.rlbench.num_view_for_nerf
+    # !! -----------------------------------------------
+    
+    # low_dim_state-------bimanual特有-------------------------------------------
+
+    observation_elements = []
+    observation_elements.append(
+        ObservationElement("right_low_dim_state", (LOW_DIM_SIZE,), np.float32)
+    )
+    observation_elements.append(
+        ObservationElement("left_low_dim_state", (LOW_DIM_SIZE,), np.float32)
+    )
+    
+    # rgb, depth, point cloud, intrinsics, extrinsics
+    for cname in cameras:
+        observation_elements.append(
+            # color, height, width 新增depth
+            ObservationElement(
+                "%s_rgb" % cname,
+                (3,image_size[1],image_size[0],),
+                np.float32,
+            )
+        )
+        observation_elements.append(
+            ObservationElement('%s_depth' % cname, (1, image_size[1], image_size[0]), np.float32))
+        observation_elements.append(
+            ObservationElement("%s_point_cloud" % cname, (3, image_size[1], image_size[0]), np.float16)
+        )  # see pyrep/objects/vision_sensor.py on how pointclouds are extracted from depth frames
+        observation_elements.append(
+            ObservationElement(
+                "%s_camera_extrinsics" % cname,
+                (4,4,),
+                np.float32,
+            )
+        )
+        observation_elements.append(
+            ObservationElement(
+                "%s_camera_intrinsics" % cname,
+                (3,3,),
+                np.float32,
+            )
+        )        
+
+    #-------------------------------NERF----------------------------------------------
+    # for nerf img, exs, ins
+    # 使用 append 时，添加的对象会作为一个单一的元素（无论它本身是一个列表还是其他类型）。
+    # 使用 extend 时，添加的对象（必须是可迭代的）会被拆分，其元素会被逐个添加到列表中。
+    observation_elements.append(
+        ObservationElement('nerf_multi_view_rgb', (num_view_for_nerf,), np.object_))
+    observation_elements.append(
+        ObservationElement('nerf_multi_view_depth', (num_view_for_nerf,), np.object_))
+    observation_elements.append(
+        ObservationElement('nerf_multi_view_camera', (num_view_for_nerf,), np.object_))
+    
+    # for next nerf
+    observation_elements.append(
+        ObservationElement('nerf_next_multi_view_rgb', (num_view_for_nerf,), np.object_))
+    observation_elements.append(
+        ObservationElement('nerf_next_multi_view_depth', (num_view_for_nerf,), np.object_))
+    observation_elements.append(
+        ObservationElement('nerf_next_multi_view_camera', (num_view_for_nerf,), np.object_))
+    #-------------------------------NERF----------------------------------------------
+
+
+
+    #-------------------------------bimanual双臂----------------------------------------------
+    # 离散化翻译、离散化旋转、离散忽略碰撞、6-DoF 抓手姿势和预训练语言嵌入
+    # discretized translation, discretized rotation, discrete ignore collision, 6-DoF gripper pose, and pre-trained language embeddings
+    for robot_name in ["right", "left"]:
+        observation_elements.extend(
+            [
+                ReplayElement(
+                    f"{robot_name}_trans_action_indicies",
+                    (trans_indicies_size,),
+                    np.int32,
+                ),
+                ReplayElement(
+                    f"{robot_name}_rot_grip_action_indicies",
+                    (rot_and_grip_indicies_size,),
+                    np.int32,
+                ),
+                ReplayElement(
+                    f"{robot_name}_ignore_collisions",
+                    (ignore_collisions_size,),
+                    np.int32,
+                ),
+                ReplayElement(
+                    f"{robot_name}_gripper_pose", (gripper_pose_size,), np.float32
+                ),
+            ]
+        )
+
+    # -------上面在双臂中改了一部分----------------------------------------------------------
+
+    observation_elements.extend(
+        [
+            ReplayElement("lang_goal_emb", (lang_feat_dim,), np.float32),
+            ReplayElement(
+                "lang_token_embs",
+                (
+                    max_token_seq_len,
+                    lang_emb_dim,
+                ),
+                np.float32,
+            ),  # extracted from CLIP's language encoder
+            ReplayElement("task", (), str),
+            ReplayElement(
+                "lang_goal", (1,), object
+            ),  # language goal string for debugging and visualization
+        ]
+    )
+
+    extra_replay_elements = [
+        ReplayElement('demo', (), np.bool),
+    ]
+    if not single_process:  # default: False
+        # TaskUniformReplayBuffer不用改
+        replay_buffer = TaskUniformReplayBuffer(
+            save_dir=save_dir,
+            batch_size=batch_size,
+            timesteps=timesteps,
+            replay_capacity=int(replay_size),
+            # action_shape=(8,), # 单臂时的大小
+            action_shape=(8 * 2,),
+            action_dtype=np.float32,
+            reward_shape=(),
+            reward_dtype=np.float32,
+            update_horizon=1,
+            observation_elements=observation_elements,
+            extra_replay_elements=extra_replay_elements,
+        )
+    else:
+        replay_buffer = UniformReplayBufferSingleProcess(
+            save_dir=save_dir,
+            batch_size=batch_size,
+            timesteps=timesteps,
+            replay_capacity=int(replay_size),
+            action_shape=(8,),
+            action_dtype=np.float32,
+            reward_shape=(),
+            reward_dtype=np.float32,
+            update_horizon=1,
+            observation_elements=observation_elements,
+            extra_replay_elements=extra_replay_elements
+        )
+    return replay_buffer
 
 def _get_action(
     obs_tp1: Observation,

@@ -186,7 +186,8 @@ class UniformReplayBuffer(ReplayBuffer):
         self._observation_elements = observation_elements
         self._extra_replay_elements = extra_replay_elements
 
-        self._storage_signature, self._obs_signature = self.get_storage_signature()
+        self._storage_signature, self._obs_signature = self.get_storage_signature()  # 49 44
+        # print("self._storage_signature, self._obs_signature",len(self._storage_signature),len(self._obs_signature))
         self._create_storage()
 
         self._lock = Lock()
@@ -236,6 +237,10 @@ class UniformReplayBuffer(ReplayBuffer):
 
         Returns:
           dict of ReplayElements defining the type of the contents stored.
+        返回要存储在此重播内存中的元素的默认列表。
+        注 - 派生类可能会返回不同的签名。
+        返回：
+        dict 的 ReplayElements 定义存储的内容类型
         """
         storage_elements = [
             ReplayElement(ACTION, self._action_shape, self._action_dtype),
@@ -253,8 +258,13 @@ class UniformReplayBuffer(ReplayBuffer):
 
         for extra_replay_element in self._extra_replay_elements:
             storage_elements.append(extra_replay_element)
+            # print(extra_replay_element)
 
-        return storage_elements, obs_elements
+        # print("len(storage_elements)=",len(storage_elements))   # 49
+        # print("storage_elements = ",storage_elements)
+        # print("obs_elements = ",obs_elements)
+        # print("len(obs_elements)=",len(obs_elements))           # 44 
+        return storage_elements, obs_elements # 49 44
 
     def add(self, action, reward, terminal, timeout, **kwargs):
         """Adds a transition to the replay memory.
@@ -286,7 +296,8 @@ class UniformReplayBuffer(ReplayBuffer):
         kwargs[REWARD] = reward
         kwargs[TERMINAL] = terminal
         kwargs[TIMEOUT] = timeout
-        self._check_add_types(kwargs, self._storage_signature)
+        # print("self._check_add_types(kwargs, self._obs_signature)",len(kwargs),len(self._obs_signature))
+        self._check_add_types(kwargs, self._storage_signature) #49 55
         self._add(kwargs)
 
     def add_final(self, **kwargs):
@@ -399,12 +410,12 @@ class UniformReplayBuffer(ReplayBuffer):
 
         if (len(kwargs)) != len(signature):
         # if (len(kwargs)) < len(signature):
-            expected = str(natsort.natsorted([e.name for e in signature]))
+            expected = str(natsort.natsorted([e.name for e in signature])) # 49少了
             actual = str(natsort.natsorted(list(kwargs.keys())))
             error_list = '\nList of expected:\n{}\nList of actual:\n{}'.format(
                 expected, actual)
             raise ValueError('Add expects {} elements, received {}.'.format(
-                len(signature), len(kwargs)) + error_list)
+                len(signature), len(kwargs)) + error_list) # 出现问题signature要49 实kwargs55（多了NERF的）
 
         for store_element in signature:
             # --------------------------------------------------------------------

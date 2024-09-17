@@ -61,6 +61,8 @@ def extract_obs_unimanual(
     obs.joint_positions = None
     if obs.gripper_joint_positions is not None:
         obs.gripper_joint_positions = np.clip(obs.gripper_joint_positions, 0.0, 0.04)
+    # print("obs.right.gripper_joint_positions",obs.right.gripper_joint_positions)
+    print(" obs.gripper_joint_positions", obs.gripper_joint_positions)
 
     obs_dict = vars(obs)
     obs_dict = {k: v for k, v in obs_dict.items() if v is not None}
@@ -145,6 +147,7 @@ def extract_obs_bimanual(
             obs.left.gripper_joint_positions, 0.0, 0.04
         )
 
+    
     # Mani增加---------------------------------------------
     if obs.nerf_multi_view_rgb is not None:
         nerf_multi_view_rgb = obs.nerf_multi_view_rgb

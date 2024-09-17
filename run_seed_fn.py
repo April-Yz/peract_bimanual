@@ -211,13 +211,13 @@ def run_seed(
         from agents import manigaussian_bc2
         # 和双臂的一样（除了导入的c2farm_lingunet_bc）
         # !!双臂这边只需要cfg和replay_path就行
-        # print(replay_path)
+        print(replay_path)
         # if os.path.exists(replay_path)and os.listdir(replay_path):
-        #     print("Replay files found. Loading...")
+            # print("Replay files found. Loading...")
         #     # 初始化 Replay Buffer
         #     # replay_buffer = TaskUniformReplayBuffer()
         #     # ####################################################################    
-        #     replay_buffer = replay_utils.create_replay(cfg, replay_path)
+            # replay_buffer = replay_utils.create_replay(cfg, replay_path)
         replay_buffer = manigaussian_bc2.launch_utils.create_replay(
             cfg.replay.batch_size,
             cfg.replay.timesteps,
@@ -239,14 +239,14 @@ def run_seed(
         #                 print(f"Error unpickling file {replay_file}: {e}")
         # else:
         #     print("No replay files found. Creating replay...")
-        #     replay_buffer = replay_utils.create_replay(cfg, replay_path)
-        #     # replay_utils.fill_multi_task_replay(
-        #     #     cfg,
-        #     #     obs_config,
-        #     #     rank,
-        #     #     replay_buffer,
-        #     #     tasks
-        #     # )
+            # replay_buffer = replay_utils.create_replay(cfg, replay_path)
+            # replay_utils.fill_multi_task_replay(
+            #     cfg,
+            #     obs_config,
+            #     rank,
+            #     replay_buffer,
+            #     tasks
+            # )
         manigaussian_bc2.launch_utils.fill_multi_task_replay(
                 cfg, 
                 obs_config, 

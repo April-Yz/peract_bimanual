@@ -133,6 +133,7 @@ def combine_interleaved(t, inner_dims=(1,), agg_type="average"):
 class PositionalEncoding(torch.nn.Module):
     """
     Implement NeRF's positional encoding
+    实现nerf的位置编码
     """
 
     def __init__(self, num_freqs=6, d_in=3, freq_factor=np.pi, include_input=True):
