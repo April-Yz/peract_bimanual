@@ -62,7 +62,7 @@ def extract_obs_unimanual(
     if obs.gripper_joint_positions is not None:
         obs.gripper_joint_positions = np.clip(obs.gripper_joint_positions, 0.0, 0.04)
     # print("obs.right.gripper_joint_positions",obs.right.gripper_joint_positions)
-    print(" obs.gripper_joint_positions", obs.gripper_joint_positions)
+    # print(" obs.gripper_joint_positions", obs.gripper_joint_positions)
 
     obs_dict = vars(obs)
     obs_dict = {k: v for k, v in obs_dict.items() if v is not None}
@@ -140,6 +140,7 @@ def extract_obs_bimanual(
     obs.left.wrist_camera_matrix = None    # mani多的
 
     if obs.right.gripper_joint_positions is not None:
+        # 使用np.clip函数将右侧抓手关节位置限制在0.0到0.04的范围内
         obs.right.gripper_joint_positions = np.clip(
             obs.right.gripper_joint_positions, 0.0, 0.04
         )

@@ -343,7 +343,7 @@ class NeuralRenderer(nn.Module):
             data = self.gs_model(data) # GeneralizableGSEmbedNet(cfg, with_gs_render=True)
 
             # Gaussian Render
-            # print("data = self.pts2renderdata = self.pts2renderdata = self.pts2renderdata = self.pts2renderdata = self.pts2render")
+            # print("data = self.pts2render")
             data = self.pts2render(data, bg_color=self.bg_color) # default: [0, 0, 0]
 
             # Loss L(GEO) 当前场景一致性损失 Current Scence Consistency Loss
@@ -515,7 +515,7 @@ class NeuralRenderer(nn.Module):
         rot_i = data['rot_maps'][i, :, :]
         scale_i = data['scale_maps'][i, :, :]
         opacity_i = data['opacity_maps'][i, :, :]
-        feature_language_i = data['feature_maps'][i, :, :]
+        feature_language_i = data['feature_maps'][i, :, :]  # [B, N, 3]   [1, 65536, 3]  
 
         # 渲染返回字典  render应该是用来渲染的  from agents.manigaussian_bc2.gaussian_renderer import render
         render_return_dict = render(

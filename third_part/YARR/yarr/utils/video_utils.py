@@ -251,8 +251,8 @@ class NeRFTaskRecorder(object):
                 
                 # save the pose and intrinsic
                 pose_path = os.path.join(timestep_pose_dir, str(i) + '.txt')
-                transformation_matrix =  all_poses[i]
-                intrinsic_matrix = all_intrinsics[i]
+                transformation_matrix =  all_poses[i] # （4x4的矩阵，用于描述相机的旋转和平移）
+                intrinsic_matrix = all_intrinsics[i]  # 通常是 3x3 的矩阵，包含焦距和光心位置等信息）
 
                 self.save_extrinsic_and_intrinsic(pose_path, transformation_matrix, intrinsic_matrix)
 

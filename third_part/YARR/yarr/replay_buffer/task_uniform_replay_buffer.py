@@ -37,7 +37,7 @@ class TaskUniformReplayBuffer(UniformReplayBuffer):
           kwargs： 过渡中的所有元素。
         """
         with self._lock:
-            cursor = self.cursor()
+            cursor = self.cursor()      # 获取游标
 
             if self._disk_saving:
                 term = self._store[TERMINAL]
@@ -55,17 +55,17 @@ class TaskUniformReplayBuffer(UniformReplayBuffer):
                         pass
 
 
-                with open(join(self._save_dir, '%d.replay' % cursor), 'wb') as f:
-                    pickle.dump(kwargs, f)
+                with open(join(self._save_dir, '%d.replay' % cursor), 'wb') as f:                   # 打开文件
+                    pickle.dump(kwargs, f)                                                          # 使用plckle.dump()方法将字典kwargs写入文件
                 # If first add, then pad for correct wrapping
-                if self._add_count.value == 0:
-                    self._add_initial_to_disk(kwargs)
+                if self._add_count.value == 0:                                                      # 处理首次添加数据：    
+                    self._add_initial_to_disk(kwargs)                                               # 将初始数据保存到磁盘
             else:
-                for name, data in kwargs.items():
+                for name, data in kwargs.items():                                #  更新数据存储：        
                     item = self._store[name]
                     item[cursor] = data
                     self._store[name] = item
-            with self._add_count.get_lock():
+            with self._add_count.get_lock():        # 更新任务索引和计数：
                 task = kwargs[TASK]
                 if task not in self._task_idxs:
                     self._task_idxs[task] = [cursor]
@@ -73,7 +73,7 @@ class TaskUniformReplayBuffer(UniformReplayBuffer):
                     self._task_idxs[task] =  self._task_idxs[task] + [cursor]
                 self._add_count.value += 1
 
-            self.invalid_range = invalid_range(
+            self.invalid_range = invalid_range(    # 更新无效范围 
                 self.cursor(), self._replay_capacity, self._timesteps,
                 self._update_horizon)
     # ---------------------------------------------------------------------

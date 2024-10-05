@@ -343,9 +343,12 @@ __device__ void computeCov3D(int idx, const glm::vec3 scale, float mod, const gl
 // Backward pass of the preprocessing steps, except
 // for the covariance computation and inversion
 // (those are handled by a previous kernel call)
+// 为每个高斯分布进行预处理，为后续的高斯光栅化做好准备。
 template<int C>
 __global__ void preprocessCUDA(
-	int P, int D, int M,
+	int P,  //高斯分布的点的数量
+	int D, //高斯分布的维度。
+	int M, //点云数量。
 	const float3* means,
 	const int* radii,
 	const float* shs,

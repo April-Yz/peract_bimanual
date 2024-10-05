@@ -25,6 +25,10 @@ from helpers.clip.core.clip import build_model, load_clip
 from omegaconf import DictConfig
 from termcolor import colored, cprint
 
+# robot 坐标
+from rlbench.backend.robot import Robot, UnimanualRobot, BimanualRobot
+# robot 坐标
+
 REWARD_SCALE = 100.0
 LOW_DIM_SIZE = 4
 
@@ -424,6 +428,9 @@ def create_bimanual_replay_mani(batch_size: int, timesteps: int,
                 ReplayElement(
                     f"{robot_name}_gripper_pose", (gripper_pose_size,), np.float32
                 ),
+                # ReplayElement(
+                #     f"{robot_name}_joint_position", (joint_position_size,), np.float32
+                # ),
             ]
         )
 

@@ -42,6 +42,7 @@ def render(data, idx, pts_xyz, rotations, scales, opacity, bg_color, pts_rgb=Non
 
     # 用于存储高斯渲染器的设置参数。
     # 包括图像的尺寸、焦距、背景张量、缩放修正因子、视图矩阵、投影矩阵、球谐函数阶数、相机位置以及调试模式
+    # 设置光栅化的配置，包括图像的大小、视场的 tan 值、背景颜色、视图矩阵、投影矩阵等。
     raster_settings = GaussianRasterizationSettings(
         image_height=int(data['novel_view']['height'][idx]),
         image_width=int(data['novel_view']['width'][idx]),

@@ -89,6 +89,7 @@ def unproj_map(width, height, f, c=None, device="cpu"):
 def gen_rays(poses, width, height, focal, z_near, z_far, c=None):
     """
     Generate camera rays
+    生成摄像机光线
     :return (B, H, W, 8)
     """
     num_images = poses.shape[0]

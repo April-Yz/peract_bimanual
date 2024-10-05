@@ -191,6 +191,9 @@ def create_replay(batch_size: int, timesteps: int,
                 ReplayElement(
                     f"{robot_name}_gripper_pose", (gripper_pose_size,), np.float32
                 ),
+                # ReplayElement(
+                #     f"{robot_name}_joint_position", (joint_position_size,), np.float32
+                # ),
             ]
         )
     # observation_elements.extend([
@@ -477,9 +480,11 @@ def _add_keypoints_to_replay(
                 "right_trans_action_indicies": right_trans_indicies,
                 "right_rot_grip_action_indicies": right_rot_grip_indicies,
                 "right_gripper_pose": obs_tp1.right.gripper_pose,
+                # "right_joint_position": obs_tp1.right.joint_positions,
                 "left_trans_action_indicies": left_trans_indicies,
                 "left_rot_grip_action_indicies": left_rot_grip_indicies,
                 "left_gripper_pose": obs_tp1.left.gripper_pose,
+                # "left_joint_position": obs_tp1.left.joint_positions,
                 "task": task,
                 "lang_goal": np.array([description], dtype=object),
             }

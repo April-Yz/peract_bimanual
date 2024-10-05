@@ -21,6 +21,8 @@
 namespace FORWARD
 {
 	// Perform initial steps for each Gaussian prior to rasterization.
+	// 在光栅化之前对每个高斯进行初始化。
+	// 先看预处理，该函数使用了CUDA并行计算，通过调用名为 preprocessCUDA 的 CUDA 核函数来执行高斯光栅化的前处理。CUDA 核函数的执行由函数参数确定。在 CUDA 核函数中，每个线程块由多个线程组成，负责处理其中的一部分数据，从而加速高斯光栅化的计算。
 	void preprocess(int P, int D, int M,
 		const float* orig_points,
 		const glm::vec3* scales,
@@ -48,6 +50,7 @@ namespace FORWARD
 		bool prefiltered);
 
 	// Main rasterization method.
+	//  主要光栅化方法
 	void render(
 		const dim3 grid, dim3 block,
 		const uint2* ranges,

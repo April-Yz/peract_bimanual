@@ -34,7 +34,7 @@ tmux new-session -d -s ${exp_name}
 batch_size=1 # 1 #4 # 2
 
 tasks=[dual_push_buttons]
-
+replay_path="/data1/zjyang/program/peract_bimanual/replay/"
 # for debug
 demo=100 # 100
 episode_length=25 #25 # 20 # 4
@@ -45,7 +45,8 @@ field_type='bimanual' # 'bimanual' 'LF'
 lambda_dyna=0.1
 lambda_reg=0.0
 render_freq=1000 #2000
-
+lambda_nerf=0 # 0.1
+use_neural_rendering=False # True
 tmux select-pane -t 0 
 # peract rlbench
 tmux send-keys "conda activate rlbench; 
@@ -64,11 +65,14 @@ CUDA_VISIBLE_DEVICES=${train_gpu}  QT_AUTO_SCREEN_SCALE_FACTOR=0 python train.py
         ddp.master_port=${port} \
         rlbench.tasks=${tasks} \
         rlbench.demos=${demo} \
+        replay.path=${replay_path} \
         rlbench.episode_length=${episode_length} \
         rlbench.camera_resolution=${camera_resolution} \
+        method.neural_renderer.lambda_nerf=${lambda_nerf} \
         method.neural_renderer.render_freq=${render_freq} \
         method.neural_renderer.field_type=${field_type} \
-        method.neural_renderer.use_dynamic_field=False
+        method.neural_renderer.use_dynamic_field=False \
+        method.use_neural_rendering=${use_neural_rendering}
 "
         # method.neural_renderer.lambda_embed=0.0 \
         # method.neural_renderer.lambda_dyna=${lambda_dyna} \

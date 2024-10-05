@@ -59,7 +59,8 @@ class _RasterizeGaussians(torch.autograd.Function):
         raster_settings,
     ):
 
-        # Restructure arguments the way that the C++ lib expects them
+        # Restructure arguments the way that the C++ lib expects them 
+        # 按照 C++ 库期望的方式重构参数
         args = (
             raster_settings.bg, 
             means3D,
@@ -97,6 +98,7 @@ class _RasterizeGaussians(torch.autograd.Function):
             num_rendered, color, language_feature, radii, geomBuffer, binningBuffer, imgBuffer = _C.rasterize_gaussians(*args)
 
         # Keep relevant tensors for backward
+        # 保留相关的张量以进行 backward
         ctx.raster_settings = raster_settings
         ctx.num_rendered = num_rendered
         ctx.save_for_backward(colors_precomp, language_feature_precomp, means3D, scales, rotations, cov3Ds_precomp, radii, sh, geomBuffer, binningBuffer, imgBuffer)
@@ -194,6 +196,7 @@ class GaussianRasterizer(nn.Module):
             
         return visible
 
+    # 前向传播方法，用于进行高斯光栅化操作。接受一系列输入参数，包括3D坐标、2D坐标、透明度、SH特征或预计算的颜色、language_feature_precomp 缩放、旋转或预计算的3D协方差等。 
     def forward(self, means3D, means2D, opacities, shs = None, colors_precomp = None, language_feature_precomp = None, scales = None, rotations = None, cov3D_precomp = None):
         
         raster_settings = self.raster_settings
@@ -220,15 +223,15 @@ class GaussianRasterizer(nn.Module):
 
         # Invoke C++/CUDA rasterization routine
         return rasterize_gaussians(
-            means3D,
-            means2D,
-            shs,
-            colors_precomp,
-            language_feature_precomp,
-            opacities,
-            scales, 
-            rotations,
-            cov3D_precomp,
-            raster_settings, 
+            means3D,            #高斯分布的三维坐标
+            means2D,            #高斯分布的二维坐标（屏幕空间坐标）
+            shs,                #SH（球谐函数）特征
+            colors_precomp,     #预计算的颜色    
+            language_feature_precomp,               # 预计算的语言特征？？？？？
+            opacities,                  #透明度    
+            scales,                     #缩放因子
+            rotations,                  #旋转因子
+            cov3D_precomp,               #预计算的3D协方差
+            raster_settings,                #光栅化设置
         )
 

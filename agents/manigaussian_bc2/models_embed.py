@@ -42,7 +42,7 @@ class GeneralizableGSEmbedNet(nn.Module):
         self.cfg = cfg
         self.with_gs_render = with_gs_render
 
-        # print(colored(f"[GeneralizableNeRFEmbedNet]de的 with_gs_render参数: {with_gs_render}", "red"))
+        # print(colored(f"[GeneralizableNeRFEmbedNet]的 with_gs_render参数: {with_gs_render}", "red"))
     
         # 坐标边界
         self.coordinate_bounds = cfg.coordinate_bounds # default: [-0.3, -0.5, 0.6, 0.7, 0.5, 1.6]
@@ -104,6 +104,7 @@ class GeneralizableGSEmbedNet(nn.Module):
         self.use_action = cfg.next_mlp.use_action
         cprint(f"[GeneralizableGSEmbedNet] Using dynamic field: {self.use_dynamic_field}", "red")
         if self.use_dynamic_field:
+            cprint(f"[GeneralizableGSEmbedNet] field_type: {self.field_type}", "red")
             if self.field_type !='LF':
                 self.use_semantic_feature = (cfg.foundation_model_name == 'diffusion')
                 cprint(f"[GeneralizableGSEmbedNet] Using action input: {self.use_action}", "red")
@@ -126,7 +127,7 @@ class GeneralizableGSEmbedNet(nn.Module):
                         beta=cfg.next_mlp.beta, use_spade=cfg.next_mlp.use_spade,
                     )
 
-                # -------------------------------for Follower ------------------------------
+                # -------------------------------for leader - Follower ------------------------------
                 # if self.field_type =='LF':
             else:
                 self.use_semantic_feature = (cfg.foundation_model_name == 'diffusion')
@@ -151,8 +152,8 @@ class GeneralizableGSEmbedNet(nn.Module):
                         beta=cfg.next_mlp.beta, use_spade=cfg.next_mlp.use_spade,
                     )
                 # else:
-                # self.use_semantic_feature = (cfg.foundation_model_name == 'diffusion')
-                next_d_in = self.d_out + self.d_in # 有问题
+                # follower
+                next_d_in = self.d_out + self.d_in # 39+26=65
                 next_d_in = next_d_in + 8 + 8 if self.use_action else next_d_in  # action: 8 再加上8 dim # new theta_right=8(还是16呢)
                 next_d_in = next_d_in if self.use_semantic_feature else next_d_in - 3
                 self.gs_deformation_field_follower = ResnetFC(
@@ -165,7 +166,7 @@ class GeneralizableGSEmbedNet(nn.Module):
                         combine_layer=cfg.next_mlp.combine_layer,
                         beta=cfg.next_mlp.beta, use_spade=cfg.next_mlp.use_spade,
                     )
-            # -------------------------------for Follower ------------------------------
+            # -------------------------------for leader - Follower ------------------------------
 
     def _get_splits_and_inits(self, cfg):
         '''Gets channel split dimensions and last layer initialization
@@ -205,13 +206,13 @@ class GeneralizableGSEmbedNet(nn.Module):
     @torch.no_grad()
     def world_to_canonical(self, xyz):
         """
-        :param xyz (B, N, 3) or (B, 3, N)
+        :param xyz (B, N, 3) or (B, 3, N)                                      (批次大小 B, 点的数量 N, 3个坐标)   找到这个加上id
         :return (B, N, 3) or (B, 3, N)
         将世界坐标转换为具有边界框 [0, 1] 的规范坐标
         transform world coordinate to canonical coordinate with bounding box [0, 1]
         """
         xyz = xyz.clone()
-        bb_min = self.coordinate_bounds[:3]
+        bb_min = self.coordinate_bounds[:3] # 前面手动记录的前三个是坐标系的最小值
         bb_max = self.coordinate_bounds[3:]
         bb_min = torch.tensor(bb_min, device=xyz.device).unsqueeze(0).unsqueeze(0) if xyz.shape[-1] == 3 \
             else torch.tensor(bb_min, device=xyz.device).unsqueeze(-1).unsqueeze(0)
@@ -225,8 +226,9 @@ class GeneralizableGSEmbedNet(nn.Module):
     # 样本在规范体素中
     def sample_in_canonical_voxel(self, xyz, voxel_feat):   # USED
         """
+        从体素特征中采样点云的特征
         :param xyz (B, 3)
-        :param self.voxel_feat: [B, 128, 20, 20, 20]
+        :param self.voxel_feat: [B, 128, 20, 20, 20] 每个体素的特征，128 是特征维度，20x20x20 是体素的空间尺寸
         :return (B, Feat)
         """
         xyz_voxel_space = xyz.clone()
@@ -268,7 +270,7 @@ class GeneralizableGSEmbedNet(nn.Module):
         canon_xyz = self.world_to_canonical(data['xyz'])    # [1,N,3], min:-2.28, max:1.39
         # print("first canon_xyz.shape=[1,65536,128]",canon_xyz.shape)     # real [1,65536,3]   [2,16384,3]
 
-        # volumetric sampling 体积采样
+        # volumetric sampling 体积采样 
         point_latent = self.sample_in_canonical_voxel(canon_xyz, data['dec_fts']) # [bs, N, 128]->[bs, 128, N] bs是批次大小，N是体素的数量，128是特征维度。
                                                                                   # [2,16384,1] bs=2 N=128 128  
         # print("point_latent.shape=[1,65536,128]-----------",point_latent.shape) # real [1,65536,3]               # [2,16384,1] 应该是 [1,16384,128]
@@ -309,6 +311,7 @@ class GeneralizableGSEmbedNet(nn.Module):
         ## regress gaussian parms 回归高斯参数
         split_network_outputs = self.gs_parm_regresser(latent) # [1, N, (3, 1, 3, 4, 3, 9)]
         # print("split_network_outputs = self[1,65536,26]",split_network_outputs.shape)  # 输出split_network_outputs张量的形状
+        # self.split_dimensions_with_offset 是一个列表，指定了每个输出部分的维度。 split_network_outputs 沿最后一个维度（dim=-1）分割
         split_network_outputs = split_network_outputs.split(self.split_dimensions_with_offset, dim=-1)
         # 元组tuple print("split_network_outputs = split_network_outputs.split(self.split_dimensions_with_offset, dim=-1)",split_network_outputs.shape)  # 输出split_network_outputs张量的形状
         
@@ -327,7 +330,7 @@ class GeneralizableGSEmbedNet(nn.Module):
 
         scale_maps = self.scaling_activation(scale_maps)    # exp   [1, 65536, 3]
         # print("scale_maps = ",scale_maps.shape)  # 输出scale_maps张量的形状 [1, 65536, 3]
-        scale_maps = torch.clamp_max(scale_maps, 0.05) # [1, 65536, 3]
+        scale_maps = torch.clamp_max(scale_maps, 0.05) # [1, 65536, 3] # 将 scale_maps 中的所有值限制在最大值为 0.05
         # print("scale_maps = ",scale_maps.shape)  # 输出scale_maps张量的形状 [1, 65536, 3]
 
         data['xyz_maps'] = data['xyz'] + xyz_maps   # [B, N, 3]           [1, 65536, 3]
@@ -343,7 +346,7 @@ class GeneralizableGSEmbedNet(nn.Module):
         # 动态建模：预测下一个高斯映射
         if self.use_dynamic_field: #and data['step'] >= self.warm_up:
 
-            # 语义特征
+            # 不用语义特征
             if not self.use_semantic_feature:
                 # dyna_input: (d_latent, d_in)
                 dyna_input = torch.cat((
@@ -358,6 +361,7 @@ class GeneralizableGSEmbedNet(nn.Module):
                     z_feature,
                 ), dim=-1) # no batch dim
             else:
+                # 用语义特征
                 dyna_input = torch.cat((
                     point_latent,   # [N, 128]
                     data['xyz_maps'].detach().reshape(N, 3), 

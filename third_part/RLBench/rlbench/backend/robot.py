@@ -9,6 +9,7 @@ import logging
 
 class Robot(ABC):
     """Simple container for the robot components.
+    机器人组件的简单容器。
     """
 
     @property
@@ -109,6 +110,7 @@ class BimanualRobot(Robot):
             self.left_gripper.release()
 
     def initial_state(self):
+        # 配置信息包括对象的相对位置/方向、连接点/路径值。稍后调用 PyRep.set_configuration_tree 将恢复对象配置（使用此函数临时保存对象的位置/方向/连接/路径值）。
         return [(self.right_arm.get_configuration_tree(),
                 self.right_gripper.get_configuration_tree()),
                 (self.left_arm.get_configuration_tree(),
@@ -118,6 +120,8 @@ class BimanualRobot(Robot):
         return self.right_arm.check_arm_collision() or self.left_arm.check_arm_collision()
 
     def zero_velocity(self):
+        # 将机械臂和夹爪的目标关节速度设置为零
+        # len(self.right_arm.joints) 获取右臂关节的数量，生成一个与之相同长度的列表，所有元素为 0。
         self.right_arm.set_joint_target_velocities([0] * len(self.right_arm.joints))
         self.right_gripper.set_joint_target_velocities([0] * len(self.right_gripper.joints))
         self.left_arm.set_joint_target_velocities([0] * len(self.left_arm.joints))
@@ -138,6 +142,7 @@ class BimanualRobot(Robot):
         if 'left' in name:
             return self.left_gripper.actuate(amount, velocity)
         if 'both' in name:
+            #amount 打开1 0关闭 velocity 速度
             right_done = self.right_gripper.actuate(amount, velocity)
             left_done = self.left_gripper.actuate(amount, velocity)
             return right_done and left_done
@@ -175,3 +180,11 @@ class BimanualRobot(Robot):
     @Robot.is_bimanual.getter
     def is_bimanual(self):
         return True
+
+    def get_position(self, name: str):
+        if 'right' in name:
+            return [self.right_arm.get_joint_positions(self)]
+        if 'left' in name:
+            return [self.left_arm.get_joint_positions(self)]
+        if 'both' in name:
+            return [self.right_arm.get_joint_positions(self), self.left_arm.get_joint_positions(self)]

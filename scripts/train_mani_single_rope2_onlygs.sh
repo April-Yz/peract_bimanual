@@ -34,7 +34,7 @@ tmux new-session -d -s ${exp_name}
 batch_size=1 # 1 #4 # 2
 
 tasks=[bimanual_straighten_rope]
-
+replay_path="/data1/zjyang/program/peract_bimanual/replay/"
 # for debug
 demo=100 # 100
 episode_length=25 #25 # 20 # 4
@@ -64,6 +64,7 @@ CUDA_VISIBLE_DEVICES=${train_gpu}  QT_AUTO_SCREEN_SCALE_FACTOR=0 python train.py
         ddp.master_port=${port} \
         rlbench.tasks=${tasks} \
         rlbench.demos=${demo} \
+        replay.path=${replay_path} \
         rlbench.episode_length=${episode_length} \
         rlbench.camera_resolution=${camera_resolution} \
         method.neural_renderer.render_freq=${render_freq} \

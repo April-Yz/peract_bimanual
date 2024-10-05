@@ -212,42 +212,45 @@ def run_seed(
         # 和双臂的一样（除了导入的c2farm_lingunet_bc）
         # !!双臂这边只需要cfg和replay_path就行
         print(replay_path)
-        # if os.path.exists(replay_path)and os.listdir(replay_path):
-            # print("Replay files found. Loading...")
+        if os.path.exists(replay_path) and os.listdir(replay_path):
+            print("Replay files found. Loading...")
         #     # 初始化 Replay Buffer
         #     # replay_buffer = TaskUniformReplayBuffer()
         #     # ####################################################################    
             # replay_buffer = replay_utils.create_replay(cfg, replay_path)
-        replay_buffer = manigaussian_bc2.launch_utils.create_replay(
-            cfg.replay.batch_size,
-            cfg.replay.timesteps,
-            cfg.replay.prioritisation,
-            cfg.replay.task_uniform,
-            replay_path if cfg.replay.use_disk else None,
-            cams, cfg.method.voxel_sizes,
-            cfg.rlbench.camera_resolution,
-            cfg=cfg)
+            replay_buffer = manigaussian_bc2.launch_utils.create_replay(
+                cfg.replay.batch_size,
+                cfg.replay.timesteps,
+                cfg.replay.prioritisation,
+                cfg.replay.task_uniform,
+                replay_path if cfg.replay.use_disk else None,
+                cams, cfg.method.voxel_sizes,
+                cfg.rlbench.camera_resolution,
+                cfg=cfg)
         #     # ####################################################################
         #     # 加载所有的 Replay 文件
-        #     replay_files = [os.path.join(replay_path, f) for f in os.listdir(replay_path) if f.endswith('.replay')]
-        #     for replay_file in tqdm(replay_files, desc="Processing files"):
-        #         with open(replay_file, 'rb') as f:
-        #             try:
-        #                 replay_data = pickle.load(f)
-        #                 replay_buffer.load_add(replay_data)
-        #             except pickle.UnpicklingError as e:
-        #                 print(f"Error unpickling file {replay_file}: {e}")
-        # else:
-        #     print("No replay files found. Creating replay...")
+            replay_files = [os.path.join(replay_path, f) for f in os.listdir(replay_path) if f.endswith('.replay')]
+            for replay_file in tqdm(replay_files, desc="Processing files"):
+                with open(replay_file, 'rb') as f:
+                    try:
+                        replay_data = pickle.load(f)
+                        replay_buffer.load_add(replay_data)
+                    except pickle.UnpicklingError as e:
+                        print(f"Error unpickling file {replay_file}: {e}")
+        else:
+            print("No replay files found. Creating replay...")
             # replay_buffer = replay_utils.create_replay(cfg, replay_path)
-            # replay_utils.fill_multi_task_replay(
-            #     cfg,
-            #     obs_config,
-            #     rank,
-            #     replay_buffer,
-            #     tasks
-            # )
-        manigaussian_bc2.launch_utils.fill_multi_task_replay(
+            replay_buffer = manigaussian_bc2.launch_utils.create_replay(
+                cfg.replay.batch_size,
+                cfg.replay.timesteps,
+                cfg.replay.prioritisation,
+                cfg.replay.task_uniform,
+                replay_path if cfg.replay.use_disk else None,
+                cams, cfg.method.voxel_sizes,
+                cfg.rlbench.camera_resolution,
+                cfg=cfg)
+            # replay_utils.fill_multi_task_replay(cfg,obs_config,rank,replay_buffer,tasks)
+            manigaussian_bc2.launch_utils.fill_multi_task_replay(
                 cfg, 
                 obs_config, 
                 0,  # 双臂是rank

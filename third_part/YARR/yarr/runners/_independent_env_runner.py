@@ -200,6 +200,7 @@ class _IndependentEnvRunner(_EnvRunner):
                 print('Evaluating weight %s for %s' % (weight_name, task_name))
 
             # evaluate on N tasks * M episodes per task = total eval episodes
+            # 评估 N 个任务 * 每个任务的 M 集数 = 评估集总数(顺序评估)
             for ep in range(self._eval_episodes):
                 start_time = time.time()
                 eval_demo_seed = ep + self._eval_from_eps_number
