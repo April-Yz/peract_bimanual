@@ -16,8 +16,10 @@ class CameraConfig(object):
                  mask=True,
                  image_size=(128, 128),
                  render_mode=RenderMode.OPENGL3,
-                 masks_as_one_channel=True,
-                 depth_in_meters=False):
+                 masks_as_one_channel=True, 
+                 depth_in_meters=False,
+                 # nerf_multi_view_mask =nerf_multi_view_mask,
+                 ):
         self.rgb = rgb
         self.rgb_noise = rgb_noise
         self.depth = depth
@@ -26,10 +28,12 @@ class CameraConfig(object):
         self.mask = mask
         self.image_size = image_size
         self.render_mode = render_mode
-        self.masks_as_one_channel = masks_as_one_channel
+        self.masks_as_one_channel = masks_as_one_channel # 指定掩码是否作为单通道图像输出。默认值为 True，表示生成单通道的掩码图像
         self.depth_in_meters = depth_in_meters
+        # self.nerf_multi_view_mask =nerf_multi_view_mask # 都是布尔型之类的
 
     def set_all(self, value: bool):
+        """全部设为 value 值"""
         self.rgb = value
         self.depth = value
         self.point_cloud = value

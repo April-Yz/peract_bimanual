@@ -116,7 +116,10 @@ neural_renderer:
   lambda_ssim: 0.0 # SSIM loss for Gaussian Splatting
 
   lambda_dyna: 0.01
+  lambda_dyna_leader: 0.4
+  lambda_mask: 1.0
   lambda_reg: 0.0 # not used
+  mask_type: 'exclude' # 'include'
 
   dataset:
     use_processed_data: True

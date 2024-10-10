@@ -77,7 +77,7 @@ class GeneralizableGSEmbedNet(nn.Module):
                 d_in=d_in, # xyz                    # 39
                 d_latent=d_latent,  # volumetric representation 体积表示
                 d_lang=d_lang, 
-                d_out=self.d_out,                   # 26
+                d_out=self.d_out,                   # 26 + 3
                 d_hidden=cfg.mlp.d_hidden,          #  512 每个隐藏层块中的隐藏单元（神经元）数量
                 n_blocks=cfg.mlp.n_blocks,          # 5  隐藏层块数量
                 combine_layer=cfg.mlp.combine_layer,    # 3
@@ -110,11 +110,12 @@ class GeneralizableGSEmbedNet(nn.Module):
                 cprint(f"[GeneralizableGSEmbedNet] Using action input: {self.use_action}", "red")
                 cprint(f"[GeneralizableGSEmbedNet] Using semantic feature: {self.use_semantic_feature}", "red")
                 # if self.leader:
-                next_d_in = self.d_out + self.d_in      #39+26=65
+                next_d_in = self.d_out + self.d_in      # (26 + 3(mask) ) + 39 = (65 + 3) = 68
                 # cprint(f"65 next_d_in = self.d_out + self.d_in: {next_d_in}", "green") 
-                next_d_in = next_d_in + 16 if self.use_action else next_d_in  # 73->81 action: 8->16 dim # new theta_right=8(还是16呢)
+                next_d_in = next_d_in + 16 if self.use_action else next_d_in  # 73 -> 81 +3(mask) -> 84  action: 8->16 dim # new theta_right=8(还是16呢)
                 # cprint(f"73 next_d_in = next_d_in + 8 if self.use_action else next_d_in {next_d_in}", "green")
                 next_d_in = next_d_in if self.use_semantic_feature else next_d_in - 3   # 70->78
+                next_d_in = next_d_in if self.field_type =='LF' else next_d_in - 3      # 如果双手一起预测   减3
                 # cprint(f"70 next_d_in = next_d_in if self.use_semantic_feature else next_d_in - 3 {next_d_in}", "green")
                 self.gs_deformation_field = ResnetFC(
                         d_in=next_d_in, # all things despite volumetric representation (26 + 39 + 8 -3 = 70) 尽管有体积表示
@@ -134,11 +135,12 @@ class GeneralizableGSEmbedNet(nn.Module):
                 cprint(f"[GeneralizableGSEmbedNet] Using action input: {self.use_action}", "red")
                 cprint(f"[GeneralizableGSEmbedNet] Using semantic feature: {self.use_semantic_feature}", "red")
                 # if self.leader:
-                next_d_in = self.d_out + self.d_in      #39+26=65
+                next_d_in = self.d_out + self.d_in      # 26( +3 mask ) + 39 = 65 + 3 = 68   
                 # cprint(f"65 next_d_in = self.d_out + self.d_in: {next_d_in}", "green") 
-                next_d_in = next_d_in + 8 if self.use_action else next_d_in  # 73 action: 8 dim # new theta_right=8(还是16呢)
+                next_d_in = next_d_in + 8 if self.use_action else next_d_in  # 73 +3(mask) = 76 action: 8 dim # new theta_right=8(还是16呢)
                 # cprint(f"73 next_d_in = next_d_in + 8 if self.use_action else next_d_in {next_d_in}", "green")
-                next_d_in = next_d_in if self.use_semantic_feature else next_d_in - 3   # 70
+                next_d_in = next_d_in if self.use_semantic_feature else next_d_in - 3   # 73-3 -> 70 +3(mask) = 73
+                next_d_in = next_d_in if self.field_type =='LF' else next_d_in - 3      # mask
                 # cprint(f"70 next_d_in = next_d_in if self.use_semantic_feature else next_d_in - 3 {next_d_in}", "green")
                 # with torch.no_grad():
                 self.gs_deformation_field_leader = ResnetFC(
@@ -156,6 +158,7 @@ class GeneralizableGSEmbedNet(nn.Module):
                 next_d_in = self.d_out + self.d_in # 39+26=65
                 next_d_in = next_d_in + 8 + 8 if self.use_action else next_d_in  # action: 8 再加上8 dim # new theta_right=8(还是16呢)
                 next_d_in = next_d_in if self.use_semantic_feature else next_d_in - 3
+                next_d_in = next_d_in if self.field_type =='LF' else next_d_in - 3
                 self.gs_deformation_field_follower = ResnetFC(
                         d_in=next_d_in, # all things despite volumetric representation (26 + 39 + 8 -3 = 70) 尽管有体积表示
                         d_latent=self.d_latent,
@@ -177,31 +180,36 @@ class GeneralizableGSEmbedNet(nn.Module):
         split_dimensions = []
         scale_inits = []
         bias_inits = []
-        split_dimensions = split_dimensions + [3, 1, 3, 4, 3, 3]
-        scale_inits = scale_inits + [
+        # split_dimensions = split_dimensions + [3, 1, 3, 4, 3, 3] # 17
+        split_dimensions = split_dimensions + [3, 1, 3, 4, 3, 3, 3] # 17->20 最后一个3用于mask
+        # print("1 split_dimensions: ", split_dimensions, len(split_dimensions))
+        scale_inits = scale_inits + [              # 添加初始化缩放值
             cfg.mlp.xyz_scale,
             cfg.mlp.opacity_scale,
             cfg.mlp.scale_scale,
             1.0,    # rotation
             5.0,    # feature_dc
             1.0,    # feature
+            1.0     # 最后一个1用于mask
             ]
-        bias_inits = [
+        bias_inits = [                              # 添加偏置初始化值，主要用于每个输出通道的偏置
             cfg.mlp.xyz_bias, 
             cfg.mlp.opacity_bias,
             np.log(cfg.mlp.scale_bias),
             0.0,
             0.0,
             0.0,
+            0.0 # 最后一个0用于mask
             ]
         if cfg.mlp.max_sh_degree != 0:    # default: 1
-            sh_num = (self.cfg.mlp.max_sh_degree + 1) ** 2 - 1    # 3
-            sh_num_rgb = sh_num * 3
-            split_dimensions.append(sh_num_rgb)
-            scale_inits.append(0.0)
+            sh_num = (self.cfg.mlp.max_sh_degree + 1) ** 2 - 1    # 3 # sh_num 计算的是球谐函数（SH，Spherical Harmonics）的参数数量
+            sh_num_rgb = sh_num * 3                                   # sh_num_rgb 是它乘以 3，因为通常对于 RGB 图像，会分别计算每个颜色通道的 SH 参数。  
+            split_dimensions.append(sh_num_rgb)                       # [3, 1, 3, 4, 3, 3, 3, 9] 20 + 9 = 29( 26 + 3(mask) ) 
+            scale_inits.append(0.0)                                   # 将 SH 特征的维度、缩放和偏置都添加到相应的列表中，初始化为 0.0
+            # print("2 split_dimensions: ", split_dimensions, len(split_dimensions))
             bias_inits.append(0.0)
-        self.split_dimensions_with_offset = split_dimensions
-        return split_dimensions, scale_inits, bias_inits
+        self.split_dimensions_with_offset = split_dimensions          # split_dimensions_with_offset 保存了计算出来的通道分割尺寸 
+        return split_dimensions, scale_inits, bias_inits  # split_dimensions原来=23(无sem)26
 
     @torch.no_grad()
     def world_to_canonical(self, xyz):
@@ -255,9 +263,9 @@ class GeneralizableGSEmbedNet(nn.Module):
 
     def forward(self, data):
         """
-        SB is batch size        批次大小（batch size）config/train                                                2
-        N is batch of points    批次中的点的数量                                                错了? 128
-        NS is number of input views   输入视图的数量                                           21?
+        SB is batch size                批次大小（batch size）config/train                                                2
+        N is batch of points            批次中的点的数量                                                错了? 128
+        NS is number of input views     输入视图的数量                                           21?
 
         Predict gaussian parameter maps
         """
@@ -295,8 +303,9 @@ class GeneralizableGSEmbedNet(nn.Module):
         combine_index = None
         dim_size = None
         # backbone
+        # 传入多个参数以计算潜在特征，返回的第一个值是编码后的潜在变量，第二个值被忽略（用下划线表示）
         latent, _ = self.encoder(
-            latent,
+            latent, # [65536,167]  这是zx（latent） 需要等于 d_latent + d_in
             combine_inner_dims=(self.num_views_per_obj, N),
             combine_index=combine_index,
             dim_size=dim_size,
@@ -309,23 +318,23 @@ class GeneralizableGSEmbedNet(nn.Module):
         # print("forward in embednet latent.shape=[1,65536,26]",latent.shape)  # 输出latent张量的形状
 
         ## regress gaussian parms 回归高斯参数
-        split_network_outputs = self.gs_parm_regresser(latent) # [1, N, (3, 1, 3, 4, 3, 9)]
+        split_network_outputs = self.gs_parm_regresser(latent) # [1, N, (3, 1, 3, 4, 3, 9)]  [3, 1, 3, 4, 3, 3, 3, 9] 20 + 9 = 29( 26 + 3(mask) )
         # print("split_network_outputs = self[1,65536,26]",split_network_outputs.shape)  # 输出split_network_outputs张量的形状
         # self.split_dimensions_with_offset 是一个列表，指定了每个输出部分的维度。 split_network_outputs 沿最后一个维度（dim=-1）分割
         split_network_outputs = split_network_outputs.split(self.split_dimensions_with_offset, dim=-1)
         # 元组tuple print("split_network_outputs = split_network_outputs.split(self.split_dimensions_with_offset, dim=-1)",split_network_outputs.shape)  # 输出split_network_outputs张量的形状
-        
-        # 分配分割后的数据
-        xyz_maps, opacity_maps, scale_maps, rot_maps, features_dc_maps, feature_maps = split_network_outputs[:6]
+        # 将上面这些 分割后的数据   进行分配
+        xyz_maps, opacity_maps, scale_maps, rot_maps, features_dc_maps, feature_maps, mask_maps = split_network_outputs[:7] # 6]
+        # xyz_maps, opacity_maps, scale_maps, rot_maps, features_dc_maps, feature_maps,  precomputed_mask = split_network_outputs[:7]
         if self.max_sh_degree > 0:
-            features_rest_maps = split_network_outputs[6]
+            features_rest_maps = split_network_outputs[7] # [6]
 
         # spherical function head 球面函数头
         features_dc_maps = features_dc_maps.unsqueeze(2) #.transpose(2, 1).contiguous().unsqueeze(2) # [B, H*W, 1, 3] [1, 65536, 1, 3]
         # print("features_dc_maps = ",features_dc_maps.shape)  # torch.Size([1, 65536, 1, 3])  输出features_dc_maps张量的形状
         features_rest_maps = features_rest_maps.reshape(*features_rest_maps.shape[:2], -1, 3) # [B, H*W, 3, 3] [1, 65536, 3, 3]
         # print("features_rest_maps = ",features_rest_maps.shape)  # [1, 65536, 3, 3]  输出features_rest_maps张量的形状
-        sh_out = torch.cat([features_dc_maps, features_rest_maps], dim=2)  # [B, H*W, 4, 3]   [1, 65536, 4, 3]
+        sh_out = torch.cat([features_dc_maps, features_rest_maps], dim=2)  # [B, H*W, 4, 3]   [1, 65536, 1, 3]+ [1, 65536, 3, 3] = [1, 65536, 4, 3]
         # print("sh_out = [1, 65536, 4, 3]",sh_out.shape)  # 输出sh_out张量的形状
 
         scale_maps = self.scaling_activation(scale_maps)    # exp   [1, 65536, 3]
@@ -338,16 +347,18 @@ class GeneralizableGSEmbedNet(nn.Module):
         data['rot_maps'] = self.rotation_activation(rot_maps, dim=-1)   # [1, 65536, 4]
         data['scale_maps'] = scale_maps                                 # [1, 65536, 3]
         data['opacity_maps'] = self.opacity_activation(opacity_maps)    # [1, 65536, 1]    
-        data['feature_maps'] = feature_maps # [B, N, 3]                   [1, 65536, 3]                  
+        data['feature_maps'] = feature_maps # [B, N, 3]                   [1, 65536, 3]
+        data['mask_maps'] = mask_maps #？1008                  [B, N, 3]  [1, 65536, 3]
         # print(data['xyz_maps'].shape ,data['sh_maps'].shape,data['rot_maps'].shape,data['scale_maps'].shape,data['opacity_maps'].shape,data['feature_maps'].shape)
         # torch.Size([1, 65536, 3]) torch.Size([1, 65536, 4, 3]) torch.Size([1, 65536, 4]) torch.Size([1, 65536, 3]) torch.Size([1, 65536, 1]) torch.Size([1, 65536, 3])
 
         # Dynamic Modeling: predict next gaussian maps
         # 动态建模：预测下一个高斯映射
+        # print("self.field_type = ",self.field_type)
         if self.use_dynamic_field: #and data['step'] >= self.warm_up:
 
             # 不用语义特征
-            if not self.use_semantic_feature:
+            if not self.use_semantic_feature and self.field_type !='LF':
                 # dyna_input: (d_latent, d_in)
                 dyna_input = torch.cat((
                     point_latent,   # [N, 128]
@@ -360,7 +371,7 @@ class GeneralizableGSEmbedNet(nn.Module):
                     # d_in:
                     z_feature,
                 ), dim=-1) # no batch dim
-            else:
+            elif self.use_semantic_feature and self.field_type !='LF':
                 # 用语义特征
                 dyna_input = torch.cat((
                     point_latent,   # [N, 128]
@@ -374,6 +385,35 @@ class GeneralizableGSEmbedNet(nn.Module):
                     # d_in:
                     z_feature,  
                 ), dim=-1) # no batch dim
+            elif not self.use_semantic_feature and self.field_type =='LF':
+                dyna_input = torch.cat((
+                    point_latent,   # [N, 128]
+                    data['xyz_maps'].detach().reshape(N, 3), 
+                    features_dc_maps.detach().reshape(N, 3),
+                    features_rest_maps.detach().reshape(N, 9),
+                    data['rot_maps'].detach().reshape(N, 4),
+                    data['scale_maps'].detach().reshape(N, 3),
+                    data['opacity_maps'].detach().reshape(N, 1),
+                    data['mask_maps'].detach().reshape(N, 3),
+                    # d_in:
+                    z_feature,  
+                ), dim=-1) # no batch dim    
+            elif self.use_semantic_feature and self.field_type =='LF':
+                dyna_input = torch.cat((
+                    point_latent,   # [N, 128]
+                    data['xyz_maps'].detach().reshape(N, 3), 
+                    features_dc_maps.detach().reshape(N, 3),
+                    features_rest_maps.detach().reshape(N, 9),
+                    data['rot_maps'].detach().reshape(N, 4),
+                    data['scale_maps'].detach().reshape(N, 3),
+                    data['opacity_maps'].detach().reshape(N, 1),
+                    data['mask_maps'].detach().reshape(N, 3),
+                    data['feature_maps'].detach().reshape(N, 3), # （加入语义特征后）多了特征图
+                    # d_in:
+                    z_feature,  
+                ), dim=-1) # no batch dim                
+            else:
+                print("error in models_embed.py")
 
             # voxel embedding, stop gradient (gaussian xyz), (128+39)+3=170
             # 体素嵌入，停止梯度（高斯 XYZ），（128+39）+3=170
@@ -423,6 +463,7 @@ class GeneralizableGSEmbedNet(nn.Module):
                     data['right_next']['scale_maps'] = data['scale_maps'].detach()
                     data['right_next']['opacity_maps'] = data['opacity_maps'].detach()
                     data['right_next']['feature_maps'] = data['feature_maps'].detach()
+                    data['right_next']['mask_maps'] = data['mask_maps'].detach()
             
                     # if self.use_action:
                     dyna_input = torch.cat((dyna_input, data['left_action'].repeat(N, 1)), dim=-1)   # action detach
@@ -443,6 +484,7 @@ class GeneralizableGSEmbedNet(nn.Module):
                     data['left_next']['scale_maps'] = data['scale_maps'].detach()
                     data['left_next']['opacity_maps'] = data['opacity_maps'].detach()
                     data['left_next']['feature_maps'] = data['feature_maps'].detach()
+                    data['left_next']['mask_maps'] = data['mask_maps'].detach()
 
                 # -------------------------------------------------------------------------------------------------
         return data

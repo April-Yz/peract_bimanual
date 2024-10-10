@@ -95,14 +95,18 @@ def create_replay(batch_size: int, timesteps: int,
     for cname in cameras:
         observation_elements.append(
             # color, height, width 新增depth
-            ObservationElement(
-                "%s_rgb" % cname,
-                (3,image_size[1],image_size[0],),
-                np.float32,
-            )
-        )
+            ObservationElement("%s_rgb" % cname,(3,image_size[1],image_size[0],),np.float32,))
         observation_elements.append(
             ObservationElement('%s_depth' % cname, (1, image_size[1], image_size[0]), np.float32))
+        # observation_elements.append(
+        #     ObservationElement('%s_mask' % cname, (1, image_size[1], image_size[0]), np.float32)) # 3?1
+        # observation_elements.append(
+        #     ObservationElement('%s_next_mask' % cname, (1, image_size[1], image_size[0]), np.float32)) # 3?1 
+        # 仅仅为了nerf所以尺寸和nerf一样
+        observation_elements.append(
+            ObservationElement('%s_mask' % cname, (1, 128, 128), np.float32)) # 3?1
+        observation_elements.append(
+            ObservationElement('%s_next_mask' % cname, (1, 128, 128), np.float32)) # 3?1      
         observation_elements.append(
             ObservationElement("%s_point_cloud" % cname, (3, image_size[1], image_size[0]), np.float16)
         )  # see pyrep/objects/vision_sensor.py on how pointclouds are extracted from depth frames
@@ -191,9 +195,10 @@ def create_replay(batch_size: int, timesteps: int,
                 ReplayElement(
                     f"{robot_name}_gripper_pose", (gripper_pose_size,), np.float32
                 ),
-                # ReplayElement(
-                #     f"{robot_name}_joint_position", (joint_position_size,), np.float32
-                # ),
+                # 新增的（大小应该和上面的一样吧（不确定））
+                ReplayElement(
+                    f"{robot_name}_joint_position", (gripper_pose_size,), np.float32
+                ),
             ]
         )
     # observation_elements.extend([
@@ -475,16 +480,19 @@ def _add_keypoints_to_replay(
 
         others = {'demo': True}
         if robot_name == "bimanual":
-
+            # print("obs_tp1.right.joint_positions = ",obs_tp1.right.joint_positions)
+            # print("obs_tp1.right.gripper_pose = ",obs_tp1.right.gripper_pose)
+            # print("obs_tp1.left.joint_positions = ",obs_tp1.left.joint_positions)
+            # print("obs_tp1.left.gripper_pose = ",obs_tp1.left.gripper_pose)    
             final_obs = {
                 "right_trans_action_indicies": right_trans_indicies,
                 "right_rot_grip_action_indicies": right_rot_grip_indicies,
                 "right_gripper_pose": obs_tp1.right.gripper_pose,
-                # "right_joint_position": obs_tp1.right.joint_positions,
+                "right_joint_position": obs_tp1.right.joint_positions, # new position
                 "left_trans_action_indicies": left_trans_indicies,
                 "left_rot_grip_action_indicies": left_rot_grip_indicies,
                 "left_gripper_pose": obs_tp1.left.gripper_pose,
-                # "left_joint_position": obs_tp1.left.joint_positions,
+                "left_joint_position": obs_tp1.left.joint_positions, #
                 "task": task,
                 "lang_goal": np.array([description], dtype=object),
             }
@@ -496,15 +504,8 @@ def _add_keypoints_to_replay(
                 "task": task,
                 "lang_goal": np.array([description], dtype=object),
             }
-        # mani原有的
-        # final_obs = {
-        #     'trans_action_indicies': trans_indicies,
-        #     'rot_grip_action_indicies': rot_grip_indicies,
-        #     'gripper_pose': obs_tp1.gripper_pose,
-        #     'task': task,
-        #     'lang_goal': np.array([description], dtype=object),
-        # }
 
+        # 使用 update() 方法将 final_obs 字典中的所有键值对添加或更新到 others 字典中。如果 others 已经包含某个与 final_obs 键相同的键，则对应的值会被 final_obs 中的值覆盖。    
         others.update(final_obs)
         others.update(obs_dict)
 

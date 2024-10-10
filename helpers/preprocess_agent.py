@@ -36,7 +36,7 @@ class PreprocessAgent(Agent):
     # new86---
 
     def _norm_rgb_(self, x):
-        if self._norm_type == 'zero_mean':
+        if self._norm_type == 'zero_mean':                       # 零均值规范化
             return (x.float() / 255.0) * 2.0 - 1.0
         elif self._norm_type == 'imagenet':
             # normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],

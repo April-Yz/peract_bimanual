@@ -145,37 +145,58 @@ class ResnetFC(nn.Module):
         :param zx (..., d_latent + d_in)
         :param combine_inner_dims 用于多视图输入的组合尺寸。
                 张量将被重塑为（-1, combine_inner_dims,...），并在 combine_layer 处使用 combine_type 对维 1 进行缩减。
+        
+        zx：输入张量，形状为(..., d_latent + d_in)，其中包含潜在特征和输入特征的拼接。
+        combine_inner_dims：指定如何组合多视图输入的维度，默认值为(1,)。
+        combine_index：可选的索引参数，用于组合过程中的选择操作。
+        dim_size：用于指定特定维度的大小（在某些操作中可能会用到）。
+        ret_last_feat：布尔值，指定是否返回中间的特征层。
+        language_embed：语言嵌入，可能是用于多模态输入的特征。
+        batch_size：批量大小。
         """
+        # 使用profiler工具来记录函数执行时间，标记为“resnetfc_infer”，这对于性能分析和优化非常有用。
         with profiler.record_function("resnetfc_infer"):
-            assert zx.size(-1) == self.d_latent + self.d_in, f"{zx.size(-1)} != {self.d_latent} + {self.d_in}"
+            # 确保输入张量zx的最后一维大小与d_latent + d_in匹配。d_latent代表潜在特征的维度，d_in代表输入特征的维度。
+            assert zx.size(-1) == self.d_latent + self.d_in, f"{zx.size(-1)} != {self.d_latent} + {self.d_in}" # 206 != 128 + 81
 
+            # 如果潜在特征的维度大于0，zx中的前d_latent维被提取为z，后面的部分则作为x。如果没有潜在特征，则直接将zx作为输入特征x。
             if self.d_latent > 0:
                 z = zx[..., : self.d_latent]
                 x = zx[..., self.d_latent :]
             else:
                 x = zx
 
+            # 处理输入特征 ##   如果输入特征的维度大于0，x会通过self.lin_in线性层处理；否则，将x设为全零张量，大小为隐藏层的维度self.d_hidden
             if self.d_in > 0:
                 x = self.lin_in(x)
             else:
                 x = torch.zeros(self.d_hidden, device=zx.device)
 
+            # 前向传播的主要循环 
+            # self.n_blocks表示网络中的块（block）数量。在每个块中，逐步对输入进行处理 
             for blkid in range(self.n_blocks):
+                # 当块的索引等于self.combine_layer时，使用utils.combine_interleaved方法将输入x在指定的维度上组合
                 if blkid == self.combine_layer:
                     x = utils.combine_interleaved(
                         x, combine_inner_dims, self.combine_type
                     )
 
+                # 潜在特征的处理
+                # 如果潜在特征的维度大于0，且当前块的索引小于combine_layer
                 if self.d_latent > 0 and blkid < self.combine_layer:
-                    tz = self.lin_z[blkid](z)
-                    if self.use_spade:
+                    tz = self.lin_z[blkid](z)                           # z会通过线性层self.lin_z[blkid]进行处理，结果赋给tz
+                    if self.use_spade:                                  # 如果use_spade为真，使用spade样式的缩放操作，将sz与输入x相乘后加上tz
                         sz = self.scale_z[blkid](z)
                         x = sz * x + tz
                     else:
-                        x = x + tz
+                        x = x + tz                                      # 否则，直接将tz加到输入x上
 
-                x = self.blocks[blkid](x)
-            out = self.lin_out(self.activation(x))
+                # 块的前向计算
+                x = self.blocks[blkid](x)                               # 每个块都会对当前的x进行处理，更新x的值
+            # 输出计算
+            out = self.lin_out(self.activation(x))                      # 通过一个线性层和激活函数计算最终的输出out
+            # 如果ret_last_feat为False，只返回输出out和最后的特征x。
+            # 如果ret_last_feat为True，则将out和x在最后一个维度上拼接，并返回拼接后的结果和x。
             if not ret_last_feat:
                 return out, x
             else:

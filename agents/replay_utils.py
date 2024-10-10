@@ -1,3 +1,17 @@
+# 抛弃了无用，用的是launch_utils.py
+# 抛弃了无用，用的是launch_utils.py
+# 抛弃了无用，用的是launch_utils.py
+# 抛弃了无用，用的是launch_utils.py
+
+
+
+
+
+
+
+
+
+
 
 import logging
 from typing import List
@@ -34,6 +48,7 @@ LOW_DIM_SIZE = 4
 
 
 def create_replay(cfg, replay_path):
+    # 抛弃了无用，用的是launch_utils.py
     
     if cfg.method.robot_name == "bimanual":
         if cfg.method.name == "ManiGaussian_BC2":

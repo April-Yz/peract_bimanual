@@ -219,23 +219,26 @@ class QFunction(nn.Module):
                 lang_goal=None,
                 nerf_next_target_rgb=None, nerf_next_target_pose=None, nerf_next_target_depth=None,
                 nerf_next_target_camera_intrinsic=None,
-                gt_embed=None, step=None, action=None):
+                gt_embed=None, step=None, action=None,
+                gt_mask=None, next_gt_mask = None,
+                ):
         '''
         Return Q-functions and neural rendering loss
         前向传播 返回Q函数和神经渲染损失
         '''
 
-        b = rgb_pcd[0][0].shape[0]
+        b = rgb_pcd[0][0].shape[0] 
 
         pcd_flat = torch.cat(
             [p.permute(0, 2, 3, 1).reshape(b, -1, 3) for p in pcd], 1)  # [1, 16384, 3]
         
         # flatten RGBs and Pointclouds 扁平化 RGB 和点云
-        rgb = [rp[0] for rp in rgb_pcd]
-        feat_size = rgb[0].shape[1] # 3
+        rgb = [rp[0] for rp in rgb_pcd] # rgb_pcd 是一个包含RGB和点云数据的列表 只取第一个元素rgb
+        feat_size = rgb[0].shape[1] # 3  # rgb[0] 的形状应该是 [b, channels（通常=3）, height, width]
 
+        # [b, height, width, channels] ->  [b, height * width, 3]
         flat_imag_features = torch.cat(
-            [p.permute(0, 2, 3, 1).reshape(b, -1, feat_size) for p in rgb], 1)  # [1, 16384, 3]
+            [p.permute(0, 2, 3, 1).reshape(b, -1, feat_size) for p in rgb], 1)  # [1, 16384, 3] 
 
         # print("coord_bounds",bounds) # tensor([[-0.3000, -0.5000,  0.6000,  0.7000,  0.5000,  1.6000]],device='cuda:0')
         # construct voxel grid 构建体元网格
@@ -291,20 +294,30 @@ class QFunction(nn.Module):
         rendering_loss_dict = {}
         if use_neural_rendering:    # train default: True; eval default: False
             # prepare nerf rendering
+            # 提取焦距
             focal = camera_intrinsics[0][:, 0, 0]  # [SB]
-            cx = 128 / 2
+            cx = 128 / 2 # 相机中心坐标cx,cy
             cy = 128 / 2
-            c = torch.tensor([cx, cy], dtype=torch.float32).unsqueeze(0)
+            c = torch.tensor([cx, cy], dtype=torch.float32).unsqueeze(0) #[1,2]
 
             if nerf_target_rgb is not None:
                 gt_rgb = nerf_target_rgb    # [1,128,128,3]
-                gt_pose = nerf_target_pose @ self._coord_trans # remember to do this
+                gt_pose = nerf_target_pose @ self._coord_trans # remember to do this # 将目标的世界坐标系转换为相机坐标系
                 gt_depth = nerf_target_depth
-
+                # todo 加一个radom i 随机相机
+                import random
+                random_int = random.randint(0, 5)
+                gt_mask_camera_intrinsic = camera_intrinsics[random_int]
+                gt_mask_camera_extrinsic = camera_extrinsics[random_int]
+                gt_mask = gt_mask[random_int]
+                next_gt_mask = next_gt_mask[random_int]
                 # (新增！！！改变)We only use the front camera  我们只使用前置摄像头
                 rgb_0 = rgb[0]
                 depth_0 = depth[0]
                 pcd_0 = pcd[0]
+                # mask_0 = mask[0]
+                # print(mask_0)
+                # print(mask_0.shape) torch.Size([1, 1, 256, 256])
 
                 # print("qfunction中的已经开始错了！！！哈哈哈终于找到你了",voxel_grid_feature.shape)
                 # render loss（改变）神经渲染 后面是一些相关数据字典通过dotmap处理后的数据，可用.访问，但是无用
@@ -322,7 +335,9 @@ class QFunction(nn.Module):
                     lang_goal=lang_goal, 
                     next_gt_pose=nerf_next_target_pose, next_gt_intrinsic=nerf_next_target_camera_intrinsic, 
                     next_gt_rgb=nerf_next_target_rgb, step=step, action=action,
-                    training=True,
+                    training=True, 
+                    gt_mask=gt_mask, 
+                    gt_mask_camera_extrinsic=gt_mask_camera_extrinsic, gt_mask_camera_intrinsic=gt_mask_camera_intrinsic, next_gt_mask = next_gt_mask,
                     )
 
             else:
@@ -350,6 +365,7 @@ class QFunction(nn.Module):
                 nerf_next_target_rgb=None, nerf_next_target_depth=None,
                 nerf_next_target_pose=None, nerf_next_target_camera_intrinsic=None, 
                 action=None, step=None,
+                gt_mask=None, next_gt_mask = None, # gt_mask_camera_extrinsic=None, gt_mask_camera_intrinsic=None,
                 ):
         """
         Render the novel view and the next novel view during the training process
@@ -417,6 +433,10 @@ class QFunction(nn.Module):
                 step=step,
                 action=action,                          # 当前执行的动作。
                 training=False,
+                gt_mask=gt_mask[0],
+                gt_mask_camera_extrinsic=camera_extrinsics[0], 
+                gt_mask_camera_intrinsic=camera_intrinsics[0],
+                next_gt_mask = next_gt_mask[0],
                 )
 
         # ----------------------------------------------------------------------    
@@ -638,6 +658,7 @@ class QAttentionPerActBCAgent(Agent):
         pcds = []
         exs = []
         ins = []
+        masks = []
         self._crop_summary = []
         # 遍历 self._camera_names 中定义的所有相机名称。这些名称可能是 ['front', 'left_shoulder', 'right_shoulder', 'wrist'] 或其他配置。
         for n in self._camera_names:    # default: [front,left_shoulder,right_shoulder,wrist] or [front]
@@ -647,18 +668,21 @@ class QAttentionPerActBCAgent(Agent):
                 pcd = replay_sample['%s_point_cloud' % n][sample_id:sample_id+1]
                 extin = replay_sample['%s_camera_extrinsics' % n][sample_id:sample_id+1]
                 intin = replay_sample['%s_camera_intrinsics' % n][sample_id:sample_id+1]
+                mask = replay_sample['%s_mask' % n][sample_id:sample_id+1]
             else:
                 rgb = replay_sample['%s_rgb' % n]
                 depth = replay_sample['%s_depth' % n]
                 pcd = replay_sample['%s_point_cloud' % n]
                 extin = replay_sample['%s_camera_extrinsics' % n]
                 intin = replay_sample['%s_camera_intrinsics' % n]
+                mask = replay_sample['%s_mask' % n]
             obs.append([rgb, pcd])
             depths.append(depth)
             pcds.append(pcd)
             exs.append(extin)
             ins.append(intin)
-        return obs, depths, pcds, exs, ins
+            masks.append(mask)
+        return obs, depths, pcds, exs, ins, masks
 
     def _mani_preprocess_inputs(self, replay_sample, sample_id=None):
         """用于预处理从回放缓冲区获取的输入数据，包括 RGB 图像、深度图、点云、相机内外参等。
@@ -670,6 +694,8 @@ class QAttentionPerActBCAgent(Agent):
         pcds = []
         exs = []
         ins = []
+        masks = []
+        next_masks = []
         self._crop_summary = []
         # 遍历 self._camera_names 中定义的所有相机名称。这些名称可能是 ['front', 'left_shoulder', 'right_shoulder', 'wrist'] 或其他配置。
         for n in self._camera_names:    # default: [front,left_shoulder,right_shoulder,wrist] or [front]
@@ -679,18 +705,25 @@ class QAttentionPerActBCAgent(Agent):
                 pcd = replay_sample['%s_point_cloud' % n][sample_id:sample_id+1]
                 extin = replay_sample['%s_camera_extrinsics' % n][sample_id:sample_id+1]
                 intin = replay_sample['%s_camera_intrinsics' % n][sample_id:sample_id+1]
+                mask = replay_sample['%s_mask' % n][sample_id:sample_id+1]
+                next_mask = replay_sample['%s_next_mask' % n][sample_id+1:sample_id+2]
             else:
                 rgb = replay_sample['%s_rgb' % n]
                 depth = replay_sample['%s_depth' % n]
                 pcd = replay_sample['%s_point_cloud' % n]
                 extin = replay_sample['%s_camera_extrinsics' % n]
                 intin = replay_sample['%s_camera_intrinsics' % n]
+                # if n == 'front':
+                mask = replay_sample['%s_mask' % n]
+                next_mask = replay_sample['%s_next_mask' % n]
             obs.append([rgb, pcd])
             depths.append(depth)
             pcds.append(pcd)
             exs.append(extin)
             ins.append(intin)
-        return obs, depths, pcds, exs, ins
+            masks.append(mask)
+            next_masks.append(next_mask)
+        return obs, depths, pcds, exs, ins, masks, next_masks
   
     # nerf[6]---
 
@@ -794,6 +827,7 @@ class QAttentionPerActBCAgent(Agent):
         right_action_rot_grip = replay_sample["right_rot_grip_action_indicies"].int()
         right_action_gripper_pose = replay_sample["right_gripper_pose"]
         right_action_ignore_collisions = replay_sample["right_ignore_collisions"].int()
+        right_action_joint_position = replay_sample["right_joint_position"].int()
 
         left_action_trans = replay_sample["left_trans_action_indicies"][
             :, self._layer * 3 : self._layer * 3 + 3
@@ -801,6 +835,7 @@ class QAttentionPerActBCAgent(Agent):
         left_action_rot_grip = replay_sample["left_rot_grip_action_indicies"].int()
         left_action_gripper_pose = replay_sample["left_gripper_pose"]
         left_action_ignore_collisions = replay_sample["left_ignore_collisions"].int()
+        left_action_joint_position = replay_sample["left_joint_position"].int()
 
         lang_goal_emb = replay_sample["lang_goal_emb"].float()
         lang_token_embs = replay_sample["lang_token_embs"].float()
@@ -822,7 +857,8 @@ class QAttentionPerActBCAgent(Agent):
         # 整体上移后
         # obs, pcd = self._preprocess_inputs(replay_sample)
         # 其实不用带Mani的也一样，都是5个返回值
-        obs, depth, pcd, extrinsics, intrinsics = self._mani_preprocess_inputs(replay_sample)
+        obs, depth, pcd, extrinsics, intrinsics, gt_mask, next_gt_mask = self._mani_preprocess_inputs(replay_sample)
+        # next_gt_mask
 
         # # batch size
         bs = pcd[0].shape[0]
@@ -1067,6 +1103,10 @@ class QAttentionPerActBCAgent(Agent):
             nerf_next_target_camera_intrinsic=nerf_next_target_camera_intrinsic,
             step=step,
             action=action_gt,
+            gt_mask=gt_mask,
+            next_gt_mask =next_gt_mask,
+            # gt_mask_camera_extrinsic= camera_extrinsics, 
+            # gt_mask_camera_intrinsic= camera_intrinsics,
             # nerf[3]---------------------
         )
 
@@ -1328,6 +1368,8 @@ class QAttentionPerActBCAgent(Agent):
                 rgb_pcd=obs,
                 proprio=proprio,
                 pcd=pcd,
+                camera_extrinsics=extrinsics, 
+                camera_intrinsics=intrinsics,
                 lang_goal_emb=lang_goal_emb,
                 lang_token_embs=lang_token_embs,
                 bounds=bounds,
@@ -1343,6 +1385,9 @@ class QAttentionPerActBCAgent(Agent):
                 nerf_next_target_camera_intrinsic=nerf_next_target_camera_intrinsic,
                 step=step,
                 action=action_gt,
+                gt_mask=gt_mask,
+                next_gt_mask =next_gt_mask,
+                # gt_mask_camera_extrinsic=camera_extrinsics, gt_mask_camera_intrinsic=camera_intrinsics,
                 )
             
             # NOTE: [1, h, w, 3]  # 均为图片质量

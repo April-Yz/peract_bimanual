@@ -99,16 +99,14 @@ class OfflineTrainRunner():
             shutil.rmtree(prev_dir)
 
     # new86---
+    def _step(self, i, sampled_batch, **kwargs):
     # def _step(self, i, sampled_batch):
     #     update_dict = self._agent.update(i, sampled_batch)
-    #     total_losses = update_dict['total_losses']
-    #     return total_losses
-
-    def _step(self, i, sampled_batch, **kwargs):
         update_dict = self._agent.update(i, sampled_batch, **kwargs)
         total_losses = update_dict['total_losses'].item()
         return total_losses
     # new86---
+
     def _get_resume_eval_epoch(self):
         starting_epoch = 0
         eval_csv_file = self._weightsdir.replace('weights', 'eval_data.csv') # TODO(mohit): check if it's supposed be 'env_data.csv'
@@ -136,7 +134,7 @@ class OfflineTrainRunner():
         batch = {k: v.to(self._train_device) for k, v in sampled_batch.items() if type(v) == torch.Tensor}
         
         # for k, v in sampled_batch.items():
-            # print("batch k v =",k, v)
+            # print("offline--## batch k =",k)
 
         # if self.method_name == 'ManiGaussian_BC2': # 后续可以加
         batch['nerf_multi_view_rgb'] = sampled_batch['nerf_multi_view_rgb'] # [bs, 1, 21]
@@ -150,16 +148,19 @@ class OfflineTrainRunner():
             batch['nerf_next_multi_view_camera'] = sampled_batch['nerf_next_multi_view_camera']
         
         # 如果维度是3
+        # 如果 nerf_multi_view_rgb 的维度是3（通常是 [batch_size, 1, channels]），则使用 squeeze(1) 方法去掉第二个维度，使其变为 [batch_size, channels]。
         if len(batch['nerf_multi_view_rgb'].shape) == 3:
             batch['nerf_multi_view_rgb'] = batch['nerf_multi_view_rgb'].squeeze(1)
             batch['nerf_multi_view_depth'] = batch['nerf_multi_view_depth'].squeeze(1)
             batch['nerf_multi_view_camera'] = batch['nerf_multi_view_camera'].squeeze(1)
 
+            # 去掉第二个维度
             if 'nerf_next_multi_view_rgb' in batch and batch['nerf_next_multi_view_rgb'] is not None:
                 batch['nerf_next_multi_view_rgb'] = batch['nerf_next_multi_view_rgb'].squeeze(1)
                 batch['nerf_next_multi_view_depth'] = batch['nerf_next_multi_view_depth'].squeeze(1)
                 batch['nerf_next_multi_view_camera'] = batch['nerf_next_multi_view_camera'].squeeze(1)
         
+        # 检查数据有效性
         if batch['nerf_multi_view_rgb'] is None or batch['nerf_multi_view_rgb'][0,0] is None:
             if not SILENT:
                 cprint('batch[nerf_multi_view_rgb] is None. find next data iter', 'red')
@@ -239,12 +240,8 @@ class OfflineTrainRunner():
                     # agent_summaries = self._agent.update_summaries()
                     # self._writer.add_summaries(i, agent_summaries)
 
-                    # self._writer.add_scalar(
-                    #     i, 'monitoring/memory_gb',
-                    #     process.memory_info().rss * 1e-9)
-                    # self._writer.add_scalar(
-                    #     i, 'monitoring/cpu_percent',
-                    #     process.cpu_percent(interval=None) / num_cpu)
+                    # self._writer.add_scalar(i, 'monitoring/memory_gb',process.memory_info().rss * 1e-9)
+                    # self._writer.add_scalar(i, 'monitoring/cpu_percent',process.cpu_percent(interval=None) / num_cpu)
 
                     logging.info(f"Train Step {i:06d} | Loss: {loss:0.5f} | Sample time: {sample_time:0.6f} | Step time: {step_time:0.4f}.")
 

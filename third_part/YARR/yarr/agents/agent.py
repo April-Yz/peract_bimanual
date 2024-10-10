@@ -93,6 +93,7 @@ class BimanualAgent(Agent):
         self.left_agent.build(training, device)
 
     def update(self, step: int, replay_sample: dict) -> dict:
+        """用于更新两个代理（right_agent 和 left_agent）的状态，并返回更新后的摘要信息。"""
         right_observation = {}
         left_observation = {}
 
@@ -122,6 +123,7 @@ class BimanualAgent(Agent):
     
 
     def act(self, step: int, observation: dict, deterministic: bool) -> ActResult:
+        """用于根据当前的观察数据和步骤，计算两个代理（right_agent 和 left_agent）的动作，并返回相应的结果"""
 
         observation_elements = {}
         info = {}
@@ -193,7 +195,7 @@ class BimanualAgent(Agent):
 
     
     def load_weights(self, savedir: str) -> None:
-        print("--- ---  在agent.py中出现的loadweight  --- ---")
+        # print("--- ---  在agent.py中出现的loadweight  --- ---")
         self.right_agent.load_weights(savedir)
         self.left_agent.load_weights(savedir)
 

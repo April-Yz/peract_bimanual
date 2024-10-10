@@ -297,7 +297,7 @@ class UniformReplayBuffer(ReplayBuffer):
         kwargs[TERMINAL] = terminal
         kwargs[TIMEOUT] = timeout
         # print("self._check_add_types(kwargs, self._obs_signature)",len(kwargs),len(self._obs_signature))
-        self._check_add_types(kwargs, self._storage_signature) #49 55
+        self._check_add_types(kwargs, self._storage_signature) #49 55 #10.08 57 63(多了mask数据)
         self._add(kwargs)
 
     def add_final(self, **kwargs):
@@ -415,7 +415,7 @@ class UniformReplayBuffer(ReplayBuffer):
             error_list = '\nList of expected:\n{}\nList of actual:\n{}'.format(
                 expected, actual)
             raise ValueError('Add expects {} elements, received {}.'.format(
-                len(signature), len(kwargs)) + error_list) # 出现问题signature要49 实kwargs55（多了NERF的）
+                len(signature), len(kwargs)) + error_list) # 出现问题signature要49 实kwargs55（多了NERF的）# 1008 57 63 多了mask
 
         for store_element in signature:
             # --------------------------------------------------------------------

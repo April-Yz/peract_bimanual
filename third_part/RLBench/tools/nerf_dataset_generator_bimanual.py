@@ -48,8 +48,8 @@ def save_demo(demo, example_path, variation):
 
     # Save image data first, and then None the image data, and pickle
     for i, obs in enumerate(demo):
-        for camera_name in camera_names:
-            for dtype in data_types:
+        for camera_name in camera_names: # ["over_shoulder_left", "over_shoulder_right",
+            for dtype in data_types:     #  ["rgb", "depth", "point_cloud", "mask"]
 
                 camera_full_name = f"{camera_name}_{dtype}"
                 data_path = os.path.join(example_path, camera_full_name)

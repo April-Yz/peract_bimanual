@@ -29,6 +29,7 @@ def extract_obs(
     robot_name: str = "",
     next_obs: Observation = None # mani多的
 ):
+    """在train时用的observation_utils.py 加载 data eval时用的是custom_rlbench_env.py"""
     #-------------------Mani--------------------
     # bimanual里面用了函数的方式，Mani里面只有一个函数
     #-------------------Mani--------------------
@@ -147,6 +148,8 @@ def extract_obs_bimanual(
         obs.left.gripper_joint_positions = np.clip(
             obs.left.gripper_joint_positions, 0.0, 0.04
         )
+        # print("obs_utils ## obs.right.gripper_joint_positions",obs.right.gripper_joint_positions) # [0.00443191 0.00415269](一堆输出)
+        # print("obs_utils  ## obs.left.gripper_joint_positions",obs.left.gripper_joint_positions) # [0.0044179  0.00414202]
 
     
     # Mani增加---------------------------------------------
@@ -168,15 +171,24 @@ def extract_obs_bimanual(
     # Mani增加---------------------------------------------
 
     # fixme::
+    # 使用 vars(obs) 将 obs 对象的属性转换为字典 obs_dict，字典的键是属性名，值是对应的属性值。
     obs_dict = vars(obs)
+    # for k in obs_dict.keys():
+    #     print("k = ",k)
+    # for k in obs_dict["perception_data"].keys():
+        # print("perception_key = ",k)
+    # # for k in obs_dict["right"].keys():
+    # print("perception_key",obs_dict["right"])       
+
     obs_dict = {k: v for k, v in obs_dict.items() if v is not None}
+    # print("front_mask",obs_dict["perception_data"]["front_mask"]) # 应该就是256*256个数字，代表标签
+    # print(obs_dict["perception_data"]["front_mask"].shape) #(256,256)
 
     # 新的双臂 get_low_dim_data是啥!! ?? --[{2}]---------------------------------------------
     right_robot_state = obs.get_low_dim_data(obs.right)
     left_robot_state = obs.get_low_dim_data(obs.left)
     #原来Mani
     # robot_state = np.array([obs.gripper_open,*obs.gripper_joint_positions])
-
 
     # remove low-level proprioception variables that are not needed
     # 删除不需要的低水平本体感觉变量
@@ -196,7 +208,10 @@ def extract_obs_bimanual(
         obs_dict = {
             k: v if v.ndim == 3 else np.expand_dims(v, -1) for k, v in obs.perception_data.items()
         }
-
+    for k in obs_dict.keys():
+        print("obs_dict = ",k) # 好像在这里
+    # for k in obs_dict["perception_data"].keys():
+        # print("perception_key = ",k)
     # 双臂新增的 只看bimanual就行（单纯这个if）
     if robot_name == "right":
         obs_dict["low_dim_state"] = right_robot_state.astype(np.float32)
@@ -278,6 +293,17 @@ def extract_obs_bimanual(
             obs_dict['nerf_next_multi_view_rgb'] = None
             obs_dict['nerf_next_multi_view_depth'] = None
             obs_dict['nerf_next_multi_view_camera'] = None
+        cameras = ["over_shoulder_left", "over_shoulder_right", "overhead", "wrist_right", "wrist_left", "front"] 
+        # for camera_name in cameras:
+        #     if next_obs.perception_data[f"{camera_name}_mask"] is not None:
+        #         # for k in obs_dict["perception_data"].keys():
+        #             # print("perception_data = ",k)
+        #         obs_dict[f"{camera_name}_next_mask"] = next_obs.perception_data[f"{camera_name}_mask"]
+        #         print(next_obs.perception_data[f"{camera_name}_mask"].shape)
+        #         # obs_dict["perception_data"][f"{camera_name}_next_mask"] = next_obs.perception_data[f"{camera_name}_mask"]
+        #     else:
+        #         obs_dict[f"{camera_name}_next_mask"] = None
+        #         # obs_dict["perception_data"][f"{camera_name}_next_mask"] = None
 
     # if next_obs is None, we do not add the next frame prediction
     # Mani NERF 新增----------------------------------
@@ -290,6 +316,7 @@ def create_obs_config(
     camera_resolution: List[int],
     method_name: str,
     use_depth:bool = True,
+    use_mask:bool = True, # 未改被调用时的传入！！
     robot_name: str = "bimanual",
     #nerf_multi_view: bool = True,
 ):
@@ -298,16 +325,19 @@ def create_obs_config(
     used_cams = CameraConfig(
         rgb=True,
         point_cloud=True,
-        mask=False,
+        mask=use_mask, #False,
         depth=use_depth, #mani 特有 元False,
         image_size=camera_resolution,
         render_mode=RenderMode.OPENGL,
         #nerf_multi_view =nerf_multi_view, # 为了同时跑peract新增
+        #nerf_multi_view_mask =nerf_multi_view_mask,
     )
 
+    # 键 是 camera_names 列表中的相机名称， 值 是 used_cams
     camera_configs = {camera_name: used_cams for camera_name in camera_names}
     # for keys in camera_configs:
         # print("camera_configs",keys) # over_shoulder_left等相机
+    # 其中一些 obs 仅用于关键点检测。
     # Some of these obs are only used for keypoint detection.
     obs_config = ObservationConfig(
         camera_configs=camera_configs,

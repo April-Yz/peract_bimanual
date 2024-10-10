@@ -13,7 +13,7 @@ from natsort import natsorted
 from pyrep.objects import VisionSensor
 
 from rlbench.backend.const import *
-from rlbench.backend.utils import image_to_float_array, rgb_handles_to_mask
+from rlbench.backend.utils import image_to_float_array, rgb_handles_to_mask, rgb_handles_to_mask_mani
 from rlbench.demo import Demo
 from rlbench.observation_config import ObservationConfig
 
@@ -51,6 +51,8 @@ def get_stored_demos(amount: int, image_paths: bool, dataset_root: str,
                      obs_config: ObservationConfig,
                      random_selection: bool = True,
                      from_episode_number: int = 0) -> List[Demo]:
+    """这里是读取data文件夹里存储的原来demo的数据,其中nerf相关的只是图片路径
+    obs.perception_data 里面存储的是原来的数据（egb mask depth）  """
     # print("激动地心颤抖的手，给我eval干到train一样的出错位置来了，depth错误train也是再这里解决的") # 在此处问题已解决，注释
     task_root = join(dataset_root, task_name)
     if not exists(task_root):
@@ -245,8 +247,28 @@ def get_stored_demos(amount: int, image_paths: bool, dataset_root: str,
                     data_path = os.path.join(example_path, f"{camera_name}_mask")
                     image_name = f"mask_{i:04d}.png"
                     image_path = os.path.join(data_path, image_name)
-                    obs[i].perception_data[f"{camera_name}_mask"] = rgb_handles_to_mask(np.array(_resize_if_needed(Image.open(image_path), camera_config.image_size)))
-          
+                    # image = Image.open(image_path)
+                    # image_size = image.size
+                    # print(image) <PIL.PngImagePlugin.PngImageFile image mode=RGB size=256x256 at 0x790C05DDCC40>
+                    # print(f"{camera_name}_mask 图片尺寸为: {image_size}") #256,256
+                    # obs[i].perception_data[f"{camera_name}_mask"] = rgb_handles_to_mask(np.array(_resize_if_needed(Image.open(image_path), camera_config.image_size)))
+                    # shape = obs[i].perception_data[f"{camera_name}_mask"].shape
+                    # print(f"{camera_name}_mask 图片尺寸为: {shape}")    
+                    # image = np.array(_resize_if_needed(Image.open(image_path), camera_config.image_size))
+                    # image = np.array(_resize_if_needed(Image.open(image_path), (128,128)))
+                    image = rgb_handles_to_mask_mani(np.array(_resize_if_needed(Image.open(image_path), (128,128))))
+                    # if image.shape == (128, 128, 3):
+                        # image = image.transpose(2, 0, 1) 
+                    obs[i].perception_data[f"{camera_name}_mask"] = image # （256,256,3）
+                    print(image)
+                    #  所以不能写在obs_util里面
+                    if i>0:
+                        obs[i-1].perception_data[f"{camera_name}_next_mask"] = image # 但是i应该只有一个吧？
+                    if i==num_steps-1:
+                        obs[i].perception_data[f"{camera_name}_next_mask"] = image
+                    # print("obs",obs[i].perception_data[f"{camera_name}_mask"])
+                    print(f"{camera_name}_mask = {image.shape}")
+
             # -----------------Nerf- Mani-----------------
             if obs_config.nerf_multi_view:
                 # print("---------------------------------------------")
@@ -284,7 +306,7 @@ def get_stored_demos(amount: int, image_paths: bool, dataset_root: str,
                     # print("nerf_img_dir",nerf_img_dir,exists(nerf_img_dir))
                     # print("nerf_camera_dir",nerf_camera_dir,exists(nerf_camera_dir))
                     # print("nerf_img_dir",nerf_img_dir,exists(nerf_img_dir))
-                    if not exists(nerf_img_dir):
+                    if not exists(nerf_img_dir): # 若目录不存在，则设置为None
                         obs[i].nerf_multi_view_rgb = None
                         obs[i].nerf_multi_view_depth = None
                         obs[i].nerf_multi_view_camera = None
@@ -304,10 +326,9 @@ def get_stored_demos(amount: int, image_paths: bool, dataset_root: str,
                         all_camera_files = [join(nerf_camera_dir, f) for f in all_camera_files]
 
                         # here we do not load the images, but load the paths. during training, we will load the images
+                        # 将文件名拼接成完整的文件路径，分别对应图像、深度图和相机位姿文件。
                         obs[i].nerf_multi_view_rgb = np.array(all_img_files)
-                        # ----------------------------------------------------------------
                         # print("helpers utilr.py --  obs[i].nerf_multi_view_rgb", obs[i].nerf_multi_view_rgb)
-                        #---------------------------------------------------------------
                         obs[i].nerf_multi_view_depth = np.array(all_depth_files)
                         obs[i].nerf_multi_view_camera = np.array(all_camera_files)
                         # -------------------------------------------------------------------------------------------
@@ -321,18 +342,12 @@ def get_stored_demos(amount: int, image_paths: bool, dataset_root: str,
         #         if obs_config.overhead_camera.rgb:
         #             obs[i].overhead_rgb = np.array(_resize_if_needed(Image.open(obs[i].overhead_rgb),obs_config.overhead_camera.image_size))
         #         if obs_config.wrist_camera.rgb:
-        #             obs[i].wrist_rgb = np.array(
-        #                 _resize_if_needed(
-        #                     Image.open(obs[i].wrist_rgb),obs_config.wrist_camera.image_size))
+        #             obs[i].wrist_rgb = np.array(_resize_if_needed(Image.open(obs[i].wrist_rgb),obs_config.wrist_camera.image_size))
         #         if obs_config.front_camera.rgb: # in
-        #             obs[i].front_rgb = np.array(
-        #                 _resize_if_needed(
-        #                     Image.open(obs[i].front_rgb), obs_config.front_camera.image_size))
+        #             obs[i].front_rgb = np.array(_resize_if_needed(Image.open(obs[i].front_rgb), obs_config.front_camera.image_size))
 
         #         if obs_config.left_shoulder_camera.depth or obs_config.left_shoulder_camera.point_cloud:
-        #             l_sh_depth = image_to_float_array(
-        #                 _resize_if_needed(
-        #                     Image.open(obs[i].left_shoulder_depth),obs_config.left_shoulder_camera.image_size),DEPTH_SCALE)
+        #             l_sh_depth = image_to_float_array(_resize_if_needed(Image.open(obs[i].left_shoulder_depth),obs_config.left_shoulder_camera.image_size),DEPTH_SCALE)
         #             near = obs[i].misc['left_shoulder_camera_near']
         #             far = obs[i].misc['left_shoulder_camera_far']
         #             l_sh_depth_m = near + l_sh_depth * (far - near)
@@ -343,11 +358,7 @@ def get_stored_demos(amount: int, image_paths: bool, dataset_root: str,
         #                 obs[i].left_shoulder_depth = None
 
         #         if obs_config.right_shoulder_camera.depth or obs_config.right_shoulder_camera.point_cloud:
-        #             r_sh_depth = image_to_float_array(
-        #                 _resize_if_needed(
-        #                     Image.open(obs[i].right_shoulder_depth),
-        #                     obs_config.right_shoulder_camera.image_size),
-        #                 DEPTH_SCALE)
+        #             r_sh_depth = image_to_float_array(_resize_if_needed(Image.open(obs[i].right_shoulder_depth),obs_config.right_shoulder_camera.image_size),DEPTH_SCALE)
         #             near = obs[i].misc['right_shoulder_camera_near']
         #             far = obs[i].misc['right_shoulder_camera_far']
         #             r_sh_depth_m = near + r_sh_depth * (far - near)

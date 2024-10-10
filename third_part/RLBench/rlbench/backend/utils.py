@@ -224,8 +224,24 @@ def task_file_to_task_class(task_file, bimanual=False):
 def rgb_handles_to_mask(rgb_coded_handles):
   # rgb_coded_handles should be (w, h, c)
   # Handle encoded as : handle = R + G * 256 + B * 256 * 256
+  # print("1 rgb_coded_handles",rgb_coded_handles)
+  # 算了直接注释了这个应该问题不大，别的地方也没用到的，且原来范围就是255
   rgb_coded_handles *= 255  # takes rgb range to 0 -> 255
+  # print("2 rgb_coded_handles",rgb_coded_handles)
   rgb_coded_handles.astype(int)
+  # print("rgb_handles_to_mask经过处理了")
   return (rgb_coded_handles[:, :, 0] +
           rgb_coded_handles[:, :, 1] * 256 +
           rgb_coded_handles[:, :, 2] * 256 * 256)
+
+def rgb_handles_to_mask_mani(rgb_coded_handles):
+#   # rgb_coded_handles should be (w, h, c)
+#   # Handle encoded as : handle = R + G * 256 + B * 256 * 256
+#   # print("1 rgb_coded_handles",rgb_coded_handles)
+#   # rgb_coded_handles *= 255  # takes rgb range to 0 -> 255
+#   # print("2 rgb_coded_handles",rgb_coded_handles)
+#   rgb_coded_handles.astype(int)
+#   # print("rgb_handles_to_mask经过处理了")
+  return (rgb_coded_handles[:, :, 0])
+#           rgb_coded_handles[:, :, 1] * 256 +
+#           rgb_coded_handles[:, :, 2] * 256 * 256)
