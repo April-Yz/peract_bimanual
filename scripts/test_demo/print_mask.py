@@ -12,7 +12,19 @@ mask_path = f'/data1/zjyang/program/peract_bimanual/data2/train_data/{task_name}
 output_name = f'{task_name}_{eposide_id}_{camera_id}_{mask_id}'
 output_dir = f'/data1/zjyang/program/peract_bimanual/scripts/test_demo/{output_name}'
 
+
+# right_min = 53
+# right_max = 73
+# left_min = 94
+# left_max = 114
+# left_mask = (next_render_mask_novel > left_min) & (next_render_mask_novel < left_max) # 保留左臂标签      [128,128]
+# # exclude_right_mask = (render_mask_novel_next < right_min) | (render_mask_novel_next > right_max)
+# exclude_left_mask = (next_render_mask_novel < left_min) | (next_render_mask_novel > left_max) # 排除左臂标签  
+
 mask_image = Image.open(mask_path)
+print(mask_image.size)
+print(mask_image)
+# np.savetxt('/data1/zjyang/program/peract_bimanual/scripts/test_demo/excluded_mask4.txt', mask_image, fmt='%d') 
 unique_labels = np.unique(mask_image)
 print(unique_labels)
 # for label in unique_labels:

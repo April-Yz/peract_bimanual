@@ -40,18 +40,20 @@ replay_path="/data1/zjyang/program/peract_bimanual/replay/mask/"
 # for debug
 demo=100 # 100
 episode_length=25 #25 # 20 # 4
-save_freq=100 #1000
+save_freq=2500 #1000
 camera_resolution="[256,256]"
-training_iterations=101 #100001
+training_iterations=100001 #100001
 field_type='LF' # 'bimanual' 'LF'
 lambda_dyna=0.1
 lambda_reg=0.0
-render_freq=50 #2000
+render_freq=2000 #2000
 lambda_nerf=0.01 # 0.01
-mask_gt_rgb=True
-lambda_dyna_leader=0.4
-lambda_mask=1.0
-mask_type='exclude' # 'include'
+
+mask_gt_rgb=True        
+lambda_dyna_leader=0.4  # （dyn中左右的权重比例）
+lambda_mask=1.0         # mask的权重（相对于dyn总）    
+lambda_mask_right=0.1 # mask中 右臂的权重(无用，单纯去掉会报Loss算少了 错)
+mask_type='exclude' # 'include' # 无用 直接删除next中左臂和右臂比较
 
 tmux select-pane -t 0 
 # peract rlbench
@@ -84,6 +86,7 @@ CUDA_VISIBLE_DEVICES=${train_gpu}  QT_AUTO_SCREEN_SCALE_FACTOR=0 python train.py
         method.neural_renderer.dataset.mask_gt_rgb=${mask_gt_rgb} \
         method.neural_renderer.lambda_dyna_leader=${lambda_dyna_leader} \
         method.neural_renderer.lambda_mask=${lambda_mask} \
+        method.neural_renderer.lambda_mask_right=${lambda_mask_right} \
         method.neural_renderer.mask_type=${mask_type} \
         method.neural_renderer.use_dynamic_field=True 
 "

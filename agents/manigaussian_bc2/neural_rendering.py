@@ -249,6 +249,8 @@ class NeuralRenderer(nn.Module):
                 if data['right_next']['intr'] is not None:
                     data_novel = self.get_novel_calib(data['right_next'])
                     data['right_next']['novel_view'].update(data_novel)
+                    data['right_next']['mask_view'] = {}
+                    data['right_next']['mask_view'].update(data_novel) # 更新数据
 
                 data['left_next'] = {
                     'extr': next_tgt_pose,
@@ -439,27 +441,28 @@ class NeuralRenderer(nn.Module):
                 if self.use_dynamic_field and (next_gt_rgb is not None and gt_mask is not None):
                     # mask Loss 只有front camera的训练
                     # print(gt_mask) 
-                    print(gt_mask.shape) # torch.Size([1, 1, 256, 256])  新版torch.Size([1, 1, 128, 128])
-                    # import numpy as np
+                    # test1 = gt_mask
+                    # # print(gt_mask.shape) # torch.Size([1, 1, 256, 256])  新版torch.Size([1, 1, 128, 128])
+                    # # import numpy as np
                     # from PIL import Image
-                    # # 保存为 PNG 图片
+                    # # # 保存为 PNG 图片
                     # mask_np = gt_mask.squeeze().cpu().numpy() # 形状变为 [256, 256]
-                    # print("mask_np",mask_np)
+                    # print("mask.np1 = ",mask_np, mask_np.shape)
                     # image = Image.fromarray(mask_np.astype(np.uint8))  # 将值从 [0, 1] 转换到 [0, 255]
-                    # image.save('/data1/zjyang/program/peract_bimanual/scripts/mask.png')
+                    # image.save('/data1/zjyang/program/peract_bimanual/scripts/test_demo/mask_label/mask.png')
 
                     # 1 当前场景的mask 训练  loss_dyna_mask_novel
                     data =self.pts2render_mask(data, bg_color=self.bg_color)
                     render_mask_novel = data['novel_view']['mask_pred'].permute(0, 2, 3, 1)
                     # render_mask_novel = render_mask_novel.squeeze().unsqueeze(-1).repeat(1, 1, 3)
-                    print("2 gt_mask = ",gt_mask)                                   
-                    print("gt_mask.shape = ",gt_mask.shape, render_mask_novel.shape)       # torch.Size([1, 1, 128, 128]) torch.Size([1, 128, 128, 3])
+                    # print("2 gt_mask = ",gt_mask)                                   
+                    # print("gt_mask.shape = ",gt_mask.shape, render_mask_novel.shape)       # torch.Size([1, 1, 128, 128]) torch.Size([1, 128, 128, 3])
                     # torch.Size([1, 1, 128, 128]) torch.Size([1, 128, 128, 3])
                     # gt_mask = gt_mask.squeeze(1)  # 去掉维度为 1 的通道
-                    print("3 gt_mask = ",gt_mask.shape) # 1，128,128
+                    # print("3 gt_mask = ",gt_mask.shape) # [1,1,128,128]
                     gt_mask = gt_mask.permute(0, 2, 3, 1).repeat(1, 1, 1, 3)  # 复制三次，得到 [1,128, 128, 3]
                     next_gt_mask = next_gt_mask.permute(0, 2, 3, 1).repeat(1, 1, 1, 3)
-                    print("4 gt_mask = ",gt_mask.shape, render_mask_novel.shape) # 128,128 torch.Size([1, 128, 384]) torch.Size([1, 128, 128, 3]
+                    # print("4 gt_mask = ",gt_mask.shape, render_mask_novel.shape) # 128,128 torch.Size([1, 128, 128, 3]) torch.Size([1, 128, 128, 3]
                     # print(gt_mask.shape, render_mask_novel.shape) # torch.Size([256, 256, 3]) torch.Size([1, 128, 128, 3])
                     # gt_mask = gt_mask.unsqueeze(0)
                     # gt_mask = F.interpolate(gt_mask.permute(0, 3, 1, 2), size=(128, 128), mode='bilinear').permute(0, 2, 3, 1)
@@ -471,7 +474,7 @@ class NeuralRenderer(nn.Module):
                     if ('xyz_maps' in data['left_next']):
                         data['left_next'] = self.pts2render(data['left_next'], bg_color=self.bg_color)
                         next_render_novel = data['left_next']['novel_view']['img_pred'].permute(0, 2, 3, 1)
-                        print("4 next_gt_mask.shape = ",next_gt_mask.shape, next_render_novel.shape) # torch.Size([1, 128, 128, 3]) torch.Size([1, 128, 128, 3])
+                        # print("4 next_gt_mask.shape = ",next_gt_mask.shape, next_render_novel.shape) # torch.Size([1, 128, 128, 3]) torch.Size([1, 128, 128, 3])
                         loss_dyna_follower = l2_loss(next_render_novel, next_gt_rgb)
 
 
@@ -481,7 +484,7 @@ class NeuralRenderer(nn.Module):
                     data['left_next'] =self.pts2render_mask(data['left_next'], bg_color=self.bg_color)
                     next_render_mask_novel = data['left_next']['novel_view']['mask_pred'].permute(0, 2, 3, 1)
                     loss_dyna_mask_next = l2_loss(next_render_mask_novel, next_gt_mask)
-                    loss_dyna_mask = loss_dyna_mask_novel  + loss_dyna_mask_next
+                    # loss_dyna_mask = loss_dyna_mask_novel  + loss_dyna_mask_next
                     # 计算label left_label =[] right_label =[]
                     # if self.cfg.mask_type=='exclude':    # 排除 exclude_labels
                         # exclude_left_mask = ~torch.isin(mask, torch.tensor(left_label))
@@ -500,9 +503,78 @@ class NeuralRenderer(nn.Module):
                     exclude_left_mask_expanded = exclude_left_mask.unsqueeze(-1)  # [H, W] -> [H, W, 1]
                     # background_color = torch.tensor(self.bg_color, dtype=torch.float32)  # 背景
                     #     # result_right_image = next_gt_rgb * exclude_right_mask_expanded + background_color * (~exclude_right_mask_expanded)
-                    print("6 next ",next_gt_rgb.shape,exclude_left_mask.shape,exclude_left_mask_expanded.shape) # 6 next  torch.Size([1, 128, 128, 3]) torch.Size([1, 128, 128, 3, 1])
+                    # print("6 next ",next_gt_rgb.shape,exclude_left_mask.shape,exclude_left_mask_expanded.shape) # 6 next  torch.Size([1, 128, 128, 3]) torch.Size([1, 128, 128, 3, 1])
                     # 6 next  torch.Size([1, 128, 128, 3]) torch.Size([1, 128, 128, 3]) torch.Size([1, 128, 128, 3, 1])   
                     result_right_image = next_gt_rgb * exclude_left_mask    # [1, 128, 128, 3]
+
+                    # print("next_render_mask_novel",next_render_mask_novel,next_render_mask_novel.shape) 
+                    # exclude_test_mask = (gt_mask < left_min) | (gt_mask > left_max) 
+                    # test1_cpu = test1.cpu().numpy()
+                    # print("test1_cpu",test1_cpu)
+                    # test2 = np.ones_like(test1_cpu, dtype=np.uint8)
+                    # test2[(test1_cpu < left_min) | (test1_cpu > left_max)] = 0  # (1,1,128,128)
+                    # print("test2 = ",test2,test2.shape)
+                    # # # np.savetxt('/data1/zjyang/program/peract_bimanual/scripts/test_demo/mask_label/test1.txt', test1.cpu().numpy(), fmt='%d')
+                    # test3 = test2.permute(1, 2, 0)
+                    # print("test3 = ",test3)
+                    # test4 = test3.squeeze(0) # (1,128,128)
+                    # print("test4 = ",test4,test4.shape)
+                    # # test5 = test4[:,:,0]
+                    # test5 = test4.squeeze(0)
+                    # print("test5 = ",test5,test5.shape)
+                    # import json
+                    # with open('/data1/zjyang/program/peract_bimanual/scripts/test_demo/mask_label/1.json', 'w') as f:
+                    #     json.dump(test2.tolist(), f)
+                    # np.savetxt('/data1/zjyang/program/peract_bimanual/scripts/test_demo/mask_label/test5.txt', test5, fmt='%d')
+                    # np.savetxt('/data1/zjyang/program/peract_bimanual/scripts/test_demo/mask_label/test2.txt', test2.cpu().numpy(), fmt='%d')
+                    # # exclude_test_mask_int = exclude_test_mask.int()
+                    # # print("int mask",exclude_test_mask_int)
+                    # print("1 exclude_test_mask = ",exclude_test_mask)
+                    # print(exclude_test_mask.shape)
+                    # exclude_test_mask = exclude_test_mask.squeeze(0) [128,128,3]
+                    # # np.savetxt('/data1/zjyang/program/peract_bimanual/scripts/test_demo/mask_label/excluded_mask0.txt', gt_mask.cpu().numpy(), fmt='%d')
+                    # # exclude_test_mask1 = exclude_test_mask.cpu().numpy()
+                    # # exclude_test_mask1 = exclude_test_mask1.reshape(-1, 3)
+                    # print("2 exclude_test_mask_expanded = ",exclude_test_mask, exclude_test_mask.shape)
+                    # # exclude_test_mask = exclude_test_mask.mean(dim=-1, keepdim=True)
+                    # # print("3 exclude_test_mask_expanded = ",exclude_test_mask,exclude_test_mask.shape)
+                    # result_image_np = exclude_test_mask.squeeze(0).cpu().numpy()
+
+                    # result_image_np1 = exclude_test_mask.squeeze(0).cpu().numpy().astype(np.uint8)
+                    # height, width = result_image_np1.shape[:2]
+                    # rgb_image = np.zeros((height, width, 3), dtype=np.uint8)
+                    # print("rgb",rgb_image)
+                    # print(rgb_image.shape)
+                    # gray_image = rgb_image[:, :, 0]
+                    # print("gray_image",gray_image)
+                    # print(gray_image.shape)
+                    # np.savetxt('/data1/zjyang/program/peract_bimanual/scripts/maskblack_white_image.txt', gray_image, fmt='%d')
+                    # pil_image = Image.fromarray(gray_image)
+                    # pil_image.save('/data1/zjyang/program/peract_bimanual/scripts/maskblack_white_image.png')
+
+                    # # rgb_image[result_image_np1 == 1] = [255, 255, 255]  # 白色
+                    # # rgb_image[result_image_np1 == 0] = [0, 0, 0]  # 黑色
+                    # mask = (result_image_np1 == 1)
+                    # white_color = np.array([255, 255, 255])
+                    # rgb_image[mask] = white_color
+                    # rgb_image = rgb_image.astype(np.uint8)
+
+                    # image = Image.fromarray(rgb_image)
+                    # image.save('/data1/zjyang/program/peract_bimanual/scripts/mask12.png')
+                    # import cv2
+                    # cv2.imwrite('/data1/zjyang/program/peract_bimanual/scripts/mask11.png', rgb_image)
+
+                    # print("result_image_np = ",result_image_np)
+                    # image_to_save = Image.fromarray((result_image_np * 1).astype(np.uint8))
+                    # image_to_save.save('/data1/zjyang/program/peract_bimanual/scripts/mask10.png')
+
+                    # result_image_np = exclude_left_mask.squeeze(0).cpu().numpy()
+                    # image_to_save = Image.fromarray((result_image_np * 1).astype(np.uint8))
+                    # image_to_save.save('/data1/zjyang/program/peract_bimanual/scripts/mask1.png')
+                    # # from PIL import Image
+                    # result_image_np = result_right_image.squeeze(0).cpu().numpy()
+                    # image_to_save = Image.fromarray((result_image_np * 1).astype(np.uint8))
+                    # image_to_save.save('/data1/zjyang/program/peract_bimanual/scripts/mask2.png')
 
                     # # leader 利用前面得到的mask删去左臂
                     if ('xyz_maps' in data['right_next']):
@@ -514,9 +586,14 @@ class NeuralRenderer(nn.Module):
                         # else:
                         #     next_render_novel_mask = next_gt_rgb * (~exclude_right_mask_expanded)
                         # loss_dyna = l1_loss(next_render_novel, next_gt_rgb)
-                        print("next_gt_rgb",next_gt_rgb.shape)
-                        print("next_render_novel_mask.shape",next_render_novel_mask.shape,result_right_image.shape)
+                        # print("next_gt_rgb",next_gt_rgb.shape) #[1, 128, 128, 3]
+                        # print("next_render_novel_mask.shape",next_render_novel_mask.shape,result_right_image.shape)
                         loss_dyna_leader = l2_loss(next_render_novel_mask, result_right_image)
+                    data['right_next'] =self.pts2render_mask(data['right_next'], bg_color=self.bg_color)
+                    next_render_mask_novel_right = data['right_next']['novel_view']['mask_pred'].permute(0, 2, 3, 1)
+                    loss_dyna_mask_next_right = l2_loss(next_render_mask_novel_right, next_gt_mask)
+                    loss_dyna_mask_next = loss_dyna_mask_next * ( 1 - self.cfg.lambda_mask_right ) + loss_dyna_mask_next_right * self.cfg.lambda_mask_right  # 右臂权重小一点
+                    loss_dyna_mask = loss_dyna_mask_novel  + loss_dyna_mask_next
                     # loss_dyna_leader = 0
 
                     # # 也可以说是双手结果

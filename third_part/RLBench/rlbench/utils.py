@@ -260,14 +260,14 @@ def get_stored_demos(amount: int, image_paths: bool, dataset_root: str,
                     # if image.shape == (128, 128, 3):
                         # image = image.transpose(2, 0, 1) 
                     obs[i].perception_data[f"{camera_name}_mask"] = image # （256,256,3）
-                    print(image)
+                    # print(image)
                     #  所以不能写在obs_util里面
                     if i>0:
                         obs[i-1].perception_data[f"{camera_name}_next_mask"] = image # 但是i应该只有一个吧？
                     if i==num_steps-1:
                         obs[i].perception_data[f"{camera_name}_next_mask"] = image
                     # print("obs",obs[i].perception_data[f"{camera_name}_mask"])
-                    print(f"{camera_name}_mask = {image.shape}")
+                    # print(f"{camera_name}_mask = {image.shape}")
 
             # -----------------Nerf- Mani-----------------
             if obs_config.nerf_multi_view:

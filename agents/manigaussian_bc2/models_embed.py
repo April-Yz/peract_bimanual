@@ -136,22 +136,30 @@ class GeneralizableGSEmbedNet(nn.Module):
                 cprint(f"[GeneralizableGSEmbedNet] Using semantic feature: {self.use_semantic_feature}", "red")
                 # if self.leader:
                 next_d_in = self.d_out + self.d_in      # 26( +3 mask ) + 39 = 65 + 3 = 68   
-                # cprint(f"65 next_d_in = self.d_out + self.d_in: {next_d_in}", "green") 
                 next_d_in = next_d_in + 8 if self.use_action else next_d_in  # 73 +3(mask) = 76 action: 8 dim # new theta_right=8(还是16呢)
-                # cprint(f"73 next_d_in = next_d_in + 8 if self.use_action else next_d_in {next_d_in}", "green")
                 next_d_in = next_d_in if self.use_semantic_feature else next_d_in - 3   # 73-3 -> 70 +3(mask) = 73
                 next_d_in = next_d_in if self.field_type =='LF' else next_d_in - 3      # mask
                 # cprint(f"70 next_d_in = next_d_in if self.use_semantic_feature else next_d_in - 3 {next_d_in}", "green")
                 # with torch.no_grad():
-                self.gs_deformation_field_leader = ResnetFC(
+                # self.gs_deformation_field_leader = ResnetFC(
+                #         d_in=next_d_in, # all things despite volumetric representation (26 + 39 + 8 -3 = 70) 尽管有体积表示
+                #         d_latent=self.d_latent,
+                #         d_lang=self.d_lang,
+                #         d_out=3 + 4,    # xyz, rot
+                #         d_hidden=cfg.next_mlp.d_hidden, 
+                #         n_blocks=cfg.next_mlp.n_blocks, 
+                #        combine_layer=cfg.next_mlp.combine_layer,
+                #         beta=cfg.next_mlp.beta, use_spade=cfg.next_mlp.use_spade,
+                #     )
+                self.gs_deformation_field_leader_smaller = ResnetFC(
                         d_in=next_d_in, # all things despite volumetric representation (26 + 39 + 8 -3 = 70) 尽管有体积表示
                         d_latent=self.d_latent,
                         d_lang=self.d_lang,
                         d_out=3 + 4,    # xyz, rot
-                        d_hidden=cfg.next_mlp.d_hidden, 
-                        n_blocks=cfg.next_mlp.n_blocks, 
-                       combine_layer=cfg.next_mlp.combine_layer,
-                        beta=cfg.next_mlp.beta, use_spade=cfg.next_mlp.use_spade,
+                        d_hidden=cfg.next_mlp_small.d_hidden, 
+                        n_blocks=cfg.next_mlp_small.n_blocks, 
+                       combine_layer=cfg.next_mlp_small.combine_layer,
+                        beta=cfg.next_mlp_small.beta, use_spade=cfg.next_mlp_small.use_spade,
                     )
                 # else:
                 # follower
@@ -358,60 +366,62 @@ class GeneralizableGSEmbedNet(nn.Module):
         if self.use_dynamic_field: #and data['step'] >= self.warm_up:
 
             # 不用语义特征
-            if not self.use_semantic_feature and self.field_type !='LF':
-                # dyna_input: (d_latent, d_in)
-                dyna_input = torch.cat((
-                    point_latent,   # [N, 128]
-                    data['xyz_maps'].detach().reshape(N, 3), 
-                    features_dc_maps.detach().reshape(N, 3),
-                    features_rest_maps.detach().reshape(N, 9),
-                    data['rot_maps'].detach().reshape(N, 4),
-                    data['scale_maps'].detach().reshape(N, 3),
-                    data['opacity_maps'].detach().reshape(N, 1),
-                    # d_in:
-                    z_feature,
-                ), dim=-1) # no batch dim
-            elif self.use_semantic_feature and self.field_type !='LF':
-                # 用语义特征
-                dyna_input = torch.cat((
-                    point_latent,   # [N, 128]
-                    data['xyz_maps'].detach().reshape(N, 3), 
-                    features_dc_maps.detach().reshape(N, 3),
-                    features_rest_maps.detach().reshape(N, 9),
-                    data['rot_maps'].detach().reshape(N, 4),
-                    data['scale_maps'].detach().reshape(N, 3),
-                    data['opacity_maps'].detach().reshape(N, 1),
-                    data['feature_maps'].detach().reshape(N, 3), # （加入语义特征后）多了特征图
-                    # d_in:
-                    z_feature,  
-                ), dim=-1) # no batch dim
-            elif not self.use_semantic_feature and self.field_type =='LF':
-                dyna_input = torch.cat((
-                    point_latent,   # [N, 128]
-                    data['xyz_maps'].detach().reshape(N, 3), 
-                    features_dc_maps.detach().reshape(N, 3),
-                    features_rest_maps.detach().reshape(N, 9),
-                    data['rot_maps'].detach().reshape(N, 4),
-                    data['scale_maps'].detach().reshape(N, 3),
-                    data['opacity_maps'].detach().reshape(N, 1),
-                    data['mask_maps'].detach().reshape(N, 3),
-                    # d_in:
-                    z_feature,  
-                ), dim=-1) # no batch dim    
-            elif self.use_semantic_feature and self.field_type =='LF':
-                dyna_input = torch.cat((
-                    point_latent,   # [N, 128]
-                    data['xyz_maps'].detach().reshape(N, 3), 
-                    features_dc_maps.detach().reshape(N, 3),
-                    features_rest_maps.detach().reshape(N, 9),
-                    data['rot_maps'].detach().reshape(N, 4),
-                    data['scale_maps'].detach().reshape(N, 3),
-                    data['opacity_maps'].detach().reshape(N, 1),
-                    data['mask_maps'].detach().reshape(N, 3),
-                    data['feature_maps'].detach().reshape(N, 3), # （加入语义特征后）多了特征图
-                    # d_in:
-                    z_feature,  
-                ), dim=-1) # no batch dim                
+            if self.field_type !='LF':
+                if not self.use_semantic_feature :
+                    # dyna_input: (d_latent, d_in)
+                    dyna_input = torch.cat((
+                        point_latent,   # [N, 128]
+                        data['xyz_maps'].detach().reshape(N, 3), 
+                        features_dc_maps.detach().reshape(N, 3),
+                        features_rest_maps.detach().reshape(N, 9),
+                        data['rot_maps'].detach().reshape(N, 4),
+                        data['scale_maps'].detach().reshape(N, 3),
+                        data['opacity_maps'].detach().reshape(N, 1),
+                        # d_in:
+                        z_feature,
+                    ), dim=-1) # no batch dim
+                else:
+                    # 用语义特征
+                    dyna_input = torch.cat((
+                        point_latent,   # [N, 128]
+                        data['xyz_maps'].detach().reshape(N, 3), 
+                        features_dc_maps.detach().reshape(N, 3),
+                        features_rest_maps.detach().reshape(N, 9),
+                        data['rot_maps'].detach().reshape(N, 4),
+                        data['scale_maps'].detach().reshape(N, 3),
+                        data['opacity_maps'].detach().reshape(N, 1),
+                        data['feature_maps'].detach().reshape(N, 3), # （加入语义特征后）多了特征图
+                        # d_in:
+                        z_feature,  
+                    ), dim=-1) # no batch dim
+            elif self.field_type =='LF':
+                if not self.use_semantic_feature :
+                    dyna_input = torch.cat((
+                        point_latent,   # [N, 128]
+                        data['xyz_maps'].detach().reshape(N, 3), 
+                        features_dc_maps.detach().reshape(N, 3),
+                        features_rest_maps.detach().reshape(N, 9),
+                        data['rot_maps'].detach().reshape(N, 4),
+                        data['scale_maps'].detach().reshape(N, 3),
+                        data['opacity_maps'].detach().reshape(N, 1),
+                        data['mask_maps'].detach().reshape(N, 3),
+                        # d_in:
+                        z_feature,  
+                    ), dim=-1) # no batch dim    
+                else:
+                    dyna_input = torch.cat((
+                        point_latent,   # [N, 128]
+                        data['xyz_maps'].detach().reshape(N, 3), 
+                        features_dc_maps.detach().reshape(N, 3),
+                        features_rest_maps.detach().reshape(N, 9),
+                        data['rot_maps'].detach().reshape(N, 4),
+                        data['scale_maps'].detach().reshape(N, 3),
+                        data['opacity_maps'].detach().reshape(N, 1),
+                        data['mask_maps'].detach().reshape(N, 3),
+                        data['feature_maps'].detach().reshape(N, 3), # （加入语义特征后）多了特征图
+                        # d_in:
+                        z_feature,  
+                    ), dim=-1) # no batch dim                
             else:
                 print("error in models_embed.py")
 
@@ -445,7 +455,7 @@ class GeneralizableGSEmbedNet(nn.Module):
                     # cprint(f"dyna_input.shape: {dyna_input.shape}", "red") # [65536, 206]
 
                     # with torch.no_grad():
-                    next_split_network_outputs_leader, _ = self.gs_deformation_field_leader(
+                    next_split_network_outputs_leader, _ = self.gs_deformation_field_leader_smaller(
                          dyna_input,
                         combine_inner_dims=(self.num_views_per_obj, N),
                         combine_index=combine_index,

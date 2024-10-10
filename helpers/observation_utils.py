@@ -208,8 +208,8 @@ def extract_obs_bimanual(
         obs_dict = {
             k: v if v.ndim == 3 else np.expand_dims(v, -1) for k, v in obs.perception_data.items()
         }
-    for k in obs_dict.keys():
-        print("obs_dict = ",k) # 好像在这里
+    # for k in obs_dict.keys():
+        # print("obs_dict = ",k) # 
     # for k in obs_dict["perception_data"].keys():
         # print("perception_key = ",k)
     # 双臂新增的 只看bimanual就行（单纯这个if）
@@ -293,7 +293,7 @@ def extract_obs_bimanual(
             obs_dict['nerf_next_multi_view_rgb'] = None
             obs_dict['nerf_next_multi_view_depth'] = None
             obs_dict['nerf_next_multi_view_camera'] = None
-        cameras = ["over_shoulder_left", "over_shoulder_right", "overhead", "wrist_right", "wrist_left", "front"] 
+        # cameras = ["over_shoulder_left", "over_shoulder_right", "overhead", "wrist_right", "wrist_left", "front"] 
         # for camera_name in cameras:
         #     if next_obs.perception_data[f"{camera_name}_mask"] is not None:
         #         # for k in obs_dict["perception_data"].keys():
