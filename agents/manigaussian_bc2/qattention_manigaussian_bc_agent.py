@@ -401,12 +401,7 @@ class QFunction(nn.Module):
         split_pred, \
         voxel_grid_feature, \
         lang_embedd = self._qnet(voxel_grid,
-        # q_trans, \
-        # q_rot_and_grip,\
-        # q_ignore_collisions,\
-        # voxel_grid_feature,\
-        # multi_scale_voxel_list,\
-        # lang_embedd = self._qnet(voxel_grid, 
+        # q_trans, q_rot_and_grip,q_ignore_collisions,voxel_grid_feature,multi_scale_voxel_list,ang_embedd = self._qnet(voxel_grid, 
                                         proprio,
                                         lang_goal_emb, 
                                         lang_token_embs,
@@ -440,7 +435,7 @@ class QFunction(nn.Module):
                 )
 
         # ----------------------------------------------------------------------    
-        return ret_dict.render_novel, ret_dict.next_render_novel, ret_dict.render_embed, ret_dict.gt_embed
+        return ret_dict.render_novel, ret_dict.next_render_novel, ret_dict.render_embed, ret_dict.gt_embed, ret_dict.render_mask_novel, ret_dict.next_render_mask_novel, ret_dict.next_render_mask_novel_right
 
 
 class QAttentionPerActBCAgent(Agent):
@@ -1290,6 +1285,8 @@ class QAttentionPerActBCAgent(Agent):
             loss_rgb_item = rendering_loss_dict['loss_rgb']
             loss_embed_item = rendering_loss_dict['loss_embed']
             loss_dyna_item = rendering_loss_dict['loss_dyna']
+            loss_LF_item = rendering_loss_dict['loss_LF']
+            loss_dyna_mask_item = rendering_loss_dict['loss_dyna_mask']          
             loss_reg_item = rendering_loss_dict['loss_reg']
             psnr = rendering_loss_dict['psnr']
 
@@ -1297,6 +1294,8 @@ class QAttentionPerActBCAgent(Agent):
             lambda_rgb = self.cfg.neural_renderer.lambda_rgb * lambda_nerf  # 0.01
             lambda_dyna = (self.cfg.neural_renderer.lambda_dyna if step >= self.cfg.neural_renderer.next_mlp.warm_up else 0.) * lambda_nerf  # 0.01
             lambda_reg = (self.cfg.neural_renderer.lambda_reg if step >= self.cfg.neural_renderer.next_mlp.warm_up else 0.) * lambda_nerf  # 0.01
+            lambda_LF = ((1 - self.cfg.neural_renderer.lambda_mask)  if step >= self.cfg.neural_renderer.next_mlp.warm_up else 0.)
+            lambda_dyna_mask = (self.cfg.neural_renderer.lambda_mask if step >= self.cfg.neural_renderer.next_mlp.warm_up else 0.) * lambda_nerf  # 0.01
 
             # 输出操作
             if step % 10 == 0 and rank == 0:
@@ -1310,6 +1309,8 @@ class QAttentionPerActBCAgent(Agent):
                     L_rgb: {loss_rgb_item:.3f} x {lambda_rgb:.3f} | \
                     L_embed: {loss_embed_item:.3f} x {lambda_embed:.4f} | \
                     L_dyna: {loss_dyna_item:.3f} x {lambda_dyna:.4f} | \
+                    L_LF: {loss_LF_item:.3f} x {lambda_LF:.4f} | \
+                    L_dyna_mask: {loss_dyna_mask_item:.3f} x {lambda_dyna_mask:.4f} | \
                     L_reg: {loss_reg_item:.3f} x {lambda_reg:.4f} | \
                     psnr: {psnr:.3f}', 'green')
                 if self.cfg.use_wandb:
@@ -1364,7 +1365,8 @@ class QAttentionPerActBCAgent(Agent):
         if to_render:
             # print("to_render start")
             # print("\033[0;33;40maction_gt\033[0m",action_gt)
-            rgb_render, next_rgb_render, embed_render, gt_embed_render = self._q.render(
+            rgb_render, next_rgb_render, embed_render, gt_embed_render, \
+                render_mask_novel, next_render_mask_novel, next_render_mask_novel_right, = self._q.render(
                 rgb_pcd=obs,
                 proprio=proprio,
                 pcd=pcd,
@@ -1398,7 +1400,12 @@ class QAttentionPerActBCAgent(Agent):
                 next_rgb_gt = nerf_next_target_rgb[0]
                 next_rgb_render = next_rgb_render[0]
                 psnr_dyna = PSNR_torch(next_rgb_render, next_rgb_gt)
-            
+            # print("next_render_mask_novel is not None", next_render_mask_novel is not None)
+            if next_render_mask_novel is not None:
+                next_render_mask_novel = next_render_mask_novel[0] * 127
+            if render_mask_novel is not None:
+                render_mask_novel = render_mask_novel[0] * 127
+
             # 创建目录 'recon' 用于保存可视化结果。 
             os.makedirs('recon', exist_ok=True)
             import matplotlib.pyplot as plt
@@ -1408,7 +1415,7 @@ class QAttentionPerActBCAgent(Agent):
             # 绘制源图像（rgb_src）、目标图像（rgb_gt）、渲染图像（rgb_render）、
             # 特征嵌入（embed_render 和 gt_embed_render）
             # 以及下一步骤的图像（next_rgb_gt 和 next_rgb_render）。
-            fig, axs = plt.subplots(1, 7, figsize=(15, 3))   # 使用 matplotlib 创建一个包含7个子图的图形
+            fig, axs = plt.subplots(1, 9, figsize=(15, 3))   # 使用 matplotlib 创建一个包含1行7->8列子图的图形
             # src
             axs[0].imshow(rgb_src.cpu().numpy())    # 在子图 axs[0] 上显示名为 rgb_src 的图像数
             axs[0].title.set_text('src')            # 设置子图 axs[0] 的标题为 'src'，这可能代表“源图像”（source image）
@@ -1423,12 +1430,13 @@ class QAttentionPerActBCAgent(Agent):
             embed_render = visualize_feature_map_by_normalization(embed_render.permute(0,3,1,2))    # range from -1 to 1
             axs[3].imshow(embed_render)
             axs[3].title.set_text('embed seg')
-            # gt embed
+            # gt embed 出问题了直接注释
             if gt_embed_render is not None:
                 # gt_embed_render = visualize_feature_map_by_clustering(gt_embed_render, num_cluster=4)
                 gt_embed_render = visualize_feature_map_by_normalization(gt_embed_render)    # range from -1 to 1
                 axs[4].imshow(gt_embed_render)
                 axs[4].title.set_text('gt embed seg')
+                
             if next_rgb_render is not None:
                 # gt next rgb frame
                 axs[6].imshow(next_rgb_gt.cpu().numpy())
@@ -1436,6 +1444,13 @@ class QAttentionPerActBCAgent(Agent):
                 # Ours
                 axs[5].imshow(next_rgb_render.cpu().numpy())
                 axs[5].title.set_text('next psnr={:.2f}'.format(psnr_dyna))
+            if next_render_mask_novel is not None:
+                axs[7].imshow(next_render_mask_novel.cpu().numpy())
+                axs[7].title.set_text('next_mask')
+            if render_mask_novel is not None:
+                axs[8].imshow(render_mask_novel.cpu().numpy())
+                axs[8].title.set_text('mask now')
+
             # remove axis
             for ax in axs:
                 ax.axis('off')

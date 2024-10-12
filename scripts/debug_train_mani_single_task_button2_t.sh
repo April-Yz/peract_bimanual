@@ -48,6 +48,7 @@ render_freq=20 #2000
 replay_path="/data1/zjyang/program/peract_bimanual/replay/debug"
 lambda_nerf=0.01 # 0.01
 mask_gt_rgb=True
+warm_up=0
 
 tmux select-pane -t 0 
 # peract rlbench
@@ -78,7 +79,8 @@ CUDA_VISIBLE_DEVICES=${train_gpu}  QT_AUTO_SCREEN_SCALE_FACTOR=0 TORCH_DISTRIBUT
         method.neural_renderer.foundation_model_name=null \
         method.neural_renderer.use_dynamic_field=True \
         method.neural_renderer.field_type=${field_type} \
-        method.neural_renderer.dataset.mask_gt_rgb=${mask_gt_rgb} 
+        method.neural_renderer.dataset.mask_gt_rgb=${mask_gt_rgb} \
+        method.neural_renderer.next_mlp.warm_up=${warm_up} 
 
 "
 # remove 0.ckpt
