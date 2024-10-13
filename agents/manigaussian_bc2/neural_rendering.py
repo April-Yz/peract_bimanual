@@ -113,6 +113,16 @@ class NeuralRenderer(nn.Module):
         else:
             cprint(f"loss_embed_fn {self.loss_embed_fn} is not implemented", "yellow")
         return loss_embed
+    
+    def _mask_loss_fn(self, render_mask, gt_mask):
+        """
+        render_embed: [bs, h, w, 3]
+        gt_embed: [bs, h, w, 3]
+        """
+        MIN_DENOMINATOR = 1e-12
+        gt_mask = (gt_mask - gt_mask.min()) / (gt_mask.max() - gt_mask.min() + MIN_DENOMINATOR)
+        loss_mask = l2_loss(render_mask, gt_mask)
+        return loss_mask
 
     def _save_gradient(self, name):
         """
@@ -495,7 +505,7 @@ class NeuralRenderer(nn.Module):
                     # 1 当前场景的mask 训练  loss_dyna_mask_novel
                     data =self.pts2render_mask(data, bg_color=self.bg_color)
                     render_mask_novel = data['novel_view']['mask_pred'].permute(0, 2, 3, 1) # [1,3，128, 128] -> [1,128, 128, 3]                           
-                    loss_dyna_mask_novel = l2_loss(render_mask_novel, gt_mask) # mask现阶段的
+                    loss_dyna_mask_novel = self._mask_loss_fn(render_mask_novel, gt_mask) # mask现阶段的
 
                     # 2 GRB total(Follower)  先对left预测（最后的结果） loss_dyna_follower  左臂 RGB Loss   
                     # 也可以说是双手结果
@@ -511,7 +521,7 @@ class NeuralRenderer(nn.Module):
                     # render_mask_novel_next = data['right_next']['novel_view']['mask_pred'].permute(0, 2, 3, 1)
                     data['left_next'] =self.pts2render_mask(data['left_next'], bg_color=self.bg_color)
                     next_render_mask_novel = data['left_next']['novel_view']['mask_pred'].permute(0, 2, 3, 1) # [1,3，128, 128] -> [1,128, 128, 3]
-                    next_loss_dyna_mask_left = l2_loss(next_render_mask_novel, next_gt_mask) # mask去左臂的mask
+                    next_loss_dyna_mask_left = self._mask_loss_fn(next_render_mask_novel, next_gt_mask) # mask去左臂的mask
                     # loss_dyna_mask = loss_dyna_mask_novel  + next_loss_dyna_mask_left
 
                     # exclude_right_mask = (render_mask_novel_next < right_min) | (render_mask_novel_next > right_max)
@@ -572,11 +582,13 @@ class NeuralRenderer(nn.Module):
                         # else:
                         #     next_render_novel_mask = next_gt_rgb * (~exclude_right_mask_expanded)
                         loss_dyna_leader = l2_loss(next_render_novel_mask, result_right_image)
+                        # print('loss_dyna_leader = ', loss_dyna_leader)
                     
                     # 5 Mask loss_dyna_mask_next_right 右臂mask训练（和now一样 无用）
                     data['right_next'] =self.pts2render_mask(data['right_next'], bg_color=self.bg_color)
                     next_render_mask_novel_right = data['right_next']['novel_view']['mask_pred'].permute(0, 2, 3, 1)
-                    next_loss_dyna_mask_right = l2_loss(next_render_mask_novel_right, next_gt_mask)
+                    next_loss_dyna_mask_right = self._mask_loss_fn(next_render_mask_novel_right, next_gt_mask)
+                    # next_loss_dyna_mask_right = l2_loss(next_render_mask_novel_right, next_gt_mask)
 
                     # pre mask = right +left    
                     next_loss_dyna_mask = next_loss_dyna_mask_left * ( 1 - self.cfg.lambda_mask_right ) + next_loss_dyna_mask_right * self.cfg.lambda_mask_right  # 右臂权重小一点
@@ -585,8 +597,10 @@ class NeuralRenderer(nn.Module):
                     loss_dyna_mask = loss_dyna_mask_novel *0.5  + next_loss_dyna_mask * 0.5
 
                     # RGB pre = leader( right ) + follower
-                    loss_LF = loss_dyna_leader * self.cfg.lambda_dyna_leader + loss_dyna_follower * (1-self.cfg.lambda_dyna_leader) 
-                    loss_dyna = loss_LF * (1 - self.cfg.lambda_mask) + loss_dyna_mask * self.cfg.lambda_mask 
+                    loss_LF = loss_dyna_leader * self.cfg.lambda_dyna_leader + loss_dyna_follower * (1-self.cfg.lambda_dyna_leader)
+                    # print('loss_LF = ', loss_LF, loss_dyna_leader, loss_dyna_follower)
+                    loss_dyna = loss_LF * (1-self.cfg.lambda_mask) + loss_dyna_mask * self.cfg.lambda_mask 
+                    # print('loss_dyna = ', loss_dyna,loss_LF,loss_dyna_mask)
                     # 预热步数（3000步以后算上了）
                     lambda_dyna = self.cfg.lambda_dyna if step >= self.cfg.next_mlp.warm_up else 0.                    
                     

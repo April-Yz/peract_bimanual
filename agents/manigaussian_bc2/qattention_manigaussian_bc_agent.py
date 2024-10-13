@@ -1320,6 +1320,8 @@ class QAttentionPerActBCAgent(Agent):
                         'train/rgb_loss':loss_rgb_item,
                         'train/embed_loss':loss_embed_item,
                         'train/dyna_loss':loss_dyna_item,
+                        'train/LF_loss':loss_LF_item,
+                        'train/dyna_mask_loss':loss_dyna_mask_item,
                         }, step=step)
             
         else:   # no neural renderer
