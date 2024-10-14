@@ -576,9 +576,9 @@ class NeuralRenderer(nn.Module):
                     if ('xyz_maps' in data['right_next']):
                         # with torch.no_grad():  原来为了有的Loss没计算报无回传错误而写的
                         data['right_next'] = self.pts2render(data['right_next'], bg_color=self.bg_color)
-                        next_render_novel = data['right_next']['novel_view']['img_pred'].permute(0, 2, 3, 1) # [1,128, 128, 3]
+                        next_render_novel_right = data['right_next']['novel_view']['img_pred'].permute(0, 2, 3, 1) # [1,128, 128, 3]
                         # if self.cfg.mask_type=='exclude':   # 将预测图片根据mask裁剪
-                        next_render_novel_mask = next_gt_rgb * exclude_left_mask 
+                        next_render_novel_mask = next_render_novel_right * exclude_left_mask  # 原来用错了...  next_gt_rgb -> next_render_novel_right
                         # else:
                         #     next_render_novel_mask = next_gt_rgb * (~exclude_right_mask_expanded)
                         loss_dyna_leader = l2_loss(next_render_novel_mask, result_right_image)
@@ -669,7 +669,7 @@ class NeuralRenderer(nn.Module):
                         if ('xyz_maps' in data['right_next']):
                             # with torch.no_grad():  原来为了有的Loss没计算报无回传错误而写的
                             data['right_next'] = self.pts2render(data['right_next'], bg_color=self.bg_color)
-                            next_render_novel = data['right_next']['novel_view']['img_pred'].permute(0, 2, 3, 1) # [1,128, 128, 3]
+                            next_render_novel_right = data['right_next']['novel_view']['img_pred'].permute(0, 2, 3, 1) # [1,128, 128, 3]
                         # 5 Mask loss_dyna_mask_next_right 右臂mask训练（和now一样 无用）
                         data['right_next'] =self.pts2render_mask(data['right_next'], bg_color=self.bg_color)
                         next_render_mask_novel_right = data['right_next']['novel_view']['mask_pred'].permute(0, 2, 3, 1)
