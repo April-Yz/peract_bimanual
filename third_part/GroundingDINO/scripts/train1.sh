@@ -22,8 +22,8 @@ output_dir="/data1/zjyang/program/peract_bimanual/scripts/test_demo/${output_nam
 
  CUDA_VISIBLE_DEVICES=${eval_gpu} python grounded_sam_demo.py \
   --config groundingdino/config/GroundingDINO_SwinT_OGC.py \
-  --grounded_checkpoint weights/groundingdino_swint_ogc.pth \
-  --sam_checkpoint weights/sam_vit_h_4b8939.pth \
+  --grounded_checkpoint /data1/zjyang/program/peract_bimanual/third_part/GroundingDINO/weights/groundingdino_swint_ogc.pth \
+  --sam_checkpoint /data1/zjyang/program/peract_bimanual/third_part/GroundingDINO/weights/sam_vit_h_4b8939.pth \
   --input_image ${mask_path} \
   --output_dir "/data1/zjyang/program/peract_bimanual/scripts/test_demo/1" \
   --box_threshold 0.3 \

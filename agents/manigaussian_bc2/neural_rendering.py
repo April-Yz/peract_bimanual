@@ -260,10 +260,16 @@ class NeuralRenderer(nn.Module):
                     'novel_view': {},
                 }
                 if data['right_next']['intr'] is not None:
+                    # 为了生成左臂的mask
                     data_novel = self.get_novel_calib(data['right_next'])
                     data['right_next']['novel_view'].update(data_novel)
                     data['right_next']['mask_view'] = {}
-                    data['right_next']['mask_view'].update(data_novel) # 更新数据
+                    # test 为了mask训练
+                    data['right_next']['mask_view']['intr'] = gt_mask_camera_intrinsic 
+                    data['right_next']['mask_view']['extr'] = gt_mask_camera_extrinsic   
+                    if data['right_next']['mask_view']['intr'] is not None:
+                        data_novel_test = self.get_novel_calib(data['right_next']['mask_view'])
+                        data['right_next']['mask_view'].update(data_novel_test) # 更新数据
 
                 data['left_next'] = {
                     'extr': next_tgt_pose,
@@ -278,7 +284,12 @@ class NeuralRenderer(nn.Module):
                     # data['mask_view']['extr'] = gt_mask_camera_extrinsic         
                     # if data['mask_view']['intr'] is not None:
                     #     data_novel = self.get_novel_calib(data)
-                    data['left_next']['mask_view'].update(data_novel) # 更新数据
+                    # data['left_next']['mask_view'].update(data_novel) # 更新数据
+                    data['left_next']['mask_view']['intr'] = gt_mask_camera_intrinsic 
+                    data['left_next']['mask_view']['extr'] = gt_mask_camera_extrinsic   
+                    if data['left_next']['mask_view']['intr'] is not None:
+                        data_novel_test = self.get_novel_calib(data['left_next']['mask_view'])
+                        data['left_next']['mask_view'].update(data_novel_test) # 更新数据
             # ------------------------------------------------------------------------------
 
         return data
@@ -358,6 +369,8 @@ class NeuralRenderer(nn.Module):
         render_mask_novel = None
         next_render_mask_novel_right = None
         next_render_mask_novel = None
+        next_render_novel_right = None
+        next_left_mask_gen = None
 
         # create gt feature from foundation models 从基础模型创建 gt特征
         # 用于暂时禁用PyTorch中的梯度计算
@@ -470,11 +483,13 @@ class NeuralRenderer(nn.Module):
                     # gt_mask_label = np.zeros_like(gt_mask_cpu, dtype=np.uint8)
 
                     # Tensor写法（mask标签归类 0：bg 1:ritght 2:left）
-                    gt_mask_label = torch.zeros_like(gt_mask, dtype=torch.uint8)
+                    # gt_mask_label = torch.zeros_like(gt_mask, dtype=torch.uint8)
+                    gt_mask_label = torch.zeros_like(gt_mask, dtype=torch.long)
                     gt_mask_label[(gt_mask > right_min-1) & (gt_mask < right_max+1)] = 1
                     gt_mask_label[(gt_mask > left_min-1) & (gt_mask < left_max+1)] = 2
 
-                    next_gt_mask_label = torch.zeros_like(next_gt_mask, dtype=torch.uint8)
+                    # next_gt_mask_label = torch.zeros_like(next_gt_mask, dtype=torch.uint8)
+                    next_gt_mask_label = torch.zeros_like(next_gt_mask, dtype=torch.long)
                     next_gt_mask_label[(next_gt_mask > right_min-1) & (next_gt_mask < right_max+1)] = 1
                     next_gt_mask_label[(next_gt_mask > left_min-1) & (next_gt_mask < left_max+1)] = 2
 
@@ -521,12 +536,15 @@ class NeuralRenderer(nn.Module):
                     # render_mask_novel_next = data['right_next']['novel_view']['mask_pred'].permute(0, 2, 3, 1)
                     data['left_next'] =self.pts2render_mask(data['left_next'], bg_color=self.bg_color)
                     next_render_mask_novel = data['left_next']['novel_view']['mask_pred'].permute(0, 2, 3, 1) # [1,3，128, 128] -> [1,128, 128, 3]
-                    next_loss_dyna_mask_left = self._mask_loss_fn(next_render_mask_novel, next_gt_mask) # mask去左臂的mask
+                    next_loss_dyna_mask_left = self._mask_loss_fn(next_render_mask_novel, next_gt_mask_label) # mask去左臂的mask
                     # loss_dyna_mask = loss_dyna_mask_novel  + next_loss_dyna_mask_left
 
+                    # gen mask and exclude
+                    data['left_next'] =self.pts2render_mask_gen(data['left_next'], bg_color=self.bg_color)
+                    next_left_mask_gen = data['left_next']['novel_view']['mask_gen'].permute(0, 2, 3, 1)                        
                     # exclude_right_mask = (render_mask_novel_next < right_min) | (render_mask_novel_next > right_max)
                     # exclude_left_mask = (next_render_mask_novel < left_min) | (next_render_mask_novel > left_max) # 排除左臂标签 [1,128, 128, 3] [True,False]
-                    exclude_left_mask = (next_render_mask_novel != 2) 
+                    exclude_left_mask = (next_left_mask_gen > 2.5) | (next_left_mask_gen < 1.5)
                     # background_color = torch.tensor(self.bg_color, dtype=torch.float32)  # 背景
                     result_right_image = next_gt_rgb * exclude_left_mask    # [1, 128, 128, 3] # + background_color * (~exclude_right_mask_expanded)
 
@@ -594,7 +612,7 @@ class NeuralRenderer(nn.Module):
                     next_loss_dyna_mask = next_loss_dyna_mask_left * ( 1 - self.cfg.lambda_mask_right ) + next_loss_dyna_mask_right * self.cfg.lambda_mask_right  # 右臂权重小一点
                     
                     # MASK = now +pre
-                    loss_dyna_mask = loss_dyna_mask_novel *0.5  + next_loss_dyna_mask * 0.5
+                    loss_dyna_mask = loss_dyna_mask_novel * (1 - self.cfg.lambda_next_loss_mask)  + next_loss_dyna_mask * self.cfg.lambda_next_loss_mask
 
                     # RGB pre = leader( right ) + follower
                     loss_LF = loss_dyna_leader * self.cfg.lambda_dyna_leader + loss_dyna_follower * (1-self.cfg.lambda_dyna_leader)
@@ -664,6 +682,9 @@ class NeuralRenderer(nn.Module):
                             next_render_novel = data['left_next']['novel_view']['img_pred'].permute(0, 2, 3, 1) # [1,3，128, 128] -> [1,128, 128, 3]
                         data['left_next'] =self.pts2render_mask(data['left_next'], bg_color=self.bg_color)
                         next_render_mask_novel = data['left_next']['novel_view']['mask_pred'].permute(0, 2, 3, 1) # [1,3，128, 128] -> [1,128, 128, 3]
+                        # gen
+                        data['left_next'] =self.pts2render_mask_gen(data['left_next'], bg_color=self.bg_color)
+                        next_left_mask_gen = data['left_next']['novel_view']['mask_gen'].permute(0, 2, 3, 1)    
 
                         #  4 RGB loss_dyna_leader leader  利用前面得到的mask删去左臂
                         if ('xyz_maps' in data['right_next']):
@@ -690,8 +711,12 @@ class NeuralRenderer(nn.Module):
         # dotmap 允许使用点（.）符号来访问字典中的键
         ret_dict = DotMap(render_novel=render_novel, next_render_novel=next_render_novel,
                           render_embed=render_embed, gt_embed=gt_embed, 
-                          render_mask_novel = render_mask_novel,
-                        next_render_mask_novel_right = next_render_mask_novel_right, next_render_mask_novel = next_render_mask_novel,)
+                          render_mask_novel = render_mask_novel, # 整体mask
+                        next_render_mask_novel_right = next_render_mask_novel_right,  # 无用 右臂mask 
+                        next_render_mask_novel = next_render_mask_novel,              # 左臂mask              
+                        next_render_novel_right = next_render_novel_right,            # 右臂next rgb
+                        next_left_mask_gen = next_left_mask_gen                       # 生成的左臂当时视角的mask
+                        )             
         # print("render_mask_novel = ",render_mask_novel.shape, render_mask_novel)
 
         return loss_dict, ret_dict
@@ -747,4 +772,32 @@ class NeuralRenderer(nn.Module):
         # data['novel_view']['img_pred']: 这是在 data 字典中的 'novel_view' 键下创建或更新一个子键 'img_pred'。这个子键被赋值为 render_return_dict['render'] 张量增加一个新维度后的结果。
         data['novel_view']['mask_pred'] = render_return_dict['mask'].unsqueeze(0)
         data['novel_view']['embed_pred'] = render_return_dict['render_embed'].unsqueeze(0)
+        return data
+    
+    def pts2render_mask_gen(self, data: dict, bg_color=[0,0,0]):
+        '''use render function in GSZ 在GSZ 中使用渲染功能(应该就是使用先前采集的数据重建场景)'''
+        bs = data['intr'].shape[0]
+        assert bs == 1, "batch size should be 1"
+        # 公式2中 时刻i 的状态（θ 多了f 高级语义特征）
+        i = 0
+        xyz_i = data['xyz_maps'][i, :, :]
+        feature_i = data['sh_maps'][i, :, :, :] # [16384, 4, 3]
+        rot_i = data['rot_maps'][i, :, :]
+        scale_i = data['scale_maps'][i, :, :]
+        opacity_i = data['opacity_maps'][i, :, :]
+        precomputed_mask_i = data['mask_maps'][i, :, :] # mask  [1, 65536, 3]
+        feature_language_i = data['feature_maps'][i, :, :]  # [B, N, 3]   [1, 65536, 3]  
+        
+
+        # 渲染返回字典  render应该是用来渲染的  from agents.manigaussian_bc2.gaussian_renderer import render
+        render_return_dict = render_mask(
+            data, i, xyz_i, rot_i, scale_i, opacity_i, 
+            bg_color=bg_color, pts_rgb=None, features_color=feature_i, features_language=feature_language_i,
+            precomputed_mask = precomputed_mask_i,
+            )
+
+        # .unsqueeze(0): 这是PyTorch张量的一个操作，用于在张量的第0个维度（即最前面）增加一个维度。如果原始张量是一维的，这个操作会将其变成二维的，其中新加的维度大小为1。
+        # data['novel_view']['img_pred']: 这是在 data 字典中的 'novel_view' 键下创建或更新一个子键 'img_pred'。这个子键被赋值为 render_return_dict['render'] 张量增加一个新维度后的结果。
+        data['novel_view']['mask_gen'] = render_return_dict['mask'].unsqueeze(0)
+        # data['novel_view']['embed_pred'] = render_return_dict['render_embed'].unsqueeze(0)
         return data

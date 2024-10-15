@@ -121,6 +121,7 @@ neural_renderer:
   lambda_mask_right: 0.1
   lambda_reg: 0.0 # not used
   mask_type: 'exclude' # 'include'
+  lambda_next_loss_mask: 0.6
 
   dataset:
     use_processed_data: True
@@ -185,8 +186,8 @@ neural_renderer:
     d_in: 3       # 输入层的维度，这里是3
     d_lang: 128   # 语言模型的维度，这里是128
     d_out: 3      # 输出层的维度，这里是3
-    n_blocks: 3   # 试着减少一点看看# MLP中的隐藏层块数量
-    d_hidden: 128 # 每个隐藏层块中的隐藏单元（神经元）数量
+    n_blocks: 4 #4   # 试着减少一点看看# MLP中的隐藏层块数量
+    d_hidden: 384 #256 # 每个隐藏层块中的隐藏单元（神经元）数量
     combine_layer: 3      # 指定在第3个隐藏层块进行某种形式的组合操作。
     combine_type: average # 指定组合操作的类型为平均值（average），可能是指合并不同层的输出。
     beta: 0.0             # 可能用于控制某些层激活函数的参数，
