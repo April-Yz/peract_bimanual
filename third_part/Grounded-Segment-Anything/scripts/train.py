@@ -12,8 +12,12 @@ mask_path = f"/data1/zjyang/program/peract_bimanual/data2/train_data/{task_name}
 output_name = f"{task_name}_{eposide_id}_{camera_id}_{rgb_id}.png"
 # output_dir = "/data1/zjyang/program/peract_bimanual/scripts/test_demo/${output_name}"
 output_dir = f"/data1/zjyang/program/peract_bimanual/scripts/test_demo/{output_name}"
-
-model = load_model("groundingdino/config/GroundingDINO_SwinT_OGC.py", "weights/groundingdino_swint_ogc.pth")
+model_root = '/data1/zjyang/program/peract_bimanual/third_part/Grounded-Segment-Anything/'
+# /data1/zjyang/program/test/Grounded-Segment-Anything/GroundingDINO/groundingdino/config/GroundingDINO_SwinT_OGC.py
+# /data1/zjyang/program/peract_bimanual/third_part/GroundingDINO/weights/groundingdino_swint_ogc.pth
+model = load_model(os.path.join(model_root, "GroundingDINO/groundingdino/config/GroundingDINO_SwinT_OGC.py"), \
+                       os.path.join(model_root, "weights/groundingdino_swint_ogc.pth"))
+# model = load_model("groundingdino/config/GroundingDINO_SwinT_OGC.py", "weights/groundingdino_swint_ogc.pth")
 IMAGE_PATH = mask_path # "weights/dog-3.jpeg"
 TEXT_PROMPT = "object" # "chair . person . dog ."
 BOX_TRESHOLD = 0.35

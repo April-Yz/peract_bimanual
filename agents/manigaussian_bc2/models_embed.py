@@ -13,6 +13,7 @@ from termcolor import colored, cprint
 from agents.manigaussian_bc2.utils import PositionalEncoding, visualize_pcd
 from agents.manigaussian_bc2.resnetfc import ResnetFC
 
+
 from typing import List
 import numpy as np
 import visdom
@@ -283,7 +284,7 @@ class GeneralizableGSEmbedNet(nn.Module):
         NS = self.num_views_per_obj # 1
         # print("SB=",SB,", N=",N,", NS=",NS)
 
-        canon_xyz = self.world_to_canonical(data['xyz'])    # [1,N,3], min:-2.28, max:1.39
+        canon_xyz = self.world_to_canonical(data['xyz'])    # [1,N,3], （从数值变成比例）min:-2.28, max:1.39
         # print("first canon_xyz.shape=[1,65536,128]",canon_xyz.shape)     # real [1,65536,3]   [2,16384,3]
 
         # volumetric sampling 体积采样 

@@ -21,7 +21,7 @@ exp_name=${3:-"${method}_${addition_info}"}
 # tasks=[bimanual_pick_laptop,bimanual_straighten_rope,coordinated_lift_tray,coordinated_push_box,coordinated_put_bottle_in_fridge,dual_push_buttons,handover_item,bimanual_sweep_to_dustpan,coordinated_take_tray_out_of_oven,handover_item_easy]
 # 为了单个任务试试
 # tasks=[coordinated_take_tray_out_of_oven]   
-tasks=[handover_item_easy]
+# tasks=[handover_item_easy]
 # tasks=[bimanual_sweep_to_dustpan]
 # tasks=[coordinated_push_box]
 # tasks=[bimanual_pick_laptop] # 原来有一版本这个的
@@ -30,12 +30,13 @@ tasks=[handover_item_easy]
 # tasks=[dual_push_buttons]
 # tasks=[coordinated_lift_tray]
 # tasks=[bimanual_straighten_rope]
+tasks=[coordinated_put_bottle_in_fridge]
 starttime=`date +'%Y-%m-%d %H:%M:%S'`
 # printf 'exp_name = %s\n' "$exp_name"
 # printf '%s\n' "$starttime"
 # tasks=[bimanual_pick_laptop,bimanual_push_single_button,coordinated_lift_tray,coordinated_push_box,coordinated_put_bottle_in_fridge,handover_item_medium]
 
-eval_type=75000 # [50000,22000,24000,28000] #[20000,30000,40000,50000,60000,70000]  # [32000,37000,39000,43000,60000,70000,65000] #[5000,15000,25000,35000,51000,59000,61000,82000,89000] # [58000,62000,15000,25000,35000,52000,65000,75000,85000] # 90000    # "[20000,65000,49000,51000]" # 80000 #'last' # or 'best', 'missing', or 'last' or 'all'
+eval_type=35000 # [50000,22000,24000,28000] #[20000,30000,40000,50000,60000,70000]  # [32000,37000,39000,43000,60000,70000,65000] #[5000,15000,25000,35000,51000,59000,61000,82000,89000] # [58000,62000,15000,25000,35000,52000,65000,75000,85000] # 90000    # "[20000,65000,49000,51000]" # 80000 #'last' # or 'best', 'missing', or 'last' or 'all'
 camera=False
 eval_episodes=25 #25 #eval每个task的轮数
 # camera=False # 是否录制视频

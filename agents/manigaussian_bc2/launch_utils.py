@@ -98,15 +98,17 @@ def create_replay(batch_size: int, timesteps: int,
             ObservationElement("%s_rgb" % cname,(3,image_size[1],image_size[0],),np.float32,))
         observation_elements.append(
             ObservationElement('%s_depth' % cname, (1, image_size[1], image_size[0]), np.float32))
+        observation_elements.append(
+            ObservationElement('%s_next_depth' % cname, (1, image_size[1], image_size[0]), np.float32))
         # observation_elements.append(
         #     ObservationElement('%s_mask' % cname, (1, image_size[1], image_size[0]), np.float32)) # 3?1
         # observation_elements.append(
         #     ObservationElement('%s_next_mask' % cname, (1, image_size[1], image_size[0]), np.float32)) # 3?1 
         # 仅仅为了nerf所以尺寸和nerf一样
         observation_elements.append(
-            ObservationElement('%s_mask' % cname, (1, 128, 128), np.float32)) # 3?1
+            ObservationElement('%s_mask' % cname, (1, image_size[1], image_size[0]), np.float32)) # 3?1
         observation_elements.append(
-            ObservationElement('%s_next_mask' % cname, (1, 128, 128), np.float32)) # 3?1      
+            ObservationElement('%s_next_mask' % cname, (1, image_size[1], image_size[0]), np.float32)) # 3?1      
         observation_elements.append(
             ObservationElement("%s_point_cloud" % cname, (3, image_size[1], image_size[0]), np.float16)
         )  # see pyrep/objects/vision_sensor.py on how pointclouds are extracted from depth frames
@@ -159,7 +161,11 @@ def create_replay(batch_size: int, timesteps: int,
         ObservationElement('nerf_multi_view_depth', (num_view_for_nerf,), np.object_))
     observation_elements.append(
         ObservationElement('nerf_multi_view_camera', (num_view_for_nerf,), np.object_))
-    
+    # observation_elements.append(
+    #     ObservationElement('nerf_multi_view_camera_intrinsics', (num_view_for_nerf,), np.object_))
+    # observation_elements.append(
+    #     ObservationElement('nerf_multi_view_camera_extrinsics', (num_view_for_nerf,), np.object_))
+                
     # for next nerf
     observation_elements.append(
         ObservationElement('nerf_next_multi_view_rgb', (num_view_for_nerf,), np.object_))
@@ -167,6 +173,10 @@ def create_replay(batch_size: int, timesteps: int,
         ObservationElement('nerf_next_multi_view_depth', (num_view_for_nerf,), np.object_))
     observation_elements.append(
         ObservationElement('nerf_next_multi_view_camera', (num_view_for_nerf,), np.object_))
+    # observation_elements.append(
+    #     ObservationElement('nerf_next_multi_view_camera_intrinsics', (num_view_for_nerf,), np.object_))
+    # observation_elements.append(
+    #     ObservationElement('nerf_next_multi_view_camera_extrinsics', (num_view_for_nerf,), np.object_))
     #-------------------------------NERF----------------------------------------------
 
 

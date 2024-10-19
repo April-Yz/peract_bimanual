@@ -289,10 +289,12 @@ def extract_obs_bimanual(
             obs_dict['nerf_next_multi_view_rgb'] = next_obs.nerf_multi_view_rgb
             obs_dict['nerf_next_multi_view_depth'] = next_obs.nerf_multi_view_depth
             obs_dict['nerf_next_multi_view_camera'] = next_obs.nerf_multi_view_camera
+            # print("next_obs.nerf_multi_view_camera",next_obs.nerf_multi_view_camera)  # 说明有NERF参数
         else:
             obs_dict['nerf_next_multi_view_rgb'] = None
             obs_dict['nerf_next_multi_view_depth'] = None
             obs_dict['nerf_next_multi_view_camera'] = None
+            # print("next_obs.nerf_multi_view_camera",next_obs.nerf_multi_view_camera)
         # cameras = ["over_shoulder_left", "over_shoulder_right", "overhead", "wrist_right", "wrist_left", "front"] 
         # for camera_name in cameras:
         #     if next_obs.perception_data[f"{camera_name}_mask"] is not None:

@@ -7,13 +7,13 @@ rgb_id='0000'
 eposide_id='episode0'
 camera_id='overhead_rgb' # 'overhead_mask' #'over_shoulder_left_mask' #'front_mask'
 mask_path="/data1/zjyang/program/peract_bimanual/data2/train_data/${task_name}/all_variations/episodes/${eposide_id}/${camera_id}/rgb_${rgb_id}.png"
-output_name = "${task_name}_${eposide_id}_${camera_id}_${rgb_id}"
-output_dir = "/data1/zjyang/program/peract_bimanual/scripts/test_demo/${output_name}"
+output_name="${task_name}_${eposide_id}_${camera_id}_${rgb_id}"
+output_dir="/data1/zjyang/program/peract_bimanual/scripts/test_demo/${output_name}"
 
 
-CUDA_VISIBLE_DEVICES=${eval_gpu} python demo/inference_on_a_image.py \
--c groundingdino/config/GroundingDINO_SwinT_OGC.py \
--p weights/groundingdino_swint_ogc.pth \
+CUDA_VISIBLE_DEVICES=${eval_gpu} python /data1/zjyang/program/peract_bimanual/third_part/Grounded-Segment-Anything/GroundingDINO/demo/inference_on_a_image.py \
+-c /data1/zjyang/program/peract_bimanual/third_part/Grounded-Segment-Anything/GroundingDINO/groundingdino/config/GroundingDINO_SwinT_OGC.py \
+-p /data1/zjyang/program/peract_bimanual/third_part/Grounded-Segment-Anything/weights/groundingdino_swint_ogc.pth \
 -i ${mask_path} \
 -o "/data1/zjyang/program/test/GroundingDINO/output/2" \
 -t "object"

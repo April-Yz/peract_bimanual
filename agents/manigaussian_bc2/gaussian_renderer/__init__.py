@@ -65,7 +65,7 @@ def render(data, idx, pts_xyz, rotations, scales, opacity, bg_color, pts_rgb=Non
         scale_modifier=1.0,
         viewmatrix=data['novel_view']['world_view_transform'][idx],  # 视图矩阵  (用X*X的单位矩阵作为视图矩阵)
         projmatrix=data['novel_view']['full_proj_transform'][idx],   # 投影矩阵
-        sh_degree=3 if features_color is None else 1,                # SH（球谐函数）的阶数
+        sh_degree=3 if features_color is None else 1,                # SH（球谐函数）的阶数 （1）
         campos=data['novel_view']['camera_center'][idx],             # 相机位置
         prefiltered=False,                                           # 是否进行预过滤
         debug=False,
@@ -82,9 +82,11 @@ def render(data, idx, pts_xyz, rotations, scales, opacity, bg_color, pts_rgb=Non
     # shs后续有用 颜色特征？（不应该是旋转和移动有用）
     if features_color is not None:  # default: None, use SHs
         shs = features_color
+        # print("shs.shape",shs.shape) # [65536, 4, 3]
     else:
         assert pts_rgb is not None
         colors_precomp = pts_rgb
+        # print("pts_rgb.shape",pts_rgb.shape)
 
     # 语义特征    
     if features_language is not None:
@@ -138,6 +140,7 @@ def render_mask(data, idx, pts_xyz, rotations, scales, opacity, bg_color, pts_rg
     # Create zero tensor. We will use it to make pytorch return gradients of the 2D (screen-space) means
     # 创建零张量。我们将用它来使 pytorch 返回二维（屏幕空间）手段的梯度
     screenspace_points = torch.zeros_like(pts_xyz, dtype=torch.float32, requires_grad=True, device=device) + 0
+    # screenspace_points = torch.zeros_like(pts_xyz, dtype=torch.long, requires_grad=True, device=device) + 0
     try:
         screenspace_points.retain_grad()
     except:
@@ -152,6 +155,7 @@ def render_mask(data, idx, pts_xyz, rotations, scales, opacity, bg_color, pts_rg
     # 用于存储高斯渲染器的设置参数。
     # 包括图像的尺寸、焦距、背景张量、缩放修正因子、视图矩阵、投影矩阵、球谐函数阶数、相机位置以及调试模式
     # 设置光栅化的配置，包括图像的大小、视场的 tan 值、背景颜色、视图矩阵、投影矩阵等。
+    # 相当于render得到的图片配置
     raster_settings = GaussianRasterizationSettings(
         image_height=int(data['mask_view']['height'][idx]),
         image_width=int(data['mask_view']['width'][idx]),
@@ -174,18 +178,24 @@ def render_mask(data, idx, pts_xyz, rotations, scales, opacity, bg_color, pts_rg
     # ############################for mask################################
 
     # 获取高斯模型的遮罩数据。如果传入了 precomputed_mask，则直接使用预计算的遮罩。对于一维或单通道遮罩，进行维度扩展，使其成为三通道（RGB）。
-    mask = precomputed_mask
+    mask = precomputed_mask # [65536, 3]
     # mask = pc.get_mask if precomputed_mask is None else precomputed_mask
 
     # 原来的方法
+    # print("0 mask.shape",mask.shape) # [N=256 *256 , 3]
     # if len(mask.shape) == 1 or mask.shape[-1] == 1: # [W, H, 1] -> [W, H, 3] repeat([1,3])最后一维复制三次
         # mask = mask.squeeze().unsqueeze(-1).repeat([1,3]).cuda()
     # 预想的方法，但是好像不对，格式 [65536,3] 
-    # if len(mask.shape) == 2 or (len(mask.shape) == 3 and mask.shape[-1] == 1):
-    #     mask = mask.squeeze()  # 移除多余的维度
-    #     mask = mask_to_rgb(mask)  # 使用之前定义的函数转换为RGB
-    mask = mask.reshape(256,256,3)
-
+    if len(mask.shape) == 2: 
+        mask = mask.reshape(256,256,3)
+    elif (len(mask.shape) == 3 and mask.shape[-1] == 1):
+        mask = mask.repeat([1,3])
+        # mask = mask.squeeze()  # 移除多余的维度
+        # mask = mask_to_rgb(mask)  # 使用之前定义的函数转换为RGB
+    
+    # print("1 mask.shape",mask.shape)
+    # mask = mask.reshape(256,256,3)
+    # print("2 mask.shape",mask.shape)
     # 将 mask 移动到 GPU 上
     mask = torch.tensor(mask).cuda()
     # ############################for mask################################
@@ -217,8 +227,8 @@ def render_mask(data, idx, pts_xyz, rotations, scales, opacity, bg_color, pts_rg
     # 将可见高斯光栅化到图像上，获取它们的半径（在屏幕上）。 在这里处理了？
     # rendered_image, language_feature_image, radii = rasterizer(
     rendered_mask, language_feature_image, radii = rasterizer(
-        means3D=pts_xyz,
-        means2D=screenspace_points,
+        means3D=pts_xyz,                    # 3D点的坐标
+        means2D=screenspace_points,         # 2D点的坐标
         shs=shs,
         colors_precomp=colors_precomp,   #?
         language_feature_precomp=language_feature_precomp,
@@ -227,6 +237,8 @@ def render_mask(data, idx, pts_xyz, rotations, scales, opacity, bg_color, pts_rg
         rotations=rotations,
         cov3D_precomp=None,
         )
+    
+    # print("3 rendered_mask.shape",rendered_mask.shape) # [3, 128, 128]
 
     # Those Gaussians that were frustum culled or had a radius of 0 were not visible.
     # They will be excluded from value updates used in the splitting criteria.
@@ -257,6 +269,7 @@ def render_mask_gen(data, idx, pts_xyz, rotations, scales, opacity, bg_color, pt
     # Create zero tensor. We will use it to make pytorch return gradients of the 2D (screen-space) means
     # 创建零张量。我们将用它来使 pytorch 返回二维（屏幕空间）手段的梯度
     screenspace_points = torch.zeros_like(pts_xyz, dtype=torch.float32, requires_grad=True, device=device) + 0
+    # screenspace_points = torch.zeros_like(pts_xyz, dtype=torch.long, requires_grad=True, device=device) + 0
     try:
         screenspace_points.retain_grad()
     except:

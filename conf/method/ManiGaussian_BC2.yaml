@@ -104,6 +104,7 @@ neural_renderer:
 
   use_clip: False
   field_type: 'bimanual' #'LF'
+  mask_gen: 'gt' # 'pre'
   use_dynamic_field: False  # please set use_neural_rendering true first
 
   # weight for all auxiliary losses

@@ -47,7 +47,7 @@ field_type='LF' # 'bimanual' 'LF'
 lambda_dyna=0.1
 lambda_reg=0.0
 render_freq=500 # 1000 #2000
-lambda_nerf=0.01 # 0.01
+lambda_nerf=0.001 # 0.01
 
 mask_gt_rgb=True        
 lambda_dyna_leader=0.2  # V4 0.3  # （rgb dyn中左右的权重比例）
@@ -55,6 +55,7 @@ lambda_mask=0.5         # V4 0.2         # 2:rgb8mask的权重（相对于dyn总
 lambda_mask_right=0.1 # mask中 右臂的权重(无用，单纯去掉会报Loss算少了 错)
 mask_type='exclude' # 'include' # 无用 直接删除next中左臂和右臂比较
 lambda_next_loss_mask=0.7
+mask_gen='gt' # 'pre' # 是否用凸包围成的mask来确定物体
 
 tmux select-pane -t 0 
 # peract rlbench
@@ -84,6 +85,7 @@ CUDA_VISIBLE_DEVICES=${train_gpu}  QT_AUTO_SCREEN_SCALE_FACTOR=0 python train.py
         method.neural_renderer.lambda_reg=${lambda_reg} \
         method.neural_renderer.foundation_model_name=null \
         method.neural_renderer.field_type=${field_type} \
+        method.neural_renderer.mask_gen=${mask_gen} \
         method.neural_renderer.dataset.mask_gt_rgb=${mask_gt_rgb} \
         method.neural_renderer.lambda_dyna_leader=${lambda_dyna_leader} \
         method.neural_renderer.lambda_mask=${lambda_mask} \

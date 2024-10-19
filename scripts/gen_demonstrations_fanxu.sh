@@ -13,7 +13,7 @@ cd third_part/RLBench/tools
 # xvfb-run -a python dataset_generator_bimanual.py --tasks=${task} \
 #                             --save_path="../../../data2/test_data"  \
 #                             --image_size=256x256 \
-#                             --episodes_per_task=20 #\
+#                             --episodes_per_task=21 #\
 #                             # --all_variations=True   # default is True
 #                             # --processes=1 \
 #                             # --renderer=opengl \

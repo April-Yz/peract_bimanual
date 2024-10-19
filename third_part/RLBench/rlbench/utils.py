@@ -206,8 +206,16 @@ def get_stored_demos(amount: int, image_paths: bool, dataset_root: str,
                         far = obs[i].misc[f'{camera_name}_camera_far']
                         depth_image_m = near + image * (far - near)
                         obs[i].perception_data[f"{camera_name}_depth"] = camera_config.depth_noise.apply(depth_image_m)
+                        if i>0:
+                            obs[i-1].perception_data[f"{camera_name}_next_depth"] = camera_config.depth_noise.apply(depth_image_m)
+                        if i==num_steps-1:
+                            obs[i].perception_data[f"{camera_name}_next_depth"] = camera_config.depth_noise.apply(depth_image_m)
                     else:                      
                         obs[i].perception_data[f"{camera_name}_depth"] = camera_config.depth_noise.apply(image)
+                        if i>0:
+                            obs[i-1].perception_data[f"{camera_name}_next_depth"] = camera_config.depth_noise.apply(image)
+                        if i==num_steps-1:
+                            obs[i].perception_data[f"{camera_name}_next_depth"] = camera_config.depth_noise.apply(image)
                         # print(f"depth case 2 {camera_name}_depth ")
                         # print(obs[i].perception_data[f"{camera_name}_depth"].shape) # [128,128]没毛病啊  
 
@@ -256,7 +264,7 @@ def get_stored_demos(amount: int, image_paths: bool, dataset_root: str,
                     # print(f"{camera_name}_mask 图片尺寸为: {shape}")    
                     # image = np.array(_resize_if_needed(Image.open(image_path), camera_config.image_size))
                     # image = np.array(_resize_if_needed(Image.open(image_path), (128,128)))
-                    image = rgb_handles_to_mask_mani(np.array(_resize_if_needed(Image.open(image_path), (128,128))))
+                    image = rgb_handles_to_mask_mani(np.array(_resize_if_needed(Image.open(image_path), camera_config.image_size)))
                     # if image.shape == (128, 128, 3):
                         # image = image.transpose(2, 0, 1) 
                     obs[i].perception_data[f"{camera_name}_mask"] = image # （256,256,3）
