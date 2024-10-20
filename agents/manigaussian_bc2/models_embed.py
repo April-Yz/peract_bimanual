@@ -100,6 +100,7 @@ class GeneralizableGSEmbedNet(nn.Module):
 
         # we move xyz, rot
         self.use_dynamic_field = cfg.use_dynamic_field
+        self.mask_gen =cfg.mask_gen
         self.field_type = cfg.field_type
         self.warm_up = cfg.next_mlp.warm_up
         self.use_action = cfg.next_mlp.use_action
@@ -116,7 +117,7 @@ class GeneralizableGSEmbedNet(nn.Module):
                 next_d_in = next_d_in + 16 if self.use_action else next_d_in  # 73 -> 81 +3(mask) -> 84  action: 8->16 dim # new theta_right=8(还是16呢)
                 # cprint(f"73 next_d_in = next_d_in + 8 if self.use_action else next_d_in {next_d_in}", "green")
                 next_d_in = next_d_in if self.use_semantic_feature else next_d_in - 3   # 70->78
-                next_d_in = next_d_in if self.field_type =='LF' else next_d_in - 3      # 如果双手一起预测   减3
+                next_d_in = next_d_in if self.field_type =='LF' and self.mask_gen== 'pre'  else next_d_in - 3      # (-mask)如果双手一起预测   减3
                 # cprint(f"70 next_d_in = next_d_in if self.use_semantic_feature else next_d_in - 3 {next_d_in}", "green")
                 self.gs_deformation_field = ResnetFC(
                         d_in=next_d_in, # all things despite volumetric representation (26 + 39 + 8 -3 = 70) 尽管有体积表示
@@ -139,7 +140,7 @@ class GeneralizableGSEmbedNet(nn.Module):
                 next_d_in = self.d_out + self.d_in      # 26( +3 mask ) + 39 = 65 + 3 = 68   
                 next_d_in = next_d_in + 8 if self.use_action else next_d_in  # 73 +3(mask) = 76 action: 8 dim # new theta_right=8(还是16呢)
                 next_d_in = next_d_in if self.use_semantic_feature else next_d_in - 3   # 73-3 -> 70 +3(mask) = 73
-                next_d_in = next_d_in if self.field_type =='LF' else next_d_in - 3      # mask
+                next_d_in = next_d_in if self.field_type =='LF' and self.mask_gen== 'pre' else next_d_in - 3      # mask
                 # cprint(f"70 next_d_in = next_d_in if self.use_semantic_feature else next_d_in - 3 {next_d_in}", "green")
                 # with torch.no_grad():
                 # self.gs_deformation_field_leader = ResnetFC(
@@ -167,7 +168,7 @@ class GeneralizableGSEmbedNet(nn.Module):
                 next_d_in = self.d_out + self.d_in # 39+26=65
                 next_d_in = next_d_in + 8 + 8 if self.use_action else next_d_in  # action: 8 再加上8 dim # new theta_right=8(还是16呢)
                 next_d_in = next_d_in if self.use_semantic_feature else next_d_in - 3
-                next_d_in = next_d_in if self.field_type =='LF' else next_d_in - 3
+                next_d_in = next_d_in if self.field_type =='LF' and self.mask_gen == 'pre' else next_d_in - 3
                 self.gs_deformation_field_follower = ResnetFC(
                         d_in=next_d_in, # all things despite volumetric representation (26 + 39 + 8 -3 = 70) 尽管有体积表示
                         d_latent=self.d_latent,
@@ -286,7 +287,7 @@ class GeneralizableGSEmbedNet(nn.Module):
 
         canon_xyz = self.world_to_canonical(data['xyz'])    # [1,N,3], （从数值变成比例）min:-2.28, max:1.39
         # print("first canon_xyz.shape=[1,65536,128]",canon_xyz.shape)     # real [1,65536,3]   [2,16384,3]
-
+        data['canon_xyz'] = canon_xyz # gt mask临时用一下
         # volumetric sampling 体积采样 
         point_latent = self.sample_in_canonical_voxel(canon_xyz, data['dec_fts']) # [bs, N, 128]->[bs, 128, N] bs是批次大小，N是体素的数量，128是特征维度。
                                                                                   # [2,16384,1] bs=2 N=128 128  
@@ -366,8 +367,36 @@ class GeneralizableGSEmbedNet(nn.Module):
         # print("self.field_type = ",self.field_type)
         if self.use_dynamic_field: #and data['step'] >= self.warm_up:
 
+            if self.field_type =='LF' and self.mask_gen == 'pre':
+                if not self.use_semantic_feature :
+                    dyna_input = torch.cat((
+                        point_latent,   # [N, 128]
+                        data['xyz_maps'].detach().reshape(N, 3), 
+                        features_dc_maps.detach().reshape(N, 3),
+                        features_rest_maps.detach().reshape(N, 9),
+                        data['rot_maps'].detach().reshape(N, 4),
+                        data['scale_maps'].detach().reshape(N, 3),
+                        data['opacity_maps'].detach().reshape(N, 1),
+                        data['mask_maps'].detach().reshape(N, 3),
+                        # d_in:
+                        z_feature,  
+                    ), dim=-1) # no batch dim    
+                else:
+                    dyna_input = torch.cat((
+                        point_latent,   # [N, 128]
+                        data['xyz_maps'].detach().reshape(N, 3), 
+                        features_dc_maps.detach().reshape(N, 3),
+                        features_rest_maps.detach().reshape(N, 9),
+                        data['rot_maps'].detach().reshape(N, 4),
+                        data['scale_maps'].detach().reshape(N, 3),
+                        data['opacity_maps'].detach().reshape(N, 1),
+                        data['mask_maps'].detach().reshape(N, 3),
+                        data['feature_maps'].detach().reshape(N, 3), # （加入语义特征后）多了特征图
+                        # d_in:
+                        z_feature,  
+                    ), dim=-1) # no batch dim      
             # 不用语义特征
-            if self.field_type !='LF':
+            elif self.field_type !='LF' or (self.field_type =='LF' and self.mask_gen != 'pre'):
                 if not self.use_semantic_feature :
                     # dyna_input: (d_latent, d_in)
                     dyna_input = torch.cat((
@@ -395,34 +424,7 @@ class GeneralizableGSEmbedNet(nn.Module):
                         # d_in:
                         z_feature,  
                     ), dim=-1) # no batch dim
-            elif self.field_type =='LF':
-                if not self.use_semantic_feature :
-                    dyna_input = torch.cat((
-                        point_latent,   # [N, 128]
-                        data['xyz_maps'].detach().reshape(N, 3), 
-                        features_dc_maps.detach().reshape(N, 3),
-                        features_rest_maps.detach().reshape(N, 9),
-                        data['rot_maps'].detach().reshape(N, 4),
-                        data['scale_maps'].detach().reshape(N, 3),
-                        data['opacity_maps'].detach().reshape(N, 1),
-                        data['mask_maps'].detach().reshape(N, 3),
-                        # d_in:
-                        z_feature,  
-                    ), dim=-1) # no batch dim    
-                else:
-                    dyna_input = torch.cat((
-                        point_latent,   # [N, 128]
-                        data['xyz_maps'].detach().reshape(N, 3), 
-                        features_dc_maps.detach().reshape(N, 3),
-                        features_rest_maps.detach().reshape(N, 9),
-                        data['rot_maps'].detach().reshape(N, 4),
-                        data['scale_maps'].detach().reshape(N, 3),
-                        data['opacity_maps'].detach().reshape(N, 1),
-                        data['mask_maps'].detach().reshape(N, 3),
-                        data['feature_maps'].detach().reshape(N, 3), # （加入语义特征后）多了特征图
-                        # d_in:
-                        z_feature,  
-                    ), dim=-1) # no batch dim                
+          
             else:
                 print("error in models_embed.py")
 
@@ -451,51 +453,98 @@ class GeneralizableGSEmbedNet(nn.Module):
                 data['next']['feature_maps'] = data['feature_maps'].detach()
             else:
                 # -------------------------------------------------------------------------------------------------
-                if self.use_action:
-                    dyna_input = torch.cat((dyna_input, data['right_action'].repeat(N, 1)), dim=-1)   # action detach [65536, 206]
-                    # cprint(f"dyna_input.shape: {dyna_input.shape}", "red") # [65536, 206]
+                if self.mask_gen == 'pre':
+                    if self.use_action:
+                        dyna_input = torch.cat((dyna_input, data['right_action'].repeat(N, 1)), dim=-1)   # action detach [65536, 206]
+                        # cprint(f"dyna_input.shape: {dyna_input.shape}", "red") # [65536, 206]
 
-                    # with torch.no_grad():
-                    next_split_network_outputs_leader, _ = self.gs_deformation_field_leader_smaller(
-                         dyna_input,
-                        combine_inner_dims=(self.num_views_per_obj, N),
-                        combine_index=combine_index,
-                        dim_size=dim_size,
-                        language_embed=data['lang'],
-                        batch_size=SB,
-                       )
-                    # 这部分要不要缩进呢
-                    next_xyz_maps, next_rot_maps = next_split_network_outputs_leader.split([3, 4], dim=-1)   
-                    data['right_next']['xyz_maps'] = data['xyz_maps'].detach() + next_xyz_maps    # [1, 65536, 3]?
-                    # print("data['right_next']['xyz_maps'].shape: ", data['right_next']['xyz_maps'].shape) # [1, 65536, 3]
-                    data['right_next']['sh_maps'] = data['sh_maps'].detach()
-                    data['right_next']['rot_maps'] = self.rotation_activation(data['rot_maps'].detach() + next_rot_maps, dim=-1)  # [1, 65536, 4]
-                    # print("data['right_next']['rot_maps'].shape: ", data['right_next']['rot_maps'].shape,"next_rot_maps",next_rot_maps) # torch.Size([1, 65536, 4]) next_rot_maps tensor([[[ 3.3136e-01, -7.9674e-01,  1.2806e+00,  3.1690e-01],很长的一列
-                    data['right_next']['scale_maps'] = data['scale_maps'].detach()
-                    data['right_next']['opacity_maps'] = data['opacity_maps'].detach()
-                    data['right_next']['feature_maps'] = data['feature_maps'].detach()
-                    data['right_next']['mask_maps'] = data['mask_maps'].detach()
-            
-                    # if self.use_action:
-                    dyna_input = torch.cat((dyna_input, data['left_action'].repeat(N, 1)), dim=-1)   # action detach
-                    # cprint(f"dyna_input.shape: {dyna_input.shape}", "red")
-
-                    next_split_network_outputs_follower, _ = self.gs_deformation_field_follower(
-                        dyna_input,
-                        combine_inner_dims=(self.num_views_per_obj, N),
-                        combine_index=combine_index,
-                        dim_size=dim_size,
-                        language_embed=data['lang'],
-                        batch_size=SB,
+                        # with torch.no_grad():
+                        next_split_network_outputs_leader, _ = self.gs_deformation_field_leader_smaller(
+                            dyna_input,
+                            combine_inner_dims=(self.num_views_per_obj, N),
+                            combine_index=combine_index,
+                            dim_size=dim_size,
+                            language_embed=data['lang'],
+                            batch_size=SB,
                         )
-                    next_xyz_maps, next_rot_maps = next_split_network_outputs_follower.split([3, 4], dim=-1)   
-                    data['left_next']['xyz_maps'] = data['xyz_maps'].detach() + next_xyz_maps
-                    data['left_next']['sh_maps'] = data['sh_maps'].detach()
-                    data['left_next']['rot_maps'] = self.rotation_activation(data['rot_maps'].detach() + next_rot_maps, dim=-1)
-                    data['left_next']['scale_maps'] = data['scale_maps'].detach()
-                    data['left_next']['opacity_maps'] = data['opacity_maps'].detach()
-                    data['left_next']['feature_maps'] = data['feature_maps'].detach()
-                    data['left_next']['mask_maps'] = data['mask_maps'].detach()
+                        # 这部分要不要缩进呢
+                        next_xyz_maps, next_rot_maps = next_split_network_outputs_leader.split([3, 4], dim=-1)   
+                        data['right_next']['xyz_maps'] = data['xyz_maps'].detach() + next_xyz_maps    # [1, 65536, 3]?
+                        # print("data['right_next']['xyz_maps'].shape: ", data['right_next']['xyz_maps'].shape) # [1, 65536, 3]
+                        data['right_next']['sh_maps'] = data['sh_maps'].detach()
+                        data['right_next']['rot_maps'] = self.rotation_activation(data['rot_maps'].detach() + next_rot_maps, dim=-1)  # [1, 65536, 4]
+                        # print("data['right_next']['rot_maps'].shape: ", data['right_next']['rot_maps'].shape,"next_rot_maps",next_rot_maps) # torch.Size([1, 65536, 4]) next_rot_maps tensor([[[ 3.3136e-01, -7.9674e-01,  1.2806e+00,  3.1690e-01],很长的一列
+                        data['right_next']['scale_maps'] = data['scale_maps'].detach()
+                        data['right_next']['opacity_maps'] = data['opacity_maps'].detach()
+                        data['right_next']['feature_maps'] = data['feature_maps'].detach()
+                        data['right_next']['mask_maps'] = data['mask_maps'].detach()
+                
+                        # if self.use_action:
+                        dyna_input = torch.cat((dyna_input, data['left_action'].repeat(N, 1)), dim=-1)   # action detach
+                        # cprint(f"dyna_input.shape: {dyna_input.shape}", "red")
+
+                        next_split_network_outputs_follower, _ = self.gs_deformation_field_follower(
+                            dyna_input,
+                            combine_inner_dims=(self.num_views_per_obj, N),
+                            combine_index=combine_index,
+                            dim_size=dim_size,
+                            language_embed=data['lang'],
+                            batch_size=SB,
+                            )
+                        next_xyz_maps, next_rot_maps = next_split_network_outputs_follower.split([3, 4], dim=-1)   
+                        data['left_next']['xyz_maps'] = data['xyz_maps'].detach() + next_xyz_maps
+                        data['left_next']['sh_maps'] = data['sh_maps'].detach()
+                        data['left_next']['rot_maps'] = self.rotation_activation(data['rot_maps'].detach() + next_rot_maps, dim=-1)
+                        data['left_next']['scale_maps'] = data['scale_maps'].detach()
+                        data['left_next']['opacity_maps'] = data['opacity_maps'].detach()
+                        data['left_next']['feature_maps'] = data['feature_maps'].detach()
+                        data['left_next']['mask_maps'] = data['mask_maps'].detach()
+                else:
+                    if self.use_action:
+                        dyna_input = torch.cat((dyna_input, data['right_action'].repeat(N, 1)), dim=-1)   # action detach [65536, 206]
+                        # cprint(f"dyna_input.shape: {dyna_input.shape}", "red") # [65536, 206]
+
+                        # with torch.no_grad():
+                        next_split_network_outputs_leader, _ = self.gs_deformation_field_leader_smaller(
+                            dyna_input,
+                            combine_inner_dims=(self.num_views_per_obj, N),
+                            combine_index=combine_index,
+                            dim_size=dim_size,
+                            language_embed=data['lang'],
+                            batch_size=SB,
+                        )
+                        # 这部分要不要缩进呢
+                        next_xyz_maps, next_rot_maps = next_split_network_outputs_leader.split([3, 4], dim=-1)   
+                        data['right_next']['xyz_maps'] = data['xyz_maps'].detach() + next_xyz_maps    # [1, 65536, 3]?
+                        # print("data['right_next']['xyz_maps'].shape: ", data['right_next']['xyz_maps'].shape) # [1, 65536, 3]
+                        data['right_next']['sh_maps'] = data['sh_maps'].detach()
+                        data['right_next']['rot_maps'] = self.rotation_activation(data['rot_maps'].detach() + next_rot_maps, dim=-1)  # [1, 65536, 4]
+                        # print("data['right_next']['rot_maps'].shape: ", data['right_next']['rot_maps'].shape,"next_rot_maps",next_rot_maps) # torch.Size([1, 65536, 4]) next_rot_maps tensor([[[ 3.3136e-01, -7.9674e-01,  1.2806e+00,  3.1690e-01],很长的一列
+                        data['right_next']['scale_maps'] = data['scale_maps'].detach()
+                        data['right_next']['opacity_maps'] = data['opacity_maps'].detach()
+                        data['right_next']['feature_maps'] = data['feature_maps'].detach()
+                        # data['right_next']['mask_maps'] = data['mask_maps'].detach()
+                
+                        # if self.use_action:
+                        dyna_input = torch.cat((dyna_input, data['left_action'].repeat(N, 1)), dim=-1)   # action detach
+                        # cprint(f"dyna_input.shape: {dyna_input.shape}", "red")
+
+                        next_split_network_outputs_follower, _ = self.gs_deformation_field_follower(
+                            dyna_input,
+                            combine_inner_dims=(self.num_views_per_obj, N),
+                            combine_index=combine_index,
+                            dim_size=dim_size,
+                            language_embed=data['lang'],
+                            batch_size=SB,
+                            )
+                        next_xyz_maps, next_rot_maps = next_split_network_outputs_follower.split([3, 4], dim=-1)   
+                        data['left_next']['xyz_maps'] = data['xyz_maps'].detach() + next_xyz_maps
+                        data['left_next']['sh_maps'] = data['sh_maps'].detach()
+                        data['left_next']['rot_maps'] = self.rotation_activation(data['rot_maps'].detach() + next_rot_maps, dim=-1)
+                        data['left_next']['scale_maps'] = data['scale_maps'].detach()
+                        data['left_next']['opacity_maps'] = data['opacity_maps'].detach()
+                        data['left_next']['feature_maps'] = data['feature_maps'].detach()
+                        # data['left_next']['mask_maps'] = data['mask_maps'].detach()
 
                 # -------------------------------------------------------------------------------------------------
         return data

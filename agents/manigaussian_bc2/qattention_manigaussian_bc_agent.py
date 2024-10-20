@@ -138,6 +138,7 @@ def parse_depth_file(file_path):
     """
     depth = Image.open(file_path).convert('L')
     depth = np.asarray(depth).astype(np.float32)
+    # print("nerfdepth",depth)
     return depth
 
 
@@ -1449,6 +1450,7 @@ class QAttentionPerActBCAgent(Agent):
                 next_render_mask_left = next_render_mask_left # *127    
             if render_mask_novel is not None:
                 render_mask_novel = render_mask_novel[0] # * 127
+                # print("render_mask_novel",render_mask_novel,render_mask_novel.shape)
 
             # 创建目录 'recon' 用于保存可视化结果。 
             os.makedirs('recon', exist_ok=True)

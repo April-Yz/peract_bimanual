@@ -210,7 +210,12 @@ def get_stored_demos(amount: int, image_paths: bool, dataset_root: str,
                             obs[i-1].perception_data[f"{camera_name}_next_depth"] = camera_config.depth_noise.apply(depth_image_m)
                         if i==num_steps-1:
                             obs[i].perception_data[f"{camera_name}_next_depth"] = camera_config.depth_noise.apply(depth_image_m)
-                    else:                      
+                    else:                    
+                        # print("depth case not in meaters")
+                        # near = obs[i].misc[f'{camera_name}_camera_near']
+                        # far = obs[i].misc[f'{camera_name}_camera_far']
+                        # depth_image_m = near + image * (far - near)
+                        # print("depth_image_m", depth_image_m,"nera=",near, far)
                         obs[i].perception_data[f"{camera_name}_depth"] = camera_config.depth_noise.apply(image)
                         if i>0:
                             obs[i-1].perception_data[f"{camera_name}_next_depth"] = camera_config.depth_noise.apply(image)

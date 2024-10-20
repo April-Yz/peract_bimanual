@@ -36,7 +36,7 @@ starttime=`date +'%Y-%m-%d %H:%M:%S'`
 # printf '%s\n' "$starttime"
 # tasks=[bimanual_pick_laptop,bimanual_push_single_button,coordinated_lift_tray,coordinated_push_box,coordinated_put_bottle_in_fridge,handover_item_medium]
 
-eval_type=35000 # [50000,22000,24000,28000] #[20000,30000,40000,50000,60000,70000]  # [32000,37000,39000,43000,60000,70000,65000] #[5000,15000,25000,35000,51000,59000,61000,82000,89000] # [58000,62000,15000,25000,35000,52000,65000,75000,85000] # 90000    # "[20000,65000,49000,51000]" # 80000 #'last' # or 'best', 'missing', or 'last' or 'all'
+eval_type=30000 # [50000,22000,24000,28000] #[20000,30000,40000,50000,60000,70000]  # [32000,37000,39000,43000,60000,70000,65000] #[5000,15000,25000,35000,51000,59000,61000,82000,89000] # [58000,62000,15000,25000,35000,52000,65000,75000,85000] # 90000    # "[20000,65000,49000,51000]" # 80000 #'last' # or 'best', 'missing', or 'last' or 'all'
 camera=False
 eval_episodes=25 #25 #eval每个task的轮数
 # camera=False # 是否录制视频
@@ -48,7 +48,7 @@ camera_resolution="[256,256]"
 # printf "logdir = %s\n" "$logdir"
 # printf "${logdir}"
 
-CUDA_VISIBLE_DEVICES=${eval_gpu} xvfb-run -a python eval.py \
+CUDA_VISIBLE_DEVICES=${eval_gpu} XFORMERS_MORE_DETAILS=1  xvfb-run -a python eval.py \
     rlbench.task_name=${exp_name} \
     rlbench.demo_path=${test_demo_path} \
     framework.start_seed=${seed} \

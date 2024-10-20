@@ -28,7 +28,7 @@ output_dir="/data1/zjyang/program/peract_bimanual/scripts/test_demo/${output_nam
   --grounded_checkpoint /data1/zjyang/program/peract_bimanual/third_part/Grounded-Segment-Anything/weights/groundingdino_swint_ogc.pth \
   --sam_checkpoint /data1/zjyang/program/peract_bimanual/third_part/Grounded-Segment-Anything/weights/sam_vit_h_4b8939.pth \
   --input_image ${mask_path} \
-  --output_dir "/data1/zjyang/program/peract_bimanual/scripts/test_demo/4/1" \
+  --output_dir "/data1/zjyang/program/peract_bimanual/scripts/test_demo/4/2" \
   --box_threshold 0.3 \
   --text_threshold 0.25 \
   --text_prompt "object" \
