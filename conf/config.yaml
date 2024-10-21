@@ -32,7 +32,7 @@ replay:
     path: '/data1/zjyang/program/peract_bimanual/log/arm/replay' 
     # path: '/home/zjyang/program/peract_bimanual/log/arm/replay' 
     # path: '/tmp/arm/replay' # only used when use_disk is True.
-    max_parallel_processes: 32 # 1 # 32
+    max_parallel_processes: 8 # 32 # 1 # 32   # 生成replay时最大的并行数量
 
 # new
 evaluation: # for online evaluation

@@ -127,6 +127,7 @@ class TaskEnvironment(object):
                   from_episode_number: int = 0
                   ) -> List[Demo]:
         """Negative means all demos"""
+        logging.info("0 get_demos")
 
         if not live_demos and (self._dataset_root is None
                                or len(self._dataset_root) == 0):
@@ -144,12 +145,16 @@ class TaskEnvironment(object):
                 self._task.get_name(), self._obs_config,
                 random_selection, from_episode_number)
         elif not self._robot.is_bimanual:
+            logging.info("1 get_demos")
             # print("taskEnvironment get_demos case2")
             ctr_loop = self._robot.arm.joints[0].is_control_loop_enabled()
             self._robot.arm.set_control_loop_enabled(True)
+            logging.info("2 get_demos")
             demos = self._get_live_demos(
                 amount, callable_each_step, max_attempts)
+            logging.info("3 get_demos")
             self._robot.arm.set_control_loop_enabled(ctr_loop)
+            logging.info("4 get_demos")
         elif self._robot.is_bimanual:
             # print("taskEnvironment get_demos case3")
             # logging.info("11**try self._robot.is_bimanual **11")
@@ -172,6 +177,7 @@ class TaskEnvironment(object):
                         callable_each_step: Callable[
                             [Observation], None] = None,
                         max_attempts: int = _MAX_DEMO_ATTEMPTS) -> List[Demo]:
+        logging.info("0 _get_live_demos")
         demos = []
         for i in range(amount):
             attempts = max_attempts
@@ -179,18 +185,24 @@ class TaskEnvironment(object):
             while attempts > 0:
                 random_seed = np.random.get_state()
                 self.reset()
+                logging.info("1 _get_live_demos")
                 # logging.info("112**try try live demo **112")
                 try:
                     # logging.info("113 demo start 113")
+                    logging.info("0 try in _get_live_demos")
                     demo = self._scene.get_demo(
                         callable_each_step=callable_each_step)
                     # logging.info("114 demo finish 114")
+                    logging.info("1 try in _get_live_demos")
                     demo.random_seed = random_seed
+                    logging.info("2 try in _get_live_demos")
                     demos.append(demo)
+                    logging.info("3 try in _get_live_demos")
                     break
                 except Exception as e:
                     attempts -= 1
                     logging.warning('Bad demo. ' + str(e) + ' Attempts left: ' + str(attempts))
+                logging.info("3 _get_live_demos")
             if attempts <= 0:
                 raise RuntimeError(
                     # !!problem

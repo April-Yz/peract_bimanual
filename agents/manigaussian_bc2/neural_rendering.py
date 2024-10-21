@@ -14,11 +14,12 @@ from agents.manigaussian_bc2.loss import l1_loss, l2_loss, cosine_loss, ssim
 from agents.manigaussian_bc2.graphics_utils import getWorld2View2, getProjectionMatrix, focal2fov
 from agents.manigaussian_bc2.gaussian_renderer import render,render_mask
 from agents.manigaussian_bc2.project_hull import label_point_cloud, points_inside_convex_hull, \
-    depth_mask_to_3d, project_3d_to_2d, create_2d_mask_from_convex_hull, merge_arrays
+    depth_mask_to_3d, project_3d_to_2d, create_2d_mask_from_convex_hull, merge_arrays, merge_tensors
 import visdom
 import logging
 import einops
 import time
+import random
 
 # for debugging 
 # from PIL import Image
@@ -194,7 +195,7 @@ class NeuralRenderer(nn.Module):
     def encode_data(self, pcd, dec_fts, lang, 
                     rgb=None, depth=None, focal=None, c=None, lang_goal=None, tgt_pose=None, tgt_intrinsic=None,
                     next_tgt_pose=None, next_tgt_intrinsic=None, action=None, step=None, 
-                    gt_mask=None,gt_mask_camera_extrinsic=None, gt_mask_camera_intrinsic=None, next_gt_mask = None):
+                    gt_mask=None,gt_mask_camera_extrinsic=None, gt_mask_camera_intrinsic=None, next_gt_mask = None,indx=None):
         '''prepare data dict'''
         bs = pcd.shape[0]
         data = {}
@@ -222,7 +223,6 @@ class NeuralRenderer(nn.Module):
         #   2.8597e-01,  3.3652e-01,  7.7093e-01, -9.3490e-05, 1.0000e+00,  7.0034e-04, 1.0216e-03,  0.0000e+00]], device='cuda:0')
         # print(action.shape) # torch.Size([1, 16])
         data['step'] = step
-        indx = 0
         if self.field_type == 'LF':
             if self.mask_gen == 'pre':
                 data['mask_view'] = {}
@@ -236,13 +236,11 @@ class NeuralRenderer(nn.Module):
 
         # novel pose
         data['novel_view'] = {}
-        data['intr'] = tgt_intrinsic # 相机内参通常包括焦距、主点坐标等，用于将3D坐标转换为2D图像坐标。
+        data['intr'] = tgt_intrinsic # nerf 相机内参通常包括焦距、主点坐标等，用于将3D坐标转换为2D图像坐标。
         data['extr'] = tgt_pose     # 相机外参通常包括旋转矩阵和平移向量，用于将世界坐标转换为相机坐标。相机外参定义了相机在世界坐标系中的位置和方向。
-        data['xyz'] = einops.rearrange(pcd, 'b c h w -> b (h w) c')
-        #  einops.rearrange 函数重新排列点云数据 pcd
-        # 'b c h w -> b (h w) c' 是一个重组操作的模式，它将输入张量
-        # 从四维格式（可能表示 [batch_size, channels, height, width]）转换为三维格式，
-        # 其中高度和宽度被合并为一个维度。这通常用于将3D点云数据从图像格式转换为列表格式，
+        data['xyz'] = einops.rearrange(pcd, 'b c h w -> b (h w) c') # bs,256*256,(xyz)
+        #  einops.rearrange 函数重新排列点云数据 pcd   'b c h w -> b (h w) c' 是一个重组操作的模式，它将输入张量
+        # 从四维格式（可能表示 [batch_size, channels, height, width]）转换为三维格式，  其中高度和宽度被合并为一个维度。这通常用于将3D点云数据从图像格式转换为列表格式，
 
         # use extrinsic pose to generate gaussain parameters
         # 使用 extrinsic pose(外部姿态) 生成 Gaussain 参数
@@ -260,7 +258,6 @@ class NeuralRenderer(nn.Module):
                 if data['next']['intr'] is not None:
                     data_novel = self.get_novel_calib(data['next'])
                     data['next']['novel_view'].update(data_novel)
-            # ------------------------------------------------------------------------------
             else:                         # 看做leader follower学习  
                 if self.mask_gen == 'pre':          # mask自己计算
                     data['right_next'] = {
@@ -301,7 +298,6 @@ class NeuralRenderer(nn.Module):
                             # print("left_next intr is not none")
                             data_novel_test = self.get_novel_calib(data['left_next']['mask_view'])
                             data['left_next']['mask_view'].update(data_novel_test) # 更新数据
-                # ------------------------------------------------------------------------------
                 else:                       # gt mask
                     data['right_next'] = {
                         'extr': next_tgt_pose,
@@ -339,12 +335,12 @@ class NeuralRenderer(nn.Module):
         for i in range(bs):
             intr = data['intr'][i, ...].cpu().numpy()
             extr = data['extr'][i, ...].cpu().numpy()
-            extr = np.linalg.inv(extr)  # the saved extrinsic is actually cam2world matrix, so turn it to world2cam matrix
+            extr = np.linalg.inv(extr)  # the saved extrinsic is actually cam2world matrix, so turn it to world2cam matrix 保存的extrinsic实际上是cam2world矩阵，所以将其转为world2cam矩阵
 
             width, height = self.W, self.H
-            R = np.array(extr[:3, :3], np.float32).reshape(3, 3).transpose(1, 0)    # inverse
-            T = np.array(extr[:3, 3], np.float32)
-            FovX = focal2fov(intr[0, 0], width)
+            R = np.array(extr[:3, :3], np.float32).reshape(3, 3).transpose(1, 0)    # inverse 旋转矩阵
+            T = np.array(extr[:3, 3], np.float32)                                   # 移动
+            FovX = focal2fov(intr[0, 0], width)     # 焦距
             FovY = focal2fov(intr[1, 1], height)
             projection_matrix = getProjectionMatrix(znear=self.znear, zfar=self.zfar, K=intr, h=height, w=width).transpose(0, 1)
             world_view_transform = torch.tensor(getWorld2View2(R, T, np.array(self.trans), self.scale)).transpose(0, 1) # [4, 4], w2c
@@ -384,11 +380,12 @@ class NeuralRenderer(nn.Module):
         # print("dec_fts.shape=",dec_fts.shape)
         # print("好吧，这里的data也有问题，但是谁干的是谁调用了我的neuralrender forward啊啊啊!!!! bs=",bs)
         # 数据预处理 return 字典对应各类信息
+        indx = random.randint(0, 1) # 0 front or 1 overhead
         data = self.encode_data(
             rgb=rgb, depth=depth, pcd=pcd, focal=focal, c=c, lang_goal=None, tgt_pose=gt_pose, tgt_intrinsic=gt_intrinsic,
             dec_fts=dec_fts, lang=language, next_tgt_pose=next_gt_pose, next_tgt_intrinsic=next_gt_intrinsic, 
             action=action, step=step, gt_mask=gt_mask, gt_mask_camera_extrinsic=gt_mask_camera_extrinsic, gt_mask_camera_intrinsic=gt_mask_camera_intrinsic,  
-            next_gt_mask=next_gt_mask,
+            next_gt_mask=next_gt_mask, indx = indx, 
         )
 
         # 渲染 novel视角
@@ -399,7 +396,7 @@ class NeuralRenderer(nn.Module):
         render_mask_novel = None
         next_render_mask_right = None
         next_render_mask = None
-        next_render_novel_right = None
+        next_render_rgb_right = None
         next_left_mask_gen = None
 
         # create gt feature from foundation models 从基础模型创建 gt特征
@@ -412,13 +409,10 @@ class NeuralRenderer(nn.Module):
         # if gt_rgb is not None:
         if training:
             # Gaussian Generator 高斯生成器
-            # print("Gaussian Generator self.gs_model这里的data已经不对了",data["dec_fts"].shape)
             # gs regress (g) 应该也不用改
-            # 这里也有数据处理（一直落下了）
             data = self.gs_model(data) # GeneralizableGSEmbedNet(cfg, with_gs_render=True)
 
             # Gaussian Render
-            # print("data = self.pts2render")
             # if self.field_type !='LF'
             data = self.pts2render(data, bg_color=self.bg_color) # default: [0, 0, 0]
             # else:
@@ -443,9 +437,8 @@ class NeuralRenderer(nn.Module):
                 vis.image(render_novel[0].permute(2, 0, 1).detach().cpu().numpy(), win='render_novel', opts=dict(title='render_novel'))
                 vis.image(gt_rgb[0].permute(2, 0, 1).detach().cpu().numpy(), win='gt_novel', opts=dict(title='gt_novel'))
 
-            # Ll1 = l1_loss(render_novel, gt_rgb)
-            
-            Ll1 = l2_loss(render_novel, gt_rgb)
+            # Ll1 = l1_loss(render_novel, gt_rgb) 
+            Ll1 = l2_loss(render_novel, gt_rgb) # loss_now_rgb
             # Lssim = 1.0 - ssim(render_novel, gt_rgb)
             Lssim = 0.
             # PSNR好像表示图片质量？
@@ -473,7 +466,7 @@ class NeuralRenderer(nn.Module):
                 loss_embed = torch.tensor(0.)
 
             # next frame prediction 下一帧预测 Ldyna(optional)
-            if self.field_type != 'LF':
+            if self.field_type == 'bimanual':
                 if self.use_dynamic_field and (next_gt_rgb is not None) and ('xyz_maps' in data['next']):
                     data['next'] = self.pts2render(data['next'], bg_color=self.bg_color)
                     next_render_novel = data['next']['novel_view']['img_pred'].permute(0, 2, 3, 1)
@@ -498,19 +491,19 @@ class NeuralRenderer(nn.Module):
                     loss_LF = torch.tensor(0.)
                     loss_dyna_mask = torch.tensor(0.)
                     loss_reg = torch.tensor(0.)
-            else:    # Leader Follower condition
+            elif self.field_type == 'LF':    # Leader Follower condition
                 if self.mask_gen == 'gt':   # mask现成的gt
                     if self.use_dynamic_field and next_gt_rgb is not None:
                         # 左手的点云
                         # time1 = time.perf_counter()
-                        # # time_step1 = time2 - time1
+                        # time_step1 = time2 - time1
                         # print(f"1 ### time1 = {time1}")   
                         mask_3d, next_mask_3d = self.createby_gt_mask(data=data, gt_mask=gt_mask, 
                             gt_mask_camera_extrinsic=gt_mask_camera_extrinsic, gt_mask_camera_intrinsic=gt_mask_camera_intrinsic,  
                             next_gt_mask=next_gt_mask,gt_maskdepth=gt_maskdepth, next_gt_maskdepth=next_gt_maskdepth)
                         # time2 = time.perf_counter()
                         # time_step1 = time2 - time1
-                        # print(f"2 ### time3 = {time2} step1 = {time_step1:.2f}s 凸包") # 0.82s
+                        # print(f"2 ### time3 = {time2} step1 = {time_step1:.2f}s 凸包") # 0.82s -> 0.6 (计算3d点改用torch方法)
 
                         # 投影到二维 (二维点)
                         projected_points = project_3d_to_2d(next_mask_3d, next_gt_intrinsic)
@@ -520,14 +513,18 @@ class NeuralRenderer(nn.Module):
                         # print(f"3 ### time3 = {time3} step1 = {time_step2:.2f}s 凸包->2D") # 1.05/1.57s      
 
                         # 创建二维掩码 （二维的凸包） 其实可以不用计算？
-                        mask_shape = (128, 128)  # 假设的掩码大小
+                        mask_shape = (256, 256)  # 假设的掩码大小 用256,256更合适 然后再缩小
                         exclude_left_mask = create_2d_mask_from_convex_hull(projected_points, mask_shape)
+                        exclude_left_mask = exclude_left_mask.unsqueeze(0).unsqueeze(-1).repeat(1, 1, 1, 3) # [1,256,256,3]
+                        exclude_left_mask = exclude_left_mask.permute(0, 3, 1, 2) # [1,3,256,256]
+                        exclude_left_mask = F.interpolate(exclude_left_mask, size=(128, 128), mode='bilinear', align_corners=False)
+                        exclude_left_mask = exclude_left_mask.permute(0, 2, 3, 1) # [1,128,128,3]
 
                         # time4 = time.perf_counter()
                         # time_step3 = time4 - time3
                         # print(f"4 ### time4 = {time4} step3 = {time_step3:.2f}s 2D->2D mask(求凸包)")   
 
-                        exclude_left_mask = exclude_left_mask.unsqueeze(0).unsqueeze(-1).repeat(1, 1, 1, 3) # [1,256,256,3]
+
                         # print(f"exclude_left_mask.shape = {exclude_left_mask.shape}\n {exclude_left_mask}") # [1,256,256,3]
                         device = next_gt_rgb.device  # 获取 next_gt_rgb 的设备
                         # 确保 exclude_left_mask 在同一个设备上
@@ -553,10 +550,10 @@ class NeuralRenderer(nn.Module):
                         if ('xyz_maps' in data['right_next']):
                             # with torch.no_grad():  原来为了有的Loss没计算报无回传错误而写的
                             data['right_next'] = self.pts2render(data['right_next'], bg_color=self.bg_color)
-                            next_render_novel_right = data['right_next']['novel_view']['img_pred'].permute(0, 2, 3, 1) # [1,128, 128, 3]
+                            next_render_rgb_right = data['right_next']['novel_view']['img_pred'].permute(0, 2, 3, 1) # [1,128, 128, 3]
                             # if self.cfg.mask_type=='exclude':   # 将预测图片根据mask裁剪
                             
-                            next_render_novel_mask = next_render_novel_right * exclude_left_mask  # 原来用错了...  next_gt_rgb -> next_render_novel_right
+                            next_render_novel_mask = next_render_rgb_right * exclude_left_mask  # 原来用错了...  next_gt_rgb -> next_render_rgb_right
                             # else:
                             #     next_render_novel_mask = next_gt_rgb * (~exclude_right_mask_expanded)
                             loss_dyna_leader = l2_loss(next_render_novel_mask, result_right_image)
@@ -579,36 +576,51 @@ class NeuralRenderer(nn.Module):
                         loss_reg = torch.tensor(0.)      
                         loss_LF = torch.tensor(0.)
                         loss_dyna_mask = torch.tensor(0.)
-                else:   # 需要自己训练mask 
+                elif self.mask_gen == 'pre':   # 需要自己训练mask 
                     if self.use_dynamic_field and (next_gt_rgb is not None and gt_mask is not None):
-                        right_min = 53
-                        right_max = 73
-                        left_min = 94
-                        left_max = 114
+                        right_min, right_max, left_min, left_max = 53, 73, 94, 114
+                        # right_min = 53 right_max = 73 left_min = 94 left_max = 114
 
                         # [1,1,128,128] -> [1,128,128,1] -> [1,128,128,3]
-                        gt_mask = gt_mask.permute(0, 2, 3, 1).repeat(1, 1, 1, 3)  # 复制三次，得到 [1,128, 128, 3]
-                        next_gt_mask = next_gt_mask.permute(0, 2, 3, 1).repeat(1, 1, 1, 3)
-                        
+                        # gt_mask = gt_mask[indx].permute(0, 2, 3, 1).repeat(1, 1, 1, 3)  # 复制三次，得到 [1,128, 128, 3]
+                        gt_mask = gt_mask[indx].repeat(1, 3, 1, 1)  #  [1,3,128,128]
+                        gt_mask = F.interpolate(gt_mask, size=(128, 128), mode='bilinear', align_corners=False).permute(0, 2, 3, 1)
+                        # next_gt_mask = next_gt_mask[indx].permute(0, 2, 3, 1).repeat(1, 1, 1, 3)
+                        next_gt_mask = next_gt_mask[indx].repeat(1, 3, 1, 1)  #  [1,3,128,128]
+                        next_gt_mask = F.interpolate(next_gt_mask, size=(128, 128), mode='bilinear', align_corners=False).permute(0, 2, 3, 1)
+
                         # numpy写法
                         # gt_mask_cpu = gt_mask1.cpu().numpy()
                         # print("gt_rgb_cpu",gt_mask_cpu,gt_mask_cpu.shape)
                         # gt_mask_label = np.zeros_like(gt_mask_cpu, dtype=np.uint8)
+                        # # Tensor写法（mask标签归类 0：bg    1:ritght    2:left）
+                        # # gt_mask_label = torch.zeros_like(gt_mask, dtype=torch.uint8)
+                        # gt_mask_label = torch.zeros_like(gt_mask, dtype=torch.long)
+                        # gt_mask_label[(gt_mask > right_min-1) & (gt_mask < right_max+1)] = 1
+                        # gt_mask_label[(gt_mask > left_min-1) & (gt_mask < left_max+1)] = 2
+                        # # next_gt_mask_label = torch.zeros_like(next_gt_mask, dtype=torch.uint8)
+                        # next_gt_mask_label = torch.zeros_like(next_gt_mask, dtype=torch.long)
+                        # next_gt_mask_label[(next_gt_mask > right_min-1) & (next_gt_mask < right_max+1)] = 1
+                        # next_gt_mask_label[(next_gt_mask > left_min-1) & (next_gt_mask < left_max+1)] = 2
 
-                        # Tensor写法（mask标签归类 0：bg    1:ritght    2:left）
-                        # gt_mask_label = torch.zeros_like(gt_mask, dtype=torch.uint8)
-                        gt_mask_label = torch.zeros_like(gt_mask, dtype=torch.long)
-                        gt_mask_label[(gt_mask > right_min-1) & (gt_mask < right_max+1)] = 1
-                        gt_mask_label[(gt_mask > left_min-1) & (gt_mask < left_max+1)] = 2
+                        # 定义类别数
+                        num_classes = 3
+                        # 初始化独热编码张量 bg:[0,0,0]   right:[0,1,0]  left:[0,0,1]
+                        gt_mask_label = torch.zeros((*gt_mask.shape, num_classes), dtype=torch.float32) 
+                        # 将标签转换为独热编码
+                        gt_mask_label[(gt_mask < right_min) | ((gt_mask > right_max) & (gt_mask < left_min) | (gt_mask > left_max)), 0] = 1  # 背景
+                        gt_mask_label[(gt_mask > right_min-1) & (gt_mask < right_max+1), 1] = 1  # 右手
+                        gt_mask_label[(gt_mask > left_min-1) & (gt_mask < left_max+1), 2] = 1  # 左手
 
-                        # next_gt_mask_label = torch.zeros_like(next_gt_mask, dtype=torch.uint8)
-                        next_gt_mask_label = torch.zeros_like(next_gt_mask, dtype=torch.long)
-                        next_gt_mask_label[(next_gt_mask > right_min-1) & (next_gt_mask < right_max+1)] = 1
-                        next_gt_mask_label[(next_gt_mask > left_min-1) & (next_gt_mask < left_max+1)] = 2
+                        # next_gt_mask_label 同理
+                        next_gt_mask_label = torch.zeros((*next_gt_mask.shape, num_classes), dtype=torch.float32)
+                        next_gt_mask_label[(next_gt_mask < right_min) | ((next_gt_mask > right_max) & (next_gt_mask < left_min) | (next_gt_mask > left_max)), 0] = 1  # 背景
+                        next_gt_mask_label[(next_gt_mask > right_min-1) & (next_gt_mask < right_max+1), 1] = 1  # 右手
+                        next_gt_mask_label[(next_gt_mask > left_min-1) & (next_gt_mask < left_max+1), 2] = 1  # 左手
 
+                        # 背景默认为0，不需要特别处理
 
                         # print("gt_mask_label", gt_mask_label, gt_mask_label.shape) # torch.Size([1, 128, 128, 3])
-
                         # # 用来可视化的东西
                         # gt_mask_label1 = gt_mask_label.squeeze(0)
                         # gt_mask_label2 = (gt_mask_label1*127) # .astype(np.uint8)
@@ -621,8 +633,7 @@ class NeuralRenderer(nn.Module):
                         # img.save('/data1/zjyang/program/peract_bimanual/scripts/test_demo/mask_label/gt_mask_label2_cpu.png')
                         # # cv2.imwrite('/data1/zjyang/program/peract_bimanual/scripts/test_demo/mask_label/gt_mask_label2.png', gt_mask_label2)
 
-
-                        # mask Loss 只有front camera的训练
+                        # mask Loss 只有front/overhead camera的训练
                         # # print(gt_mask.shape) # torch.Size([1, 1, 256, 256])  新版torch.Size([1, 1, 128, 128])
                         # 可视化   保存为 PNG 图片
                         # mask_np = gt_mask.squeeze().cpu().numpy() # 形状变为 [256, 256]
@@ -643,42 +654,34 @@ class NeuralRenderer(nn.Module):
                             # print("4 next_gt_mask.shape = ",next_gt_mask.shape, next_render_novel.shape) # torch.Size([1, 128, 128, 3]) 
                             loss_dyna_follower = l2_loss(next_render_novel, next_gt_rgb) # 双臂结果预测
 
-
                         # 3 next mask train (pre - left(mask) ) next_loss_dyna_mask_left  左臂 Mask Loss
-                        # data['right_next'] =self.pts2render_mask(data['right_next'], bg_color=self.bg_color)
-                        # render_mask_novel_next = data['right_next']['novel_view']['mask_pred'].permute(0, 2, 3, 1)
                         data['left_next'] =self.pts2render_mask(data['left_next'], bg_color=self.bg_color)
                         next_render_mask = data['left_next']['novel_view']['mask_pred'].permute(0, 2, 3, 1) # [1,3，128, 128] -> [1,128, 128, 3]
                         next_loss_dyna_mask_left = self._mask_loss_fn(next_render_mask, next_gt_mask_label) # mask去左臂的mask
-                        # loss_dyna_mask = loss_dyna_mask_novel  + next_loss_dyna_mask_left
 
                         # gen mask and exclude
                         data['left_next'] =self.pts2render_mask_gen(data['left_next'], bg_color=self.bg_color)
                         next_left_mask_gen = data['left_next']['novel_view']['mask_gen'].permute(0, 2, 3, 1)                        
-                        # exclude_right_mask = (render_mask_novel_next < right_min) | (render_mask_novel_next > right_max)
                         # exclude_left_mask = (next_render_mask < left_min) | (next_render_mask > left_max) # 排除左臂标签 [1,128, 128, 3] [True,False]
-                        exclude_left_mask = (next_left_mask_gen > 2.5) | (next_left_mask_gen < 1.5)
+                        # exclude_left_mask = (next_left_mask_gen > 2.5) | (next_left_mask_gen < 1.5)
+                        exclude_left_mask = self.generate_final_class_labels(next_left_mask_gen)
                         # background_color = torch.tensor(self.bg_color, dtype=torch.float32)  # 背景
-                        result_right_image = next_gt_rgb * exclude_left_mask    # [1, 128, 128, 3] # + background_color * (~exclude_right_mask_expanded)
-
+                        result_right_image = next_gt_rgb * exclude_left_mask # + background_color * (~exclude_left_mask) # [1, 128, 128, 3] #
 
                         #  4 RGB loss_dyna_leader leader  利用前面得到的mask删去左臂
                         if ('xyz_maps' in data['right_next']):
                             # with torch.no_grad():  原来为了有的Loss没计算报无回传错误而写的
                             data['right_next'] = self.pts2render(data['right_next'], bg_color=self.bg_color)
-                            next_render_novel_right = data['right_next']['novel_view']['img_pred'].permute(0, 2, 3, 1) # [1,128, 128, 3]
+                            next_render_rgb_right = data['right_next']['novel_view']['img_pred'].permute(0, 2, 3, 1) # [1,128, 128, 3]
                             # if self.cfg.mask_type=='exclude':   # 将预测图片根据mask裁剪
-                            next_render_novel_mask = next_render_novel_right * exclude_left_mask  # 原来用错了...  next_gt_rgb -> next_render_novel_right
-                            # else:
-                            #     next_render_novel_mask = next_gt_rgb * (~exclude_right_mask_expanded)
+                            next_render_novel_mask = next_render_rgb_right * exclude_left_mask  # 原来用错了...  next_gt_rgb -> next_render_rgb_right
+                            # else:    next_render_novel_mask = next_gt_rgb * (~exclude_right_mask_expanded)
                             loss_dyna_leader = l2_loss(next_render_novel_mask, result_right_image)
-                            # print('loss_dyna_leader = ', loss_dyna_leader)
                         
                         # 5 Mask loss_dyna_mask_next_right 右臂mask训练（和now一样 无用）
                         data['right_next'] =self.pts2render_mask(data['right_next'], bg_color=self.bg_color)
                         next_render_mask_right = data['right_next']['novel_view']['mask_pred'].permute(0, 2, 3, 1)
                         next_loss_dyna_mask_right = self._mask_loss_fn(next_render_mask_right, next_gt_mask)
-                        # next_loss_dyna_mask_right = l2_loss(next_render_mask_right, next_gt_mask)
 
                         # pre mask = right +left    
                         next_loss_dyna_mask = next_loss_dyna_mask_left * ( 1 - self.cfg.lambda_mask_right ) + next_loss_dyna_mask_right * self.cfg.lambda_mask_right  # 右臂权重小一点
@@ -698,14 +701,32 @@ class NeuralRenderer(nn.Module):
                         loss += lambda_dyna * loss_dyna
 
                         loss_reg = torch.tensor(0.)
-                        # TODO: regularization on deformation 
-                        # 考虑加入一些正则化项来处理形变（deformation）
-                        # if self.cfg.lambda_reg > 0:
-                        #     loss_reg = l2_loss(data['next']['xyz_maps'], data['xyz_maps'].detach()) #detach不追踪梯度的张量？
-                        #     lambda_reg = self.cfg.lambda_reg if step >= self.cfg.next_mlp.warm_up else 0.
-                        #     loss += lambda_reg * loss_reg
+                elif self.mask_gen == 'None':
+                    if self.use_dynamic_field and (next_gt_rgb is not None):
+                        # 2 GRB total(Follower)  先对left预测（最后的结果） loss_dyna_follower  左臂 RGB Loss   
+                        # 也可以说是双手结果
+                        if ('xyz_maps' in data['left_next']):
+                            data['left_next'] = self.pts2render(data['left_next'], bg_color=self.bg_color)
+                            next_render_novel = data['left_next']['novel_view']['img_pred'].permute(0, 2, 3, 1) # [1,3，128, 128] -> [1,128, 128, 3]
+                            loss_dyna_follower = l2_loss(next_render_novel, next_gt_rgb) # 双臂结果预测
 
-                        # TODO: local rigid loss 局部刚性损失
+                        #  4 RGB loss_dyna_leader leader  利用前面得到的mask删去左臂
+                        if ('xyz_maps' in data['right_next']):
+                            # with torch.no_grad():  原来为了有的Loss没计算报无回传错误而写的
+                            data['right_next'] = self.pts2render(data['right_next'], bg_color=self.bg_color)
+                            next_render_rgb_right = data['right_next']['novel_view']['img_pred'].permute(0, 2, 3, 1) # [1,128, 128, 3]
+                            loss_dyna_leader = l2_loss(next_render_rgb_right, next_gt_rgb)
+
+                        # RGB pre = leader( right ) + follower
+                        loss_LF = loss_dyna_leader * self.cfg.lambda_dyna_leader + loss_dyna_follower * (1-self.cfg.lambda_dyna_leader)
+                        loss_dyna = loss_LF 
+                        # 预热步数（3000步以后算上了）
+                        lambda_dyna = self.cfg.lambda_dyna if step >= self.cfg.next_mlp.warm_up else 0.                    
+    
+                        # Step 3 Loss(LGeo? + L embed/L sem + L dyna) = loss_rgb + self.cfg.lambda_embed * loss_embed + lambda_dyna * loss_dyna
+                        loss += lambda_dyna * loss_dyna
+                        loss_dyna_mask = torch.tensor(0.)
+                        loss_reg = torch.tensor(0.)
 
                     else:
                         loss_dyna = torch.tensor(0.)
@@ -737,13 +758,13 @@ class NeuralRenderer(nn.Module):
                 render_embed = data['novel_view']['embed_pred'].permute(0, 2, 3, 1)
                 
                 # 未来预测
-                if self.field_type != 'LF':
+                if self.field_type == 'bimanual':
                     if self.use_dynamic_field and 'xyz_maps' in data['next']:
                         data['next'] = self.pts2render(data['next'], bg_color=self.bg_color)
                         next_render_novel = data['next']['novel_view']['img_pred'].permute(0, 2, 3, 1)
                 else:
                     if self.mask_gen == 'gt':
-                        if self.use_dynamic_field and next_gt_rgb is not None:
+                        if self.use_dynamic_field:
                             # start_time = time.perf_counter()
                             # print("#0 time1: ", start_time)
                             # 左手的点云
@@ -755,18 +776,23 @@ class NeuralRenderer(nn.Module):
                             # 投影到二维
                             projected_points = project_3d_to_2d(next_mask_3d, next_gt_intrinsic)
                             # 创建二维掩码
-                            mask_shape = (128, 128)  # 假设的掩码大小
+                            mask_shape = (256, 256)  # 假设的掩码大小
                             # start_time = time.perf_counter()
                             # print("#0 time3: ", start_time)
                             exclude_left_mask = create_2d_mask_from_convex_hull(projected_points, mask_shape)
+                            exclude_left_mask = exclude_left_mask.unsqueeze(0).unsqueeze(-1).repeat(1, 1, 1, 3) # [1,256,256,3]
+                            exclude_left_mask = exclude_left_mask.permute(0, 3, 1, 2) # [1,3,256,256]
+                            exclude_left_mask = F.interpolate(exclude_left_mask, size=(128, 128), mode='bilinear', align_corners=False)
+                            exclude_left_mask = exclude_left_mask.permute(0, 2, 3, 1) # [1,128,128,3]
                             # final_time = time.perf_counter()
                             # print("#0 time4: ", final_time)
-                            exclude_left_mask = exclude_left_mask.unsqueeze(0).unsqueeze(-1).repeat(1, 1, 1, 3)
-                            device = next_gt_rgb.device  # 获取 next_gt_rgb 的设备
-                            exclude_left_mask = exclude_left_mask.to(device)
-                            next_render_mask = exclude_left_mask
-                            result_right_image = next_gt_rgb * exclude_left_mask  
-                            render_mask_novel = result_right_image
+                            # exclude_left_mask = exclude_left_mask.unsqueeze(0).unsqueeze(-1).repeat(1, 1, 1, 3)
+                            if next_gt_rgb is not None:
+                                device = next_gt_rgb.device  # 获取 next_gt_rgb 的设备
+                                exclude_left_mask = exclude_left_mask.to(device)
+                                next_render_mask = exclude_left_mask
+                                result_right_image = next_gt_rgb * exclude_left_mask  
+                                render_mask_novel = result_right_image
 
                             # 2 GRB total(Follower)  先对left预测（最后的结果） loss_dyna_follower  左臂 RGB Loss   
                             # 也可以说是双手结果
@@ -778,15 +804,9 @@ class NeuralRenderer(nn.Module):
                             if ('xyz_maps' in data['right_next']):
                                 # with torch.no_grad():  原来为了有的Loss没计算报无回传错误而写的
                                 data['right_next'] = self.pts2render(data['right_next'], bg_color=self.bg_color)
-                                next_render_novel_right = data['right_next']['novel_view']['img_pred'].permute(0, 2, 3, 1) # [1,128, 128, 3]                                
-                                # next_render_novel_mask = next_render_novel_right * exclude_left_mask  # 原来用错了...  next_gt_rgb -> next_render_novel_right
-                                # loss_dyna_leader = l2_loss(next_render_novel_mask, result_right_image)
-
-                    else:   # LF + 自己 train mask     
-                        # if self.use_dynamic_field and ('xyz_maps' in data['left_next']):
-                        #     data['left_next'] = self.pts2render(data['left_next'], bg_color=self.bg_color)
-                        #     next_render_novel = data['left_next']['novel_view']['img_pred'].permute(0, 2, 3, 1)                
-                        if self.use_dynamic_field and (next_gt_rgb is not None and gt_mask is not None):
+                                next_render_rgb_right = data['right_next']['novel_view']['img_pred'].permute(0, 2, 3, 1) # [1,128, 128, 3]                                
+                    elif self.mask_gen == 'pre':   # LF + 自己 train mask                
+                        if self.use_dynamic_field:
                             # 1 当前场景的mask 训练  loss_dyna_mask_novel
                             data =self.pts2render_mask(data, bg_color=self.bg_color)
                             render_mask_novel = data['novel_view']['mask_pred'].permute(0, 2, 3, 1) # [1,3，128, 128] -> [1,128, 128, 3]                           
@@ -798,16 +818,30 @@ class NeuralRenderer(nn.Module):
                             next_render_mask = data['left_next']['novel_view']['mask_pred'].permute(0, 2, 3, 1) # [1,3，128, 128] -> [1,128, 128, 3]
                             # gen
                             data['left_next'] =self.pts2render_mask_gen(data['left_next'], bg_color=self.bg_color)
-                            next_left_mask_gen = data['left_next']['novel_view']['mask_gen'].permute(0, 2, 3, 1)    
+                            next_left_mask_gen = data['left_next']['novel_view']['mask_gen'].permute(0, 2, 3, 1)
+                            exclude_left_mask = self.generate_final_class_labels(next_left_mask_gen)    
 
                             #  4 RGB loss_dyna_leader leader  利用前面得到的mask删去左臂
                             if ('xyz_maps' in data['right_next']):
                                 # with torch.no_grad():  原来为了有的Loss没计算报无回传错误而写的
                                 data['right_next'] = self.pts2render(data['right_next'], bg_color=self.bg_color)
-                                next_render_novel_right = data['right_next']['novel_view']['img_pred'].permute(0, 2, 3, 1) # [1,128, 128, 3]
+                                next_render_rgb_right = data['right_next']['novel_view']['img_pred'].permute(0, 2, 3, 1) # [1,128, 128, 3]
                             # 5 Mask loss_dyna_mask_next_right 右臂mask训练（和now一样 无用）
                             data['right_next'] =self.pts2render_mask(data['right_next'], bg_color=self.bg_color)
                             next_render_mask_right = data['right_next']['novel_view']['mask_pred'].permute(0, 2, 3, 1)
+                    elif self.mask_gen == 'None':
+                        if self.use_dynamic_field :
+                            # 2 GRB total(Follower)  先对left预测（最后的结果） loss_dyna_follower  左臂 RGB Loss   
+                            # 也可以说是双手结果
+                            if ('xyz_maps' in data['left_next']):
+                                data['left_next'] = self.pts2render(data['left_next'], bg_color=self.bg_color)
+                                next_render_novel = data['left_next']['novel_view']['img_pred'].permute(0, 2, 3, 1) # [1,3，128, 128] -> [1,128, 128, 3]
+
+                            #  4 RGB loss_dyna_leader leader  利用前面得到的mask删去左臂
+                            if ('xyz_maps' in data['right_next']):
+                                # with torch.no_grad():  原来为了有的Loss没计算报无回传错误而写的
+                                data['right_next'] = self.pts2render(data['right_next'], bg_color=self.bg_color)
+                                next_render_rgb_right = data['right_next']['novel_view']['img_pred'].permute(0, 2, 3, 1) # [1,128, 128, 3]
 
                 loss_dict = {
                     'loss': 0.,
@@ -828,7 +862,7 @@ class NeuralRenderer(nn.Module):
                           render_mask_novel = render_mask_novel, # 整体mask
                         next_render_mask_right = next_render_mask_right,  # 无用 右臂mask 
                         next_render_mask = next_render_mask,              # 左臂mask              
-                        next_render_novel_right = next_render_novel_right,            # 右臂next rgb
+                        next_render_rgb_right = next_render_rgb_right,            # 右臂next rgb
                         next_left_mask_gen = next_left_mask_gen                       # 生成的左臂当时视角的mask
                         )             
         # print("render_mask_novel = ",render_mask_novel.shape, render_mask_novel)
@@ -922,6 +956,8 @@ class NeuralRenderer(nn.Module):
         # assert bs == 1, "batch size should be 1" # 要检测吗？
         front_intrinsic = gt_mask_camera_intrinsic[0] # [tensor([[[-351.6771,    0.0000,  128.0000], 
         overhead_intrinsic = gt_mask_camera_intrinsic[1]
+        # print("gt_mask_camera_intrinsic",gt_mask_camera_intrinsic)
+        # print("gt_mask_camera_extrinsic",gt_mask_camera_extrinsic)
         # front_mask = gt_mask[0]
         # overhead_mask = gt_mask[1]
         # front_depth = gt_maskdepth[0]
@@ -940,9 +976,7 @@ class NeuralRenderer(nn.Module):
         #     mask_3d = points_inside_convex_hull(data['xyz'][0].detach(), leftxyz)
         # # if len(leftxyz_overhead) > 0:
         #     # mask_3d_overhead = points_inside_convex_hull(data['xyz'][0].detach(), leftxyz_overhead)
-        #     # 围起来两个凸包（交集？）
 
-        #     # 重复一遍用于next（是不是现在的其实可以不写）
         mask_3d = None
         # # --------上面部分是现在阶段的写法，耗时久，注释了---------------------------------------now -----------------------------------------------------
 
@@ -956,7 +990,7 @@ class NeuralRenderer(nn.Module):
         next_overhead_depth = next_gt_maskdepth[1]
         # .squeeze(0) or [0]
 
-        # 左臂的点云 前视角
+        # 左臂的点云 前视角 0.15s
         next_leftxyz_front = depth_mask_to_3d(next_front_depth,next_front_mask,front_intrinsic)
         
         # time2 = time.perf_counter()
@@ -971,16 +1005,19 @@ class NeuralRenderer(nn.Module):
         # print(f"time3 = {time3} step2 = {time_step2:.2f}s") # 0.12s
 
         # 相加    
-        # next_leftxyz = np.concatenate((next_leftxyz_front, next_leftxyz_overhead), axis=0) 
-        next_leftxyz = merge_arrays(next_leftxyz_front, next_leftxyz_overhead) # 或者相加
-        next_leftxyz = torch.tensor(next_leftxyz)
-        
+        # # CPU
+        # next_leftxyz = merge_arrays(next_leftxyz_front, next_leftxyz_overhead) # 或者相加
+        # next_leftxyz = torch.tensor(next_leftxyz)
+        # GPU
+        next_leftxyz = merge_tensors(next_leftxyz_front, next_leftxyz_overhead).cpu()
+    
         # time4 = time.perf_counter()
         # time_step3 = time4 - time3
-        # print(f"time4 = {time4} step3 = {time_step3:.2f}s") # 0.55s
+        # print(f"time4 = {time4} step3 = {time_step3:.2f}s") # CPU 0.55s GPU:0s?
 
         if len(next_leftxyz) > 0:
-            next_mask_3d = points_inside_convex_hull( data['canon_xyz'][0].detach(), next_leftxyz)
+            # next_mask_3d = points_inside_convex_hull( data['canon_xyz'][0].detach(), next_leftxyz)
+            next_mask_3d = points_inside_convex_hull( data['xyz'][0].detach(), next_leftxyz)
         
         # time5 = time.perf_counter()
         # time_step4 = time5 - time4
@@ -988,16 +1025,28 @@ class NeuralRenderer(nn.Module):
 
         return mask_3d, next_mask_3d
 
-    def merge_arrays(array1, array2):
-        # 合并数组（原来出现了空，会报错）
-        # 检查 array2 是否为空
-        if array2.size == 0:  # 也可以用 array2.shape[0] == 0
-            return array1  # 如果 array2 为空，返回 array1
-        
-        # 检查 array1 是否为空
-        if array1.size == 0:
-            return array2  # 如果 array1 为空，返回 array2
+    def generate_final_class_labels(next_left_mask_gen):
+        """
+        生成最终的分类标签并排除左手区域。
 
-        # 合并两个数组
-        merged_array = np.concatenate((array1, array2), axis=0)
-        return merged_array
+        :param next_left_mask_gen: 输入的 mask 张量，形状为 [H, W, num_classes]
+        :return: final_class_labels: 最终的分类标签，形状为 [H, W]
+                exclude_left_mask: 排除左手的 mask，形状为 [H, W]
+        """
+        # 获取每个像素的最大类索引
+        # exclude_left_mask = (next_left_mask_gen > 2.5) | (next_left_mask_gen < 1.5) # 原来 值的方式来判断
+
+        class_indices = torch.argmax(next_left_mask_gen, dim=-1)
+
+        # 初始化最终的分类标签
+        # final_class_labels = torch.zeros_like(class_indices, dtype=torch.long)
+        # # 设置背景、右手和左手的标签
+        # final_class_labels[class_indices == 0] = 0  # 背景
+        # final_class_labels[class_indices == 1] = 1  # 右手
+        # final_class_labels[class_indices == 2] = 2  # 左手
+
+        # 生成排除左手的 mask
+        exclude_left_mask = class_indices != 2  # 不等于 2 的部分为 True
+
+        # return final_class_labels, exclude_left_mask
+        return exclude_left_mask

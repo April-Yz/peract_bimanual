@@ -4,9 +4,8 @@ from pyrep.backend import sim
 
 
 class Dummy(Object):
-    """A point with orientation.
-
-    Dummies are multipurpose objects that can have many different applications.
+    """A point with orientation.   Dummies are multipurpose objects that can have many different applications.
+    有方向的点。 假人是多用途对象，可以有许多不同的应用。
     """
 
     @staticmethod

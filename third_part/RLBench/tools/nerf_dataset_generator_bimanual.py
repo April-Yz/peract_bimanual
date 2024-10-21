@@ -85,7 +85,8 @@ def save_demo(demo, example_path, variation):
 
 def run_all_variations(task_name, headless, save_path, episodes_per_task, image_size):
     """Each thread will choose one task and variation, and then gather
-    all the episodes_per_task for that variation."""
+    all the episodes_per_task for that variation.
+    每个线程都会选择一个任务和变体，然后收集 all 该变体的 Episodes_per_task"""
 
     for handler in logging.root.handlers[:]:
         logging.root.removeHandler(handler)
@@ -96,11 +97,13 @@ def run_all_variations(task_name, headless, save_path, episodes_per_task, image_
 
     logging.info("Collecting data for %s", task_name)
 
+    # 根据任务文件名动态地导入并获取相应的任务类
     tasks = [task_file_to_task_class(task_name, True)]
 
     obs_config = ObservationConfig()
     obs_config.set_all(True)
 
+    # 生成的时候也不是meters
     default_config_params = {"image_size": image_size, "depth_in_meters": False, "masks_as_one_channel": False}
     camera_configs = {camera_name: CameraConfig(**default_config_params) for camera_name in camera_names}
     obs_config.camera_configs = camera_configs
@@ -160,13 +163,13 @@ def run_all_variations(task_name, headless, save_path, episodes_per_task, image_
         episodes_path = os.path.join(variation_path, EPISODES_FOLDER)
         os.makedirs(episodes_path, exist_ok=True)
 
-        # -------------------------continue generation-------------------------
+        # -------------------------continue generation 从上次结束的次数开始运行-------------------------
         file_names = os.listdir(episodes_path)
         import re
         episode_files = [f for f in file_names if f.startswith('episode') and re.match(r'episode\d+', f)]
         episode_numbers = [int(f[len('episode'):]) for f in episode_files]
         max_episode_number = max(episode_numbers) if episode_numbers else -1
-        # print("max_episode_number", max_episode_number)
+        # print("max_episode_number", max_episode_number) # 目前文件夹中最大的情况
         # -------------------------continue generation-------------------------
         abort_variation = False
         for ex_idx in range(max_episode_number+1,episodes_per_task): # 改了
@@ -195,7 +198,7 @@ def run_all_variations(task_name, headless, save_path, episodes_per_task, image_
                                                #!!新参数
                                                callable_each_step=task_recorder.take_snap
                                                )
-                    # logging.info("2**try nerf data generation demo completed")
+                    logging.info("nerf gen完成get_demos")
                 #  NoWaypointsError, DemoError,
                 except (BoundaryError, WaypointError, InvalidActionError, TaskEnvironmentError) as e:
                     logging.warning("Exception %s", e)

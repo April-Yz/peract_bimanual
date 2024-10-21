@@ -17,7 +17,7 @@ class CameraConfig(object):
                  image_size=(128, 128),
                  render_mode=RenderMode.OPENGL3,
                  masks_as_one_channel=True, 
-                 depth_in_meters=False,
+                 depth_in_meters=True, # False,
                  # nerf_multi_view_mask =nerf_multi_view_mask,
                  ):
         self.rgb = rgb

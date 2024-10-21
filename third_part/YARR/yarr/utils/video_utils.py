@@ -25,6 +25,7 @@ class CameraMotion(object):
 
 
 class CircleCameraMotion(CameraMotion):
+    #  圆形摄像机运动
 
     def __init__(self, cam: VisionSensor, origin: Dummy,
                  speed: float, init_rotation: float = np.deg2rad(180)):
@@ -131,7 +132,7 @@ class NeRFTaskRecorder(object):
 
     def take_snap(self, scene=None, obs: Observation=None):
         # 调用的方法demo, = task_env.get_demos(amount=1, live_demos=True,callable_each_step=task_recorder.take_snap)
-        # logging.info(" 又回来了...take_snap(self, scene=None, obs: Observation=None)开始运行")
+        # logging.info("take_snap(self, scene=None, obs: Observation=None)开始运行")
         # save start pose
         self._cam_motion.save_pose()
         

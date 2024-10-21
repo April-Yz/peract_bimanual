@@ -2,7 +2,7 @@ import numpy as np
 import cv2
 from scipy.spatial import ConvexHull, Delaunay, QhullError
 import torch
-
+import time
 
 def project_points_3d_to_2d(points_3d, intrinsic_matrix):
     """
@@ -53,24 +53,17 @@ def mark_points_in_mask(points_3d, mask, intrinsic_matrix, depth_map):
 
 
 
-def label_point_cloud(points, D, K, mask):
+def label_point_cloud(points, D, K, mask): # 无用
     """
     2D->3D
     根据mask标记三维点云中的点。
-
     参数:
-    points : np.ndarray
-        三维点云，形状为 (N, 3)，包含 (X, Y, Z)
-    D : np.ndarray
-        深度图，形状为 (高度, 宽度)
-    K : np.ndarray
-        相机内参矩阵，形状为 (1, 3, 3)(1无用)
-    mask : np.ndarray
-        二维mask图像,形状为 (高度, 宽度)
-
+    points : np.ndarray  三维点云，形状为 (N, 3)，包含 (X, Y, Z)
+    D : np.ndarray       深度图，形状为 (高度, 宽度)
+    K : np.ndarray       相机内参矩阵，形状为 (1, 3, 3)(1无用)
+    mask : np.ndarray    二维mask图像,形状为 (高度, 宽度)
     返回:
-    labeled_points : np.ndarray
-        每个点的三维坐标 (X, Y, Z) 以及对应的label,形状为 (M, 4)
+    labeled_points : np.ndarray   每个点的三维坐标 (X, Y, Z) 以及对应的label,形状为 (M, 4)
     """
     # print(f"K shape: {K.shape}    {K}")
     fx, fy = K[0, 0, 0].item(), K[0, 1, 1].item()
@@ -111,7 +104,7 @@ def label_point_cloud(points, D, K, mask):
 # labeled_points = label_point_cloud(points, D, K, mask)
 
 
-def project_3d_to_2d_CPU(points, K): # 1.5s?
+def project_3d_to_2d_CPU(points, K): # 1.5s? 无用
     """
     将三维点投影到二维平面。
     参数:
@@ -164,49 +157,61 @@ def depth_mask_to_3d(D, mask, K): # D:深度图 mask:mask图 K:相机内参 ->�
     """
     遍历深度图和mask图,将满足条件的二维点映射到三维空间。
     参数:
-    D : np.ndarray
-        深度图，形状为 (高度, 宽度)
-    mask : np.ndarray
-        二维mask图像,形状为 (高度, 宽度)，用于过滤点
-    K : np.ndarray
-        相机内参矩阵，形状为 (3, 3)
+    D : np.ndarray      深度图，形状为 (高度, 宽度)
+    mask : np.ndarray   二维mask图像,形状为 (高度, 宽度)，用于过滤点
+    K : np.ndarray      相机内参矩阵，形状为 (3, 3)
     返回:
-    labeled_points : np.ndarray
-        每个点的三维坐标 (X, Y, Z) 以及对应的mask标签, 形状为 (M, 4)
+    labeled_points : np.ndarray 每个点的三维坐标 (X, Y, Z) 以及对应的mask标签, 形状为 (M, 4)
     """
     # 从相机内参矩阵中提取参数
-    fx, fy = K[0, 0, 0].item(), K[0, 1, 1].item()
-    cx, cy = K[0, 0, 2].item(), K[0, 1, 2].item()
+    fx, fy = K[0, 0, 0].item(), K[0, 1, 1].item() # 焦距(像素)
+    cx, cy = K[0, 0, 2].item(), K[0, 1, 2].item() # 光心(像素)
 
     # 存储三维点及其对应的mask标签
     labeled_points = []
+
+    # time1 = time.perf_counter()
 
     # 遍历每个像素坐标
     # print("Depth image",D,D.shape,D[0][0].shape) # [1,1,256,256]
     D = D[0][0]                     #[256,256]
     mask = mask[0][0]
-    # 如果 D 和 mask 是张量，转为 NumPy 数组
-    if isinstance(D, torch.Tensor):
-        D = D.cpu().numpy()  # 转为 NumPy 数组
-    if isinstance(mask, torch.Tensor):
-        mask = mask.cpu().numpy()  # 转为 NumPy 数组
 
-    height, width = D.shape
-    for v in range(height):
-        for u in range(width):
-            depth = D[v, u]
-            label = mask[v, u]          # 右53-73 左94-114
+    valid_mask = (mask >= 94) & (mask <= 114)
+    y_idxs, x_idxs = torch.where(valid_mask)
+    # 获取这些像素的深度值
+    depths = D[y_idxs, x_idxs]
+    # 将这些像素的二维坐标转换为相机坐标系中的三维坐标
+    X_cam = (x_idxs.float() - cx) * depths / fx
+    Y_cam = (y_idxs.float() - cy) * depths / fy
+    Z_cam = depths
+    labeled_points = torch.stack((X_cam, Y_cam, Z_cam), dim=-1)
+    # return points_3d
+    # --------------------#### CPU #### -----------------------------
+    # # 如果 D 和 mask 是张量，转为 NumPy 数组
+    # if isinstance(D, torch.Tensor):
+    #     D = D.cpu().numpy()  # 转为 NumPy 数组
+    # if isinstance(mask, torch.Tensor):
+    #     mask = mask.cpu().numpy()  # 转为 NumPy 数组
+    # height, width = D.shape
+    # for v in range(height):
+    #     for u in range(width):
+    #         depth = D[v, u]
+    #         label = mask[v, u]          # 右53-73 左94-114
+    #         # 如果mask中该点的值大于0，并且深度有效
+    #         if label >= 94 and label <= 114 and depth > 0:
+    #             # 通过公式将像素坐标 (u, v) 映射到三维空间
+    #             Z = depth
+    #             X = (u - cx) * Z / fx
+    #             Y = (v - cy) * Z / fy
+    #             # print(f"X: {X}, Y: {Y}, Z: {Z}, label: {label}")
+    #             # 将三维坐标及mask标签添加到结果中
+    #             labeled_points.append((X, Y, Z)) #label就不用加了 , 1))
+    # labeled_points = np.array(labeled_points)
 
-            # 如果mask中该点的值大于0，并且深度有效
-            if label >= 94 and label <= 114 and depth > 0:
-                # 通过公式将像素坐标 (u, v) 映射到三维空间
-                Z = depth
-                X = (u - cx) * Z / fx
-                Y = (v - cy) * Z / fy
-                # print(f"X: {X}, Y: {Y}, Z: {Z}, label: {label}")
-                # 将三维坐标及mask标签添加到结果中
-                labeled_points.append((X, Y, Z)) #label就不用加了 , 1))
-    labeled_points = np.array(labeled_points)
+    # time2 = time.perf_counter()
+    # time_step1 = time2 - time1
+    # print(f"time2 = {time2} step1 = {time_step1:.2f}s")    # 0.15s    
     # print("3d_points",labeled_points)
     return labeled_points  # 转换为numpy数组
 
@@ -266,10 +271,7 @@ def points_inside_convex_hull(point_cloud, masked_points, remove_outliers=False,
     # 检查过滤后的点数量是否足够，点是否不共线
     # if filtered_masked_points.shape[0] < 4 or torch.all(filtered_masked_points[:, 0] == filtered_masked_points[0, 0]) or torch.all(filtered_masked_points[:, 1] == filtered_masked_points[0, 1]):
     if filtered_masked_points.shape[0] < 4:
-    # if (filtered_masked_points.shape[0] < 4 or 
-    # len(torch.unique(filtered_masked_points[:, 0])) < 2 or 
-    # len(torch.unique(filtered_masked_points[:, 1])) < 2 or 
-    # len(torch.unique(filtered_masked_points[:, 2])) < 2):
+    # if (filtered_masked_points.shape[0] < 4 or len(torch.unique(filtered_masked_points[:, 0])) < 2 or len(torch.unique(filtered_masked_points[:, 1])) < 2 or len(torch.unique(filtered_masked_points[:, 2])) < 2):
         # 如果点数量不足，返回一个与原始点云相同形状的掩码，表示所有点都不在范围内
         return torch.cat([point_cloud, torch.zeros((point_cloud.shape[0], 1), device=point_cloud.device)], dim=1)
     try:
@@ -400,6 +402,21 @@ def merge_arrays(array1, array2):
     # 合并两个数组
     merged_array = np.concatenate((array1, array2), axis=0)
     return merged_array
+
+def merge_tensors(tensor1, tensor2):
+    # 合并张量（原来出现了空，会报错）
+    # 检查 tensor2 是否为空
+    if tensor2.size(0) == 0:  # 检查第一个维度是否为 0
+        return tensor1  # 如果 tensor2 为空，返回 tensor1
+    
+    # 检查 tensor1 是否为空
+    if tensor1.size(0) == 0:
+        return tensor2  # 如果 tensor1 为空，返回 tensor2
+    
+    # 合并两个张量
+    merged_tensor = torch.cat((tensor1, tensor2), dim=0)
+    return merged_tensor
+
 
 
 def test_points_inside_convex_hull():

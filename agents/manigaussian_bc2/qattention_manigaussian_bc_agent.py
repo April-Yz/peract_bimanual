@@ -434,6 +434,13 @@ class QFunction(nn.Module):
         # voxel_grid_feature = torch.cat((voxel_grid_feature, voxel_grid_feature), dim=1)
         # prepare nerf rendering            准备Nerf渲染?
         # We only use the front camera      我们只使用前置摄像头
+        gt_mask = [gt_mask[5],gt_mask[2]]
+        # print("gt_mask",gt_mask,gt_mask[0].shape)
+        gt_mask_camera_extrinsic = [camera_extrinsics[5], camera_extrinsics[2]]
+        gt_mask_camera_intrinsic= [camera_intrinsics[5],camera_intrinsics[2]]
+        gt_maskdepth = [gt_maskdepth[5],gt_maskdepth[2]]
+        next_gt_mask = [next_gt_mask[5],next_gt_mask[2]]
+        next_gt_maskdepth = [next_gt_maskdepth[5],next_gt_maskdepth[2]]
         _, ret_dict = self._neural_renderer(
                 pcd=pcd[0],                 # 点云数据（Point Cloud Data）的第一个元素，可能是一个3D点云表示
                 rgb=rgb[0],                 # ：RGB图像数据的第一个元素，表示场景的颜色信息。
@@ -450,18 +457,18 @@ class QFunction(nn.Module):
                 step=step,
                 action=action,                          # 当前执行的动作。
                 training=False,
-                gt_mask=[gt_mask[5],gt_mask[2]],
-                gt_mask_camera_extrinsic=[camera_extrinsics[5], camera_extrinsics[2]], 
-                gt_mask_camera_intrinsic=[camera_intrinsics[5],camera_intrinsics[2]],
-                next_gt_mask = [next_gt_mask[5],next_gt_mask[2]],
-                gt_maskdepth = [gt_maskdepth[5],gt_maskdepth[2]], 
-                next_gt_maskdepth = [next_gt_maskdepth[5],next_gt_maskdepth[2]],
+                gt_mask=gt_mask,
+                gt_mask_camera_extrinsic=gt_mask_camera_extrinsic, 
+                gt_mask_camera_intrinsic= gt_mask_camera_intrinsic,
+                next_gt_mask = next_gt_mask,
+                gt_maskdepth = gt_maskdepth, 
+                next_gt_maskdepth = next_gt_maskdepth,
                 )
 
         # ----------------------------------------------------------------------    
         return ret_dict.render_novel, ret_dict.next_render_novel, ret_dict.render_embed, ret_dict.gt_embed, \
             ret_dict.render_mask_novel, ret_dict.next_render_mask, ret_dict.next_render_mask_right, \
-                ret_dict.next_render_novel_right, ret_dict.next_left_mask_gen
+                ret_dict.next_render_rgb_right, ret_dict.next_left_mask_gen
 
 
 class QAttentionPerActBCAgent(Agent):
@@ -1433,16 +1440,18 @@ class QAttentionPerActBCAgent(Agent):
             # print("next_render_mask is not None", next_render_mask is not None)
             exclude_gtleft_mask1 = None
             if next_render_mask is not None:
-                next_gt_mask = next_render_mask[0]
-                exclude_left_gt_mask = ((next_gt_mask > 2.5) | (next_gt_mask < 1.5))
-                exclude_gtleft_mask1 =  torch.full((exclude_left_gt_mask.shape[0], exclude_left_gt_mask.shape[1], 3), 255, dtype=torch.uint8,device='cpu')
-                exclude_gtleft_mask1 = exclude_gtleft_mask1 * exclude_left_gt_mask.cpu()
+                next_gt_mask = next_render_mask[0] * 200 # gt时不需要这个
+                # exclude_left_gt_mask = ((next_gt_mask > 2.5) | (next_gt_mask < 1.5))
+                # exclude_gtleft_mask1 =  torch.full((exclude_left_gt_mask.shape[0], exclude_left_gt_mask.shape[1], 3), 255, dtype=torch.uint8,device='cpu')
+                # exclude_gtleft_mask1 = exclude_gtleft_mask1 * exclude_left_gt_mask.cpu()
             next_render_mask_left = None
             next_rgb_render_right_result = None
             exclude_left_mask1 = None
             if next_left_mask_gen is not None:
                 next_render_mask_left = next_left_mask_gen[0]
-                exclude_left_mask = ((next_render_mask_left > 2.5) | (next_render_mask_left < 1.5)) # (next_render_mask_left != 2)
+                # exclude_left_mask = ((next_render_mask_left > 2.5) | (next_render_mask_left < 1.5)) # (next_render_mask_left != 2)
+                class_indices = torch.argmax(next_left_mask_gen, dim=-1)
+                exclude_left_mask = class_indices != 2
                 next_rgb_render_right_result = next_rgb_render_right * exclude_left_mask
                 print("next_render_mask_left",next_render_mask_left,next_render_mask_left.shape)
                 exclude_left_mask1 =  torch.full((exclude_left_mask.shape[0], exclude_left_mask.shape[1], 3), 255, dtype=torch.uint8,device='cpu')
@@ -1514,9 +1523,9 @@ class QAttentionPerActBCAgent(Agent):
                 # print("13")
                 axs[1, 3].imshow(exclude_left_mask1.cpu().numpy())
                 axs[1, 3].title.set_text('exclude_left_mask')
-            if exclude_gtleft_mask1 is not None: # 去除右臂后的左臂mask
+            if next_gt_mask is not None: # gt 中去除左臂mask后的mask # 去除右臂后的左臂mask
                 # print("14")
-                axs[1, 4].imshow(exclude_gtleft_mask1.cpu().numpy())
+                axs[1, 4].imshow(next_gt_mask.cpu().numpy())
                 axs[1, 4].title.set_text('exclude_gt_left_mask')
 
             # remove axis

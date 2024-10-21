@@ -49,7 +49,7 @@ replay_path="/data1/zjyang/program/peract_bimanual/replay/debug"
 lambda_nerf=0.01 # 0.01
 mask_gt_rgb=True
 warm_up=0
-mask_gen='gt' # 'pre'
+mask_gen='gt' # 'pre' 'None'
 
 tmux select-pane -t 0 
 # peract rlbench

@@ -167,7 +167,7 @@ class Environment(object):
 
     def get_task(self, task_class: Type[Task]) -> TaskEnvironment:
 
-        # If user hasn't called launch, implicitly call it.
+        # If user hasn't called launch, implicitly call it.  如果用户没有调用 launch，则隐式调用它
         if self._pyrep is None:
             self.launch()
         self._scene.unload()
