@@ -130,7 +130,7 @@ class NeRFTaskRecorder(object):
         self._task_description = task_description
     
 
-    def take_snap(self, scene=None, obs: Observation=None):
+    def take_snap(self, scene=None, obs: Observation=None): # 拍个照
         # 调用的方法demo, = task_env.get_demos(amount=1, live_demos=True,callable_each_step=task_recorder.take_snap)
         # logging.info("take_snap(self, scene=None, obs: Observation=None)开始运行")
         # save start pose
@@ -164,7 +164,6 @@ class NeRFTaskRecorder(object):
             # if i%2 == 0: # squeeze to 10 views
             #     continue
             
-
             scene.step() # step the simulation environment 逐步构建仿真环境
             all_views.append(
                 (self._cam_motion.cam.capture_rgb() * 255.).astype(np.uint8))

@@ -50,11 +50,13 @@ def load_model(model_config_path, model_checkpoint_path, device):
 
 
 def get_grounding_output(model, image, caption, box_threshold, text_threshold, device="cpu"):
+     # 文本预处理: 将 caption 转为小写，去除前后空白，并确保以句号结尾。
     caption = caption.lower().strip()
     if not caption.endswith("."):
         caption += "."
     model.to(device)
     image = image.to(device)
+    # GroundingDino
     with torch.no_grad():
         outputs = model(image[None], captions=[caption])
     logits = outputs["pred_logits"].sigmoid()[0]  # Keep it on the device

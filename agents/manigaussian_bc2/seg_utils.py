@@ -29,6 +29,7 @@ def grounding_dino_prompt(image, text):
     model_root = '/data1/zjyang/program/peract_bimanual/third_part/Grounded-Segment-Anything/'
     # /data1/zjyang/program/test/Grounded-Segment-Anything/GroundingDINO/groundingdino/config/GroundingDINO_SwinT_OGC.py
     # /data1/zjyang/program/peract_bimanual/third_part/GroundingDINO/weights/groundingdino_swint_ogc.pth
+    # 但是这里的map location是cpu
     model = load_model(os.path.join(model_root, "GroundingDINO/groundingdino/config/GroundingDINO_SwinT_OGC.py"), \
                        os.path.join(model_root, "weights/groundingdino_swint_ogc.pth"))
     
@@ -312,7 +313,7 @@ def self_prompt(point_prompts, sam_feature, id):
     return_mask = (masks[id, :, :, None]*255).astype(np.uint8)
 
     return return_mask / 255
-    
+
 
 # 定义 main 函数
 def main():

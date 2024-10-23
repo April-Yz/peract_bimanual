@@ -446,9 +446,12 @@ class Scene(object):
 
 
     def execute_waypoints_bimanual(self, do_record) -> bool:
+        # 双手执行航路点
+        # 从当前任务获取右手和左手的航路点列表
         right_waypoints = self.task.right_waypoints
         left_waypoints = self.task.left_waypoints
 
+        # 遍历右手的航路点，如果某个航路点的扩展属性中包含重复次数，则根据该次数将该点重复插入到 right_waypoints 列表中
         for i, right_point in enumerate(right_waypoints.copy()):
             # 获取其扩展属性
             ext = right_point.get_ext()
@@ -470,13 +473,14 @@ class Scene(object):
                 for _ in range(j):
                     left_waypoints.insert(i, left_point)
 
+        # 对齐航路点数量 确保左右手的航路点数量相同，如果一侧的航路点多于另一侧，则将最后一个航路点复制并添加到较短的一侧。
         while len(left_waypoints) > len(right_waypoints):
             right_waypoints.append(right_waypoints[-1])
 
         while len(right_waypoints) > len(left_waypoints):
             left_waypoints.append(left_waypoints[-1])
 
-        
+        # 对每对右手和左手的航路点进行遍历，执行相关操作。如果某个航路点被标记为跳过，则继续下一个。
         while True:
             success = False
             self._ignore_collisions_for_current_waypoint = False
@@ -492,28 +496,44 @@ class Scene(object):
                     logging.error("skipping waypoints!")
                     continue
         
+                # 获取当前抓取的物体并检查是否与其他物体发生碰撞，记录所有碰撞的形状
                 grasped_objects = self.robot.right_gripper.get_grasped_objects() + self.robot.left_gripper.get_grasped_objects()
                 colliding_shapes = []
                 for s in self.pyrep.get_objects_in_tree(object_type=ObjectType.SHAPE):
+                    # print("s = ",s.get_name())
                     if s in grasped_objects:
+                        # print("s in grasped_objects= ",s.get_name())
                         continue
                     # !!为什么注释掉？
                     #if s in self._robot_shapes:
                     #    continue
                     if not s.is_collidable():
+                        # print("not s.is_collidable= ",s.get_name())
                         continue
                     if self.robot.right_arm.check_arm_collision(s):
                         colliding_shapes.append(s)
                     elif self.robot.left_arm.check_arm_collision(s):
                         colliding_shapes.append(s)
+
+                # train 中多的Panda_leftArm_leftfinger_visual: 左臂的左指部分。Panda_leftArm_rightfinger_visual: 左臂的右指部分
+                logging.info("0 got list of colliding objects: %s", ", ".join([s.get_name()  for s in colliding_shapes]))
+                # for s in colliding_shapes: #get_name()在arm_action_modes.py中
+                #     print("s = ",s,s.get_name())
                 
                 logging.debug("got list of colliding objects: %s", ", ".join([s.get_name()  for s in colliding_shapes]))
+                # logging.info("1  in execute")
                 
+                # 禁用该对象的碰撞
+                # 实在不行试试吧上面那两个排除掉（）
                 [s.set_collidable(False) for s in colliding_shapes]
                 try:
-                    right_path = right_point.get_path() 
+                    logging.info("0 try in execute 报错前的最后一句输出")
+                    # 获取每个航路点的执行路径，然后进行路径可视化和实际执行。
+                    right_path = right_point.get_path()     # 这一步出错，怀疑碰撞
+                    logging.info("1 try in execute")
                     # lift ball 会在这里报错（来自/data1/zjyang/program/peract_bimanual/third_part/pyrep/build/lib.linux-x86_64-cpython-311/pyrep/robots/arms/arm.py）
                     left_path = left_point.get_path()
+                    logging.info("2 try in execute")
                 except ConfigurationPathError as e:
                     logging.error("Unable to get path %s", e)
                     raise DemoError(f'Could not get a path for waypoint {right_point.name} or {left_point.name}.', task=self.task) from e
@@ -529,6 +549,7 @@ class Scene(object):
                 right_done = False
                 left_done = False
                 success = False
+                # 通过 path.step() 方法逐步执行路径，直到两个路径都完成。执行完成后，处理任何扩展属性。
                 while not (right_done and left_done):
                     if not right_done and right_path.step():                
                         right_point.end_of_path()
@@ -552,6 +573,7 @@ class Scene(object):
                     success, term = self.task.success()
 
             if not self.task.should_repeat_waypoints() or success:
+                # 如果任务不需要重复执行航路点或者成功执行，则返回执行结果。
                 return success
 
 
@@ -560,6 +582,7 @@ class Scene(object):
                  randomly_place: bool = True) -> Demo:
         """Returns a demo (list of observations)
         返回一个演示（观察结果列表）"""
+        logging.info("0 scene.get_demo")
 
         if not self._has_init_task:
             self.init_task()
@@ -579,7 +602,7 @@ class Scene(object):
 
         success = False
         if self.robot.is_bimanual:
-            success = self.execute_waypoints_bimanual(do_record)
+            success = self.execute_waypoints_bimanual(do_record) # 这里出错
         else:
             success = self.execute_waypoints_unimanual(do_record)
             
@@ -669,7 +692,7 @@ class Scene(object):
         if func is not None:
             #-！！!!----------------修改上面原来的代码-----------------
             # func(self.get_observation())
-            func(scene=self, obs=self.get_observation())
+            func(scene=self, obs=self.get_observation()) # 就是nerf里面的take_snaps用于记录当前场景（拍照）
             # ----------------------------------
             # func(self.get_observation())
 

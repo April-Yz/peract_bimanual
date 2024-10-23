@@ -56,19 +56,25 @@ def load_model(model_config_path, model_checkpoint_path, device):
 
 
 def get_grounding_output(model, image, caption, box_threshold, text_threshold, with_logits=True, device="cpu"):
-    caption = caption.lower()
+    # 文本预处理: 将 caption 转为小写，去除前后空白，并确保以句号结尾。
+    caption = caption.lower()   # text_prompt
     caption = caption.strip()
     if not caption.endswith("."):
         caption = caption + "."
+    # 模型和图像移至指定设备
     model = model.to(device)
     image = image.to(device)
-    with torch.no_grad():
+    # 不计算梯度: 使用 torch.no_grad() 以禁用梯度计算，加快推理过程并节省内存。
+    # 模型推理: 将图像和描述输入模型，获得输出。
+    with torch.no_grad():  # 框
         outputs = model(image[None], captions=[caption])
+    # 处理模型输出
     logits = outputs["pred_logits"].cpu().sigmoid()[0]  # (nq, 256)
     boxes = outputs["pred_boxes"].cpu()[0]  # (nq, 4)
     logits.shape[0]
 
     # filter output
+    # 过滤低置信度的输出: 创建克隆以避免修改原始数据，然后根据 box_threshold 过滤 logits 和 boxes，仅保留高于阈值的项。
     logits_filt = logits.clone()
     boxes_filt = boxes.clone()
     filt_mask = logits_filt.max(dim=1)[0] > box_threshold
@@ -76,19 +82,19 @@ def get_grounding_output(model, image, caption, box_threshold, text_threshold, w
     boxes_filt = boxes_filt[filt_mask]  # num_filt, 4
     logits_filt.shape[0]
 
-    # get phrase
+    # get phrase 标记化: 使用模型的 tokenizer 对描述进行标记化
     tokenlizer = model.tokenizer
     tokenized = tokenlizer(caption)
-    # build pred
+    # build pred 构建预测短语
     pred_phrases = []
     for logit, box in zip(logits_filt, boxes_filt):
         pred_phrase = get_phrases_from_posmap(logit > text_threshold, tokenized, tokenlizer)
-        if with_logits:
+        if with_logits: #  如果 with_logits 为真，附加最大置信度得分
             pred_phrases.append(pred_phrase + f"({str(logit.max().item())[:4]})")
         else:
             pred_phrases.append(pred_phrase)
 
-    return boxes_filt, pred_phrases
+    return boxes_filt, pred_phrases    
 
 def show_mask(mask, ax, random_color=False):
     if random_color:
@@ -225,7 +231,9 @@ if __name__ == "__main__":
     # draw output image
     plt.figure(figsize=(10, 10))
     plt.imshow(image)
+    print('masks', masks,masks.shape)
     for mask in masks:
+        print('mask', mask.shape)
         show_mask(mask.cpu().numpy(), plt.gca(), random_color=True)
     for box, label in zip(boxes_filt, pred_phrases):
         show_box(box.numpy(), plt.gca(), label)

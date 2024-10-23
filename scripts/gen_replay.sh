@@ -50,7 +50,7 @@ render_freq=500 # 1000 #2000
 lambda_nerf=0.01 # 0.01
 
 mask_gt_rgb=True        
-lambda_dyna_leader=0.3  # 0.2  # V4 0.3  # （rgb dyn中左右的权重比例）
+lambda_dyna_leader=0.5 # 0.3  # 0.2  # V4 0.3  # （rgb dyn中左右的权重比例）
 lambda_mask=0.5         # V4 0.2         # 2:rgb8mask的权重（相对于dyn总）    
 lambda_mask_right=0.1 # mask中 右臂的权重(无用，单纯去掉会报Loss算少了 错)
 mask_type='exclude' # 'include' # 无用 直接删除next中左臂和右臂比较

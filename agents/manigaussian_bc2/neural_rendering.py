@@ -513,12 +513,13 @@ class NeuralRenderer(nn.Module):
                         # print(f"3 ### time3 = {time3} step1 = {time_step2:.2f}s 凸包->2D") # 1.05/1.57s      
 
                         # 创建二维掩码 （二维的凸包） 其实可以不用计算？
-                        mask_shape = (256, 256)  # 假设的掩码大小 用256,256更合适 然后再缩小
+                        # mask_shape = (256, 256)  # 假设的掩码大小 用256,256更合适 然后再缩小
+                        mask_shape = (128, 128)
                         exclude_left_mask = create_2d_mask_from_convex_hull(projected_points, mask_shape)
                         exclude_left_mask = exclude_left_mask.unsqueeze(0).unsqueeze(-1).repeat(1, 1, 1, 3) # [1,256,256,3]
-                        exclude_left_mask = exclude_left_mask.permute(0, 3, 1, 2) # [1,3,256,256]
-                        exclude_left_mask = F.interpolate(exclude_left_mask, size=(128, 128), mode='bilinear', align_corners=False)
-                        exclude_left_mask = exclude_left_mask.permute(0, 2, 3, 1) # [1,128,128,3]
+                        # exclude_left_mask = exclude_left_mask.permute(0, 3, 1, 2) # [1,3,256,256]
+                        # exclude_left_mask = F.interpolate(exclude_left_mask, size=(128, 128), mode='bilinear', align_corners=False)
+                        # exclude_left_mask = exclude_left_mask.permute(0, 2, 3, 1) # [1,128,128,3]
 
                         # time4 = time.perf_counter()
                         # time_step3 = time4 - time3
@@ -776,14 +777,14 @@ class NeuralRenderer(nn.Module):
                             # 投影到二维
                             projected_points = project_3d_to_2d(next_mask_3d, next_gt_intrinsic)
                             # 创建二维掩码
-                            mask_shape = (256, 256)  # 假设的掩码大小
+                            mask_shape = (128,128) # (256, 256)  # 假设的掩码大小
                             # start_time = time.perf_counter()
                             # print("#0 time3: ", start_time)
                             exclude_left_mask = create_2d_mask_from_convex_hull(projected_points, mask_shape)
                             exclude_left_mask = exclude_left_mask.unsqueeze(0).unsqueeze(-1).repeat(1, 1, 1, 3) # [1,256,256,3]
-                            exclude_left_mask = exclude_left_mask.permute(0, 3, 1, 2) # [1,3,256,256]
-                            exclude_left_mask = F.interpolate(exclude_left_mask, size=(128, 128), mode='bilinear', align_corners=False)
-                            exclude_left_mask = exclude_left_mask.permute(0, 2, 3, 1) # [1,128,128,3]
+                            # exclude_left_mask = exclude_left_mask.permute(0, 3, 1, 2) # [1,3,256,256]
+                            # exclude_left_mask = F.interpolate(exclude_left_mask, size=(128, 128), mode='bilinear', align_corners=False)
+                            # exclude_left_mask = exclude_left_mask.permute(0, 2, 3, 1) # [1,128,128,3]
                             # final_time = time.perf_counter()
                             # print("#0 time4: ", final_time)
                             # exclude_left_mask = exclude_left_mask.unsqueeze(0).unsqueeze(-1).repeat(1, 1, 1, 3)

@@ -312,26 +312,36 @@ class Arm(RobotComponent):
 
         :return: A linear path in the arm configuration space.
         """
+        logging.info("0 get_linear_path 0 ")
         if not ((euler is None) ^ (quaternion is None)):
+            #  首先检查传入的欧拉角和四元数，确保只能指定其一。如果同时传入，会抛出 ConfigurationPathError 异常
+            logging.info("1 get_linear_path 0")
             raise ConfigurationPathError(
                 'Specify either euler or quaternion values, but not both.')
 
+        # 使用 self._ik_target.get_pose() 获取当前的姿态，并将其保存到 prev_pose 变量中。
         prev_pose = self._ik_target.get_pose()
-        self._ik_target.set_position(position, relative_to)
-        if euler is not None:
-            self._ik_target.set_orientation(euler, relative_to)
+        self._ik_target.set_position(position, relative_to)   # 调用 set_position 设置目标位置
+        if euler is not None:                                 # 如果指定了欧拉角，调用 set_orientation；如果指定了四元数，调用 set_quaternion          
+            self._ik_target.set_orientation(euler, relative_to) 
         elif quaternion is not None:
             self._ik_target.set_quaternion(quaternion, relative_to)
         handles = [j.get_handle() for j in self.joints]
 
         collision_pairs = []
+        #  如果未忽略碰撞检测，设置碰撞对。这里的 collision_pairs 包含了碰撞集合和所有处理。
         if not ignore_collisions:
             collision_pairs = [self._collision_collection, sim.sim_handle_all]
         joint_options = None
+        # 调用 sim.generateIkPath 函数生成从当前姿态到目标姿态的逆运动学路径，返回的路径点保存到 ret_floats
         ret_floats = sim.generateIkPath(
             self._ik_group, handles, steps, collision_pairs, joint_options)
+        # 恢复先前姿态: 在生成路径后，使用 set_pose 恢复到之前的姿态
         self._ik_target.set_pose(prev_pose)
+        # print(" Could not create path.",ret_floats)
         if len(ret_floats) == 0:
+            # logging.info("出错原因，创建了一个为0的路径  finally Could not create path.")
+            # 检查生成的路径: 如果没有生成路径（len(ret_floats) == 0），抛出 ConfigurationPathError 异常。
             raise ConfigurationPathError('Could not create path.')
         return ArmConfigurationPath(self, ret_floats)
 
@@ -446,13 +456,18 @@ class Arm(RobotComponent):
             can be created.
         :return: A linear or non-linear path in the arm configuration space.
         """
+        logging.info("## 0 planning linear path")
+        print(("## 0 planning linear path"))
         logging.debug("planning linear path")
         try:
+            logging.info("0 try in get_path 出错前的最后一句")
             p = self.get_linear_path(position, euler, quaternion,
                                      ignore_collisions=ignore_collisions,
                                      relative_to=relative_to)
+            logging.info("1 finish try in get_path")
             return p
         except ConfigurationPathError as e:
+            logging.info("error in try in get_path %s",e)
             #logging.error("configuration error", e)
             pass  # Allowed. Try again, but with non-linear.
 
@@ -461,6 +476,7 @@ class Arm(RobotComponent):
             position, euler, quaternion, ignore_collisions, trials, max_configs,
             distance_threshold, max_time_ms, trials_per_goal, algorithm,
             relative_to)
+        logging.info("3 finish in get_path")
         return p
 
     def get_tip(self) -> Dummy:

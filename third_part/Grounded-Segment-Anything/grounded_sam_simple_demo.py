@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 import supervision as sv
-
+import os 
 import torch
 import torchvision
 
@@ -11,26 +11,30 @@ from segment_anything import sam_model_registry, SamPredictor
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # GroundingDINO config and checkpoint
-GROUNDING_DINO_CONFIG_PATH = "GroundingDINO/groundingdino/config/GroundingDINO_SwinT_OGC.py"
-GROUNDING_DINO_CHECKPOINT_PATH = "./groundingdino_swint_ogc.pth"
+model_root = '/data1/zjyang/program/peract_bimanual/third_part/Grounded-Segment-Anything/'
+GROUNDING_DINO_CONFIG_PATH = os.path.join(model_root, "GroundingDINO/groundingdino/config/GroundingDINO_SwinT_OGC.py")
+GROUNDING_DINO_CHECKPOINT_PATH = os.path.join(model_root, "weights/groundingdino_swint_ogc.pth")
 
 # Segment-Anything checkpoint
 SAM_ENCODER_VERSION = "vit_h"
-SAM_CHECKPOINT_PATH = "./sam_vit_h_4b8939.pth"
+SAM_CHECKPOINT_PATH = os.path.join(model_root, "weights/sam_vit_h_4b8939.pth")
 
 # Building GroundingDINO inference model
 grounding_dino_model = Model(model_config_path=GROUNDING_DINO_CONFIG_PATH, model_checkpoint_path=GROUNDING_DINO_CHECKPOINT_PATH)
 
-# Building SAM Model and SAM Predictor
+# Building SAM Model and SAM Predictor 构建 SAM 模型和 SAM 预测器
 sam = sam_model_registry[SAM_ENCODER_VERSION](checkpoint=SAM_CHECKPOINT_PATH)
 sam.to(device=DEVICE)
 sam_predictor = SamPredictor(sam)
 
-
+task_name='handover_item_easy' # 'handover_item' #'dual_push_buttons' #'coordinated_take_tray_out_of_oven'
+eposide_id='episode0'
+camera_id='overhead_rgb' # 'overhead_mask' #'over_shoulder_left_mask' #'front_mask'
+rgb_id='0000'
 # Predict classes and hyper-param for GroundingDINO
-SOURCE_IMAGE_PATH = "./assets/demo2.jpg"
-CLASSES = ["The running dog"]
-BOX_THRESHOLD = 0.25
+SOURCE_IMAGE_PATH = "/data1/zjyang/program/peract_bimanual/data2/train_data/{task_name}/all_variations/episodes/{eposide_id}/{camera_id}/rgb_{rgb_id}.png"
+CLASSES = ["Object"]
+BOX_THRESHOLD = 0.35 # 0.25
 TEXT_THRESHOLD = 0.25
 NMS_THRESHOLD = 0.8
 

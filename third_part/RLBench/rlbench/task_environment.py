@@ -164,7 +164,7 @@ class TaskEnvironment(object):
             self._robot.left_arm.set_control_loop_enabled(True)
             # logging.info("12**try self._robot.is_bimanual **12")
             demos = self._get_live_demos(
-                amount, callable_each_step, max_attempts)
+                amount, callable_each_step, max_attempts) # 这里开始出错
             # logging.info("13**try self._robot.is_bimanual **13")
             self._robot.right_arm.set_control_loop_enabled(ctr_loop_right)
             self._robot.left_arm.set_control_loop_enabled(ctr_loop_left)
@@ -189,7 +189,7 @@ class TaskEnvironment(object):
                 # logging.info("112**try try live demo **112")
                 try:
                     # logging.info("113 demo start 113")
-                    logging.info("0 try in _get_live_demos")
+                    logging.info("0 try in _get_live_demos 这里开始出错") 
                     demo = self._scene.get_demo(
                         callable_each_step=callable_each_step)
                     # logging.info("114 demo finish 114")
