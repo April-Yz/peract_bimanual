@@ -33,7 +33,7 @@ echo "start new tmux session: ${exp_name}, running main.py"
 tmux new-session -d -s ${exp_name}
 batch_size=1 # 1 #4 # 2
 
-tasks=[dual_push_buttons]
+tasks=[bimanual_pick_laptop]
 
 # for debug
 demo=2 # 100
@@ -50,10 +50,10 @@ lambda_nerf=0.01 # 0.01
 mask_gt_rgb=True
 warm_up=0
 
-mask_gen='nonerf' #'gt' # 'pre' 'None'
-use_nerf_picture=False
-image_width=256
-image_height=256
+mask_gen='gt' #'gt' # 'pre' 'None'
+use_nerf_picture=True # False #True
+image_width=128 # 256
+image_height=128 # 256
 
 
 tmux select-pane -t 0 

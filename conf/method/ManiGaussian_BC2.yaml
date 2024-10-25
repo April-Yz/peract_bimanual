@@ -106,6 +106,7 @@ neural_renderer:
   field_type: 'bimanual' #'LF'
   mask_gen: 'gt' # 'pre'
   use_dynamic_field: False  # please set use_neural_rendering true first
+  use_nerf_picture: True
 
   # weight for all auxiliary losses
   lambda_nerf: 0.01

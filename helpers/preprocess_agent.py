@@ -61,28 +61,30 @@ class PreprocessAgent(Agent):
     #             replay_sample[k] = v.float()
     #     self._replay_sample = replay_sample
     #     return self._pose_agent.update(step, replay_sample)
-    def update(self, step: int, replay_sample: dict, **kwargs) -> dict:
+    def update(self, step: int, replay_sample: dict, use_nerf_picture=True, **kwargs) -> dict:
         # !! 
-        nerf_multi_view_rgb = replay_sample['nerf_multi_view_rgb']
-        nerf_multi_view_depth = replay_sample['nerf_multi_view_depth']
-        nerf_multi_view_camera = replay_sample['nerf_multi_view_camera']
+        if use_nerf_picture:
+            nerf_multi_view_rgb = replay_sample['nerf_multi_view_rgb']
+            nerf_multi_view_depth = replay_sample['nerf_multi_view_depth']
+            nerf_multi_view_camera = replay_sample['nerf_multi_view_camera']
 
-        if 'nerf_next_multi_view_rgb' in replay_sample:
-            nerf_next_multi_view_rgb = replay_sample['nerf_next_multi_view_rgb']
-            nerf_next_multi_view_depth = replay_sample['nerf_next_multi_view_depth']
-            nerf_next_multi_view_camera = replay_sample['nerf_next_multi_view_camera']
-        lang_goal = replay_sample['lang_goal']
+            if 'nerf_next_multi_view_rgb' in replay_sample:
+                nerf_next_multi_view_rgb = replay_sample['nerf_next_multi_view_rgb']
+                nerf_next_multi_view_depth = replay_sample['nerf_next_multi_view_depth']
+                nerf_next_multi_view_camera = replay_sample['nerf_next_multi_view_camera']
+        
 
-        if replay_sample['nerf_multi_view_rgb'] is None or replay_sample['nerf_multi_view_rgb'][0,0] is None:
-            cprint("preprocess agent no nerf rgb 1", "red")
-
+            if replay_sample['nerf_multi_view_rgb'] is None or replay_sample['nerf_multi_view_rgb'][0,0] is None:
+                cprint("preprocess agent no nerf rgb 1", "red")
+            
+        lang_goal = replay_sample['lang_goal']    
         replay_sample = {k: v[:, 0] if len(v.shape) > 2 else v for k, v in replay_sample.items()}
 
         # !! 如何搜集的
         for k, v in replay_sample.items():
             if self._norm_rgb and 'rgb' in k and 'nerf' not in k:
                 replay_sample[k] = self._norm_rgb_(v)
-            elif 'nerf' in k:
+            elif use_nerf_picture and 'nerf' in k:
                 replay_sample[k] = v
             else:
                 try:
@@ -90,23 +92,24 @@ class PreprocessAgent(Agent):
                 except:
                     replay_sample[k] = v
                     pass # some elements are not tensors/arrays
-        replay_sample['nerf_multi_view_rgb'] = nerf_multi_view_rgb
-        replay_sample['nerf_multi_view_depth'] = nerf_multi_view_depth
-        replay_sample['nerf_multi_view_camera'] = nerf_multi_view_camera
 
-        if 'nerf_next_multi_view_rgb' in replay_sample:
-            replay_sample['nerf_next_multi_view_rgb'] = nerf_next_multi_view_rgb
-            replay_sample['nerf_next_multi_view_depth'] = nerf_next_multi_view_depth
-            replay_sample['nerf_next_multi_view_camera'] = nerf_next_multi_view_camera
-        
+        if use_nerf_picture:
+            replay_sample['nerf_multi_view_rgb'] = nerf_multi_view_rgb
+            replay_sample['nerf_multi_view_depth'] = nerf_multi_view_depth
+            replay_sample['nerf_multi_view_camera'] = nerf_multi_view_camera
+
+            if 'nerf_next_multi_view_rgb' in replay_sample:
+                replay_sample['nerf_next_multi_view_rgb'] = nerf_next_multi_view_rgb
+                replay_sample['nerf_next_multi_view_depth'] = nerf_next_multi_view_depth
+                replay_sample['nerf_next_multi_view_camera'] = nerf_next_multi_view_camera
+            if replay_sample['nerf_multi_view_rgb'] is None or replay_sample['nerf_multi_view_rgb'][0,0] is None:
+                cprint("preprocess agent no nerf rgb 2", "red")        
+
         replay_sample['lang_goal'] = lang_goal
         self._replay_sample = replay_sample
 
 
-        if replay_sample['nerf_multi_view_rgb'] is None or replay_sample['nerf_multi_view_rgb'][0,0] is None:
-            cprint("preprocess agent no nerf rgb 2", "red")
-
-        return self._pose_agent.update(step, replay_sample, **kwargs)
+        return self._pose_agent.update(step, replay_sample,use_nerf_picture, **kwargs)
 
     # new86---
 

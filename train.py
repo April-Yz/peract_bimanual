@@ -72,6 +72,7 @@ def main(cfg: DictConfig) -> None:
     obs_config = create_obs_config(
         cfg.rlbench.cameras, cfg.rlbench.camera_resolution, cfg.method.name,
         use_depth=cfg.method.use_depth, # !!! Mani新增的depth
+        nerf_multi_view = cfg.method.neural_renderer.use_nerf_picture
     )
     multi_task = len(cfg.rlbench.tasks) > 1 # Mani新增的multi_task
 

@@ -37,12 +37,13 @@ tasks=[bimanual_pick_laptop,bimanual_straighten_rope,coordinated_lift_tray,coord
 
 # tasks=[dual_push_buttons]
 replay_path="/data1/zjyang/program/peract_bimanual/replay/depthmeters/"
+# replay_path="/data1/zjyang/program/peract_bimanual/replay/withoutnerf/"
 # for debug
 demo=100 # 100
 episode_length=25 #25 # 20 # 4
 save_freq=2500 #1000
 camera_resolution="[256,256]"
-training_iterations=100001 #100001
+training_iterations=101 #100001
 field_type='LF' # 'bimanual' 'LF'
 lambda_dyna=0.1
 lambda_reg=0.0
@@ -55,7 +56,11 @@ lambda_mask=0.5         # V4 0.2         # 2:rgb8mask的权重（相对于dyn总
 lambda_mask_right=0.1 # mask中 右臂的权重(无用，单纯去掉会报Loss算少了 错)
 mask_type='exclude' # 'include' # 无用 直接删除next中左臂和右臂比较
 lambda_next_loss_mask=0.7
-mask_gen='gt' # 'pre' # 是否用凸包围成的mask来确定物体
+
+mask_gen='gt' #'gt' 使用凸包 # 'pre' 'nonerf'  'None'# 是否用凸包围成的mask来确定物体
+use_nerf_picture=True
+image_width=128
+image_height=128
 
 tmux select-pane -t 0 
 # peract rlbench
@@ -64,6 +69,7 @@ CUDA_VISIBLE_DEVICES=${train_gpu}  QT_AUTO_SCREEN_SCALE_FACTOR=0 python train.py
         rlbench.task_name=${exp_name} \
         framework.logdir=${logdir} \
         rlbench.demo_path=${train_demo_path} \
+        method.neural_renderer.use_nerf_picture=${use_nerf_picture} \
         framework.save_freq=${save_freq} \
         framework.start_seed=${seed} \
         framework.use_wandb=${use_wandb} \
@@ -80,6 +86,8 @@ CUDA_VISIBLE_DEVICES=${train_gpu}  QT_AUTO_SCREEN_SCALE_FACTOR=0 python train.py
         rlbench.camera_resolution=${camera_resolution} \
         method.neural_renderer.lambda_nerf=${lambda_nerf} \
         method.neural_renderer.render_freq=${render_freq} \
+        method.neural_renderer.image_width=${image_width} \
+        method.neural_renderer.image_height=${image_height} \
         method.neural_renderer.lambda_embed=0.0 \
         method.neural_renderer.lambda_dyna=${lambda_dyna} \
         method.neural_renderer.lambda_reg=${lambda_reg} \
@@ -94,8 +102,7 @@ CUDA_VISIBLE_DEVICES=${train_gpu}  QT_AUTO_SCREEN_SCALE_FACTOR=0 python train.py
         method.neural_renderer.lambda_next_loss_mask=${lambda_next_loss_mask} \
         method.neural_renderer.use_dynamic_field=True 
 "
-        # 
-        # 
+
         # 
         # 
         #  \

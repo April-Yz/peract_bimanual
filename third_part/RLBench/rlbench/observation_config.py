@@ -3,6 +3,7 @@ from dataclasses import dataclass
 
 from pyrep.const import RenderMode
 from rlbench.noise_model import NoiseModel, Identity
+from termcolor import colored
 
 
 #@dataclass
@@ -64,11 +65,11 @@ class ObservationConfig(object):
                  task_low_dim_state=True,                           # 是否记录任务的低维状态
                  record_ignore_collisions=True,                     # 是否记录忽略碰撞的状态
                  robot_name='',                                     # 指定机器人的名称        
-                 nerf_multi_view=True, # for nerf（Mani）
+                 nerf_multi_view=False # False # True, # for nerf（Mani）
                  ):
         # -------还有一下左右臂的设置没有改-----------nerf mani------------------------------------------------------------
         self.nerf_multi_view = nerf_multi_view
-        # print(colored("[ObservationConfig] nerf_multi_view: {}".format(nerf_multi_view), "green"))
+        print(colored("[ObservationConfig] nerf_multi_view: {}".format(nerf_multi_view), "green"))
         # nerf mani------------------------------------------------------------
         self.camera_configs = camera_configs or dict()
         self.joint_velocities = joint_velocities

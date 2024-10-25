@@ -34,13 +34,13 @@ class QAttentionStackAgent(Agent):
         for qa in self._qattention_agents:
             qa.build(training, device, use_ddp, **kwargs)
 
-    def update(self, step: int, replay_sample: dict, **kwargs) -> dict:
+    def update(self, step: int, replay_sample: dict,use_nerf_picture, **kwargs) -> dict:
         priorities = 0
         total_losses = 0.
 
-                
-        if replay_sample['nerf_multi_view_rgb'] is None or replay_sample['nerf_multi_view_rgb'][0,0] is None:
-            cprint("stack agent no nerf rgb", "red")
+        if use_nerf_picture:        
+            if replay_sample['nerf_multi_view_rgb'] is None or replay_sample['nerf_multi_view_rgb'][0,0] is None:
+                cprint("stack agent no nerf rgb", "red")
 
         for qa in self._qattention_agents:
             # print("update_dict = qa.update(step, replay_sample, **kwargs)")

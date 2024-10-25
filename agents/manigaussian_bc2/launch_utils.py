@@ -97,6 +97,8 @@ def create_replay(batch_size: int, timesteps: int,
             # color, height, width 新增depth
             ObservationElement("%s_rgb" % cname,(3,image_size[1],image_size[0],),np.float32,))
         observation_elements.append(
+            ObservationElement('%s_next_rgb' % cname, (3, image_size[1], image_size[0]), np.float32))
+        observation_elements.append(
             ObservationElement('%s_depth' % cname, (1, image_size[1], image_size[0]), np.float32))
         observation_elements.append(
             ObservationElement('%s_next_depth' % cname, (1, image_size[1], image_size[0]), np.float32))
@@ -113,20 +115,13 @@ def create_replay(batch_size: int, timesteps: int,
             ObservationElement("%s_point_cloud" % cname, (3, image_size[1], image_size[0]), np.float16)
         )  # see pyrep/objects/vision_sensor.py on how pointclouds are extracted from depth frames
         observation_elements.append(
-            ObservationElement(
-                "%s_camera_extrinsics" % cname,
-                (4,4,),
-                np.float32,
-            )
-        )
+            ObservationElement("%s_camera_extrinsics" % cname,(4,4,),np.float32,))
         observation_elements.append(
-            ObservationElement(
-                "%s_camera_intrinsics" % cname,
-                (3,3,),
-                np.float32,
-            )
-        )        
-
+            ObservationElement("%s_next_camera_extrinsics" % cname,(4,4,),np.float32,))
+        observation_elements.append(
+            ObservationElement("%s_camera_intrinsics" % cname,(3,3,),np.float32,))        
+        observation_elements.append(
+            ObservationElement("%s_next_camera_intrinsics" % cname,(3,3,),np.float32,))      
 
         """
         observation_elements.append(
@@ -144,40 +139,38 @@ def create_replay(batch_size: int, timesteps: int,
         #------加了nerf和-------------------------------------------------------------
 
     #-------------------------------NERF----------------------------------------------
-    # for nerf img, exs, ins
-    # 使用 append 时，添加的对象会作为一个单一的元素（无论它本身是一个列表还是其他类型）。
-    # 使用 extend 时，添加的对象（必须是可迭代的）会被拆分，其元素会被逐个添加到列表中。
-    observation_elements.append(
-        ObservationElement('nerf_multi_view_rgb', (num_view_for_nerf,), np.object_))
-    # ------------------------2024.8.5-----------------------------------------------------------------
-    # for store_element in observation_elements:
-    #     if store_element.name == "nerf_multi_view_rgb":
-    #         print("--------------------Manigaussian_BC2/launch_utils-----nerf_multi_view_rgb-----------------------")
-    #         print("store_element.name=",store_element.name)
-    #         print("store_element=",store_element)
-    #         print("store_element.shape=",store_element.shape)
-    # ------------------------2024.8.5-----------------------------------------------------------------
-    observation_elements.append(
-        ObservationElement('nerf_multi_view_depth', (num_view_for_nerf,), np.object_))
-    observation_elements.append(
-        ObservationElement('nerf_multi_view_camera', (num_view_for_nerf,), np.object_))
-    # observation_elements.append(
-    #     ObservationElement('nerf_multi_view_camera_intrinsics', (num_view_for_nerf,), np.object_))
-    # observation_elements.append(
-    #     ObservationElement('nerf_multi_view_camera_extrinsics', (num_view_for_nerf,), np.object_))
-                
-    # for next nerf
-    observation_elements.append(
-        ObservationElement('nerf_next_multi_view_rgb', (num_view_for_nerf,), np.object_))
-    observation_elements.append(
-        ObservationElement('nerf_next_multi_view_depth', (num_view_for_nerf,), np.object_))
-    observation_elements.append(
-        ObservationElement('nerf_next_multi_view_camera', (num_view_for_nerf,), np.object_))
-    # observation_elements.append(
-    #     ObservationElement('nerf_next_multi_view_camera_intrinsics', (num_view_for_nerf,), np.object_))
-    # observation_elements.append(
-    #     ObservationElement('nerf_next_multi_view_camera_extrinsics', (num_view_for_nerf,), np.object_))
-    #-------------------------------NERF----------------------------------------------
+    print("cfg.method.neural_renderer.use_nerf_picture",cfg.method.neural_renderer.use_nerf_picture)
+    if  cfg.method.neural_renderer.use_nerf_picture:
+        # for nerf img, exs, ins
+        # 使用 append 时，添加的对象会作为一个单一的元素（无论它本身是一个列表还是其他类型）。
+        # 使用 extend 时，添加的对象（必须是可迭代的）会被拆分，其元素会被逐个添加到列表中。
+        observation_elements.append(
+            ObservationElement('nerf_multi_view_rgb', (num_view_for_nerf,), np.object_))
+        # ------------------------2024.8.5-----------------------------------------------------------------
+        # for store_element in observation_elements:
+        #     if store_element.name == "nerf_multi_view_rgb":
+        #         print("--------------------Manigaussian_BC2/launch_utils-----nerf_multi_view_rgb-----------------------")
+        #         print("store_element.name=",store_element.name)
+        #         print("store_element=",store_element)
+        #         print("store_element.shape=",store_element.shape)
+        # ------------------------2024.8.5-----------------------------------------------------------------
+        observation_elements.append(
+            ObservationElement('nerf_multi_view_depth', (num_view_for_nerf,), np.object_))
+        observation_elements.append(
+            ObservationElement('nerf_multi_view_camera', (num_view_for_nerf,), np.object_))
+                    
+        # for next nerf
+        observation_elements.append(
+            ObservationElement('nerf_next_multi_view_rgb', (num_view_for_nerf,), np.object_))
+        observation_elements.append(
+            ObservationElement('nerf_next_multi_view_depth', (num_view_for_nerf,), np.object_))
+        observation_elements.append(
+            ObservationElement('nerf_next_multi_view_camera', (num_view_for_nerf,), np.object_))
+        # observation_elements.append(
+        #     ObservationElement('nerf_next_multi_view_camera_intrinsics', (num_view_for_nerf,), np.object_))
+        # observation_elements.append(
+        #     ObservationElement('nerf_next_multi_view_camera_extrinsics', (num_view_for_nerf,), np.object_))
+        #-------------------------------NERF----------------------------------------------
 
 
 
@@ -459,6 +452,7 @@ def _add_keypoints_to_replay(
 
         # ---新增的双臂方法--------------------和原来的NERF（clip用的原来的）--------------------------------------
         obs_dict = observation_utils.extract_obs(
+            cfg,
             obs,
             t=k,
             prev_action=prev_action,
@@ -525,6 +519,7 @@ def _add_keypoints_to_replay(
 
     # final step
     obs_dict_tp1 = observation_utils.extract_obs(
+        cfg,
         obs_tp1,
         t=k + 1,
         prev_action=prev_action,

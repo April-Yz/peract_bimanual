@@ -69,6 +69,8 @@ class OfflineTrainRunner():
 
         # self.tqdm_mininterval = cfg.framework.tqdm_mininterval # tqdm 库来显示一个进度条
         self.use_wandb = cfg.framework.use_wandb
+        self.use_nerf_picture = cfg.method.neural_renderer.use_nerf_picture
+
         if self.use_wandb and rank == 0:
             wandb_name = cfg.framework.wandb_name
             wandb.init(project=cfg.framework.wandb_project, group=str(cfg.framework.wandb_group), name=wandb_name, config=cfg)
@@ -102,7 +104,7 @@ class OfflineTrainRunner():
     def _step(self, i, sampled_batch, **kwargs):
     # def _step(self, i, sampled_batch):
     #     update_dict = self._agent.update(i, sampled_batch)
-        update_dict = self._agent.update(i, sampled_batch, **kwargs)
+        update_dict = self._agent.update(i, sampled_batch, use_nerf_picture=self.use_nerf_picture, **kwargs)
         total_losses = update_dict['total_losses'].item()
         return total_losses
     # new86---
@@ -137,34 +139,36 @@ class OfflineTrainRunner():
             # print("offline--## batch k =",k)
 
         # if self.method_name == 'ManiGaussian_BC2': # 后续可以加
-        batch['nerf_multi_view_rgb'] = sampled_batch['nerf_multi_view_rgb'] # [bs, 1, 21]
-        batch['nerf_multi_view_depth'] = sampled_batch['nerf_multi_view_depth']
-        batch['nerf_multi_view_camera'] = sampled_batch['nerf_multi_view_camera'] # must!!!
         batch['lang_goal'] = sampled_batch['lang_goal']
+        # print("self.use_nerf_picture",self.use_nerf_picture)
+        if self.use_nerf_picture:
+            batch['nerf_multi_view_rgb'] = sampled_batch['nerf_multi_view_rgb'] # [bs, 1, 21]
+            batch['nerf_multi_view_depth'] = sampled_batch['nerf_multi_view_depth']
+            batch['nerf_multi_view_camera'] = sampled_batch['nerf_multi_view_camera'] # must!!!
+            
+            if 'nerf_next_multi_view_rgb' in sampled_batch:
+                batch['nerf_next_multi_view_rgb'] = sampled_batch['nerf_next_multi_view_rgb']
+                batch['nerf_next_multi_view_depth'] = sampled_batch['nerf_next_multi_view_depth']
+                batch['nerf_next_multi_view_camera'] = sampled_batch['nerf_next_multi_view_camera']
+            
+            # 如果维度是3
+            # 如果 nerf_multi_view_rgb 的维度是3（通常是 [batch_size, 1, channels]），则使用 squeeze(1) 方法去掉第二个维度，使其变为 [batch_size, channels]。
+            if len(batch['nerf_multi_view_rgb'].shape) == 3:
+                batch['nerf_multi_view_rgb'] = batch['nerf_multi_view_rgb'].squeeze(1)
+                batch['nerf_multi_view_depth'] = batch['nerf_multi_view_depth'].squeeze(1)
+                batch['nerf_multi_view_camera'] = batch['nerf_multi_view_camera'].squeeze(1)
 
-        if 'nerf_next_multi_view_rgb' in sampled_batch:
-            batch['nerf_next_multi_view_rgb'] = sampled_batch['nerf_next_multi_view_rgb']
-            batch['nerf_next_multi_view_depth'] = sampled_batch['nerf_next_multi_view_depth']
-            batch['nerf_next_multi_view_camera'] = sampled_batch['nerf_next_multi_view_camera']
-        
-        # 如果维度是3
-        # 如果 nerf_multi_view_rgb 的维度是3（通常是 [batch_size, 1, channels]），则使用 squeeze(1) 方法去掉第二个维度，使其变为 [batch_size, channels]。
-        if len(batch['nerf_multi_view_rgb'].shape) == 3:
-            batch['nerf_multi_view_rgb'] = batch['nerf_multi_view_rgb'].squeeze(1)
-            batch['nerf_multi_view_depth'] = batch['nerf_multi_view_depth'].squeeze(1)
-            batch['nerf_multi_view_camera'] = batch['nerf_multi_view_camera'].squeeze(1)
-
-            # 去掉第二个维度
-            if 'nerf_next_multi_view_rgb' in batch and batch['nerf_next_multi_view_rgb'] is not None:
-                batch['nerf_next_multi_view_rgb'] = batch['nerf_next_multi_view_rgb'].squeeze(1)
-                batch['nerf_next_multi_view_depth'] = batch['nerf_next_multi_view_depth'].squeeze(1)
-                batch['nerf_next_multi_view_camera'] = batch['nerf_next_multi_view_camera'].squeeze(1)
-        
-        # 检查数据有效性
-        if batch['nerf_multi_view_rgb'] is None or batch['nerf_multi_view_rgb'][0,0] is None:
-            if not SILENT:
-                cprint('batch[nerf_multi_view_rgb] is None. find next data iter', 'red')
-            return self.preprocess_data(data_iter)
+                # 去掉第二个维度
+                if 'nerf_next_multi_view_rgb' in batch and batch['nerf_next_multi_view_rgb'] is not None:
+                    batch['nerf_next_multi_view_rgb'] = batch['nerf_next_multi_view_rgb'].squeeze(1)
+                    batch['nerf_next_multi_view_depth'] = batch['nerf_next_multi_view_depth'].squeeze(1)
+                    batch['nerf_next_multi_view_camera'] = batch['nerf_next_multi_view_camera'].squeeze(1)
+            
+            # 检查数据有效性
+            if batch['nerf_multi_view_rgb'] is None or batch['nerf_multi_view_rgb'][0,0] is None:
+                if not SILENT:
+                    cprint('batch[nerf_multi_view_rgb] is None. find next data iter', 'red')
+                return self.preprocess_data(data_iter)
         
         return batch
 

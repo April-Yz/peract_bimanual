@@ -307,19 +307,19 @@ class EndEffectorPoseViaPlanning(ArmActionMode):
                 break    
 
     def get_path(self, scene: Scene, action: np.ndarray, ignore_collisions: bool, arm: Arm, gripper: Gripper):
-        logging.info("######## 0 in get_path")
+        # logging.info("######## 0 in get_path")
         if not self._absolute_mode and self._frame != 'end effector':
             action = calculate_delta_pose(scene.robot, action)
         relative_to = None if self._frame == 'world' else arm.get_tip()
         self._quick_boundary_check(scene, action)
-        logging.info("2 in get_path")
+        # logging.info("2 in get_path")
 
         colliding_shapes = []
         if not ignore_collisions:
             if self._robot_shapes is None:
                 self._robot_shapes = arm.get_objects_in_tree(
                     object_type=ObjectType.SHAPE)
-            logging.info("3 in get_path")
+            # logging.info("3 in get_path")
             # First check if we are colliding with anything
             colliding = arm.check_arm_collision()
             if colliding:
@@ -334,13 +334,13 @@ class EndEffectorPoseViaPlanning(ArmActionMode):
                             arm.check_arm_collision(
                                 s))]
                 [s.set_collidable(False) for s in colliding_shapes]
-                logging.info("4 if in get_path")
-            logging.info("5 in get_path")
+                # logging.info("4 if in get_path")
+            # logging.info("5 in get_path")
             
         try:
             # try once with collision checking (if ignore_collisions is true)
             try:
-                logging.info("6 try in get_path")
+                # logging.info("6 try in get_path")
                 path = arm.get_path(
                     action[:3],
                     quaternion=action[3:],
@@ -352,7 +352,7 @@ class EndEffectorPoseViaPlanning(ArmActionMode):
                     trials_per_goal=10, #..TODO was 5
                     algorithm=Algos.RRTConnect
                 )
-                logging.info("######## FINALLY in get_path")
+                # logging.info("######## FINALLY in get_path")
                 return path
             except ConfigurationPathError as e:
                 if ignore_collisions:

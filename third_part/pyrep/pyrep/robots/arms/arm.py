@@ -312,10 +312,10 @@ class Arm(RobotComponent):
 
         :return: A linear path in the arm configuration space.
         """
-        logging.info("0 get_linear_path 0 ")
+        # logging.info("0 get_linear_path 0 ")
         if not ((euler is None) ^ (quaternion is None)):
             #  首先检查传入的欧拉角和四元数，确保只能指定其一。如果同时传入，会抛出 ConfigurationPathError 异常
-            logging.info("1 get_linear_path 0")
+            # logging.info("1 get_linear_path 0")
             raise ConfigurationPathError(
                 'Specify either euler or quaternion values, but not both.')
 
@@ -456,18 +456,18 @@ class Arm(RobotComponent):
             can be created.
         :return: A linear or non-linear path in the arm configuration space.
         """
-        logging.info("## 0 planning linear path")
-        print(("## 0 planning linear path"))
+        # logging.info("## 0 planning linear path")
+        # print(("## 0 planning linear path"))
         logging.debug("planning linear path")
         try:
-            logging.info("0 try in get_path 出错前的最后一句")
+            # logging.info("0 try in get_path 出错前的最后一句")
             p = self.get_linear_path(position, euler, quaternion,
                                      ignore_collisions=ignore_collisions,
                                      relative_to=relative_to)
-            logging.info("1 finish try in get_path")
+            # logging.info("1 finish try in get_path")
             return p
         except ConfigurationPathError as e:
-            logging.info("error in try in get_path %s",e)
+            # logging.info("error in try in get_path %s",e)
             #logging.error("configuration error", e)
             pass  # Allowed. Try again, but with non-linear.
 
@@ -476,7 +476,7 @@ class Arm(RobotComponent):
             position, euler, quaternion, ignore_collisions, trials, max_configs,
             distance_threshold, max_time_ms, trials_per_goal, algorithm,
             relative_to)
-        logging.info("3 finish in get_path")
+        # logging.info("3 finish in get_path")
         return p
 
     def get_tip(self) -> Dummy:
