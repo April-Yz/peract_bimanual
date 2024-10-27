@@ -319,7 +319,8 @@ def render_mask_gen(data, idx, pts_xyz, rotations, scales, opacity, bg_color, pt
     mask = mask.reshape(256,256,3)
 
     # 将 mask 移动到 GPU 上
-    mask = torch.tensor(mask).cuda()
+    # mask = torch.tensor(mask).cuda()
+    mask = mask = mask.clone().detach().cuda()
     # ############################for mask################################
 
     # If precomputed colors are provided, use them. Otherwise, SH -> RGB conversion will be done by rasterizer.

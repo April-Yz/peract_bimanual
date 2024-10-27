@@ -38,9 +38,9 @@ tasks=[bimanual_pick_laptop]
 # for debug
 demo=2 # 100
 episode_length=2 #25 # 20 # 4
-save_freq=10
+save_freq=5
 camera_resolution="[256,256]"
-training_iterations=21
+training_iterations=11
 field_type='LF' # 'BIMANUAL' 'bimanual' 'LF'
 lambda_dyna=0.1
 lambda_reg=0.0

@@ -67,12 +67,12 @@ def main(cfg: DictConfig) -> None:
     for camera_name in cfg.rlbench.cameras:
         assert("rgb" not in camera_name)
 
-    # print("use_depth=cfg.method.use_depth",cfg.method.use_depth)
+    print("nerf_multi_view = cfg.method.neural_renderer.use_nerf_picture",cfg.method.neural_renderer.use_nerf_picture)
     # if cfg.method.name.startswith("ManiGaussian_BC2") #搞错了，use
     obs_config = create_obs_config(
         cfg.rlbench.cameras, cfg.rlbench.camera_resolution, cfg.method.name,
         use_depth=cfg.method.use_depth, # !!! Mani新增的depth
-        nerf_multi_view = cfg.method.neural_renderer.use_nerf_picture
+        # nerf_multi_view = cfg.method.neural_renderer.use_nerf_picture
     )
     multi_task = len(cfg.rlbench.tasks) > 1 # Mani新增的multi_task
 

@@ -850,6 +850,49 @@ class QAttentionPerActBCAgent(Agent):
             next_depths.append(next_depth)
         return obs, next_obs_rgb, depths, next_depths, pcds, exs, next_exs, ins, next_ins, masks, next_masks
   
+    def _nerf_preprocess_inputs(self, replay_sample, sample_id=None):
+        # 存储观察结果（obs）、深度信息（depths）、点云数据（pcds）、
+        # 相机外参（exs，代表 extrinsics）、相机内参（ins，代表 intrinsics）
+        obs = []
+        depths = [] # 深度信息是多的
+        pcds = []
+        exs = []
+        ins = []
+        masks = []
+        next_masks = []
+        next_depths = []
+        self._crop_summary = []
+        # 遍历 self._camera_names 中定义的所有相机名称。这些名称可能是 ['front', 'left_shoulder', 'right_shoulder', 'wrist'] 或其他配置。
+        for n in self._camera_names:    # default: [front,left_shoulder,right_shoulder,wrist] or [front]
+            if sample_id is not None:   # default: None
+                rgb = replay_sample['%s_rgb' % n][sample_id:sample_id+1]
+                depth = replay_sample['%s_depth' % n][sample_id:sample_id+1]
+                pcd = replay_sample['%s_point_cloud' % n][sample_id:sample_id+1]
+                extin = replay_sample['%s_camera_extrinsics' % n][sample_id:sample_id+1]
+                intin = replay_sample['%s_camera_intrinsics' % n][sample_id:sample_id+1]
+                mask = replay_sample['%s_mask' % n][sample_id:sample_id+1]
+                next_mask = replay_sample['%s_next_mask' % n][sample_id+1:sample_id+2]
+                next_depth = replay_sample['%s_next_depth' % n][sample_id+1:sample_id+2]
+            else:
+                rgb = replay_sample['%s_rgb' % n]
+                depth = replay_sample['%s_depth' % n]
+                next_depth = replay_sample['%s_next_depth'%n]
+                pcd = replay_sample['%s_point_cloud' % n]
+                extin = replay_sample['%s_camera_extrinsics' % n]
+                intin = replay_sample['%s_camera_intrinsics' % n]
+                mask = replay_sample['%s_mask' % n]
+                next_mask = replay_sample['%s_next_mask' % n]
+
+            obs.append([rgb, pcd])
+            depths.append(depth)
+            pcds.append(pcd)
+            exs.append(extin)
+            ins.append(intin)
+            masks.append(mask)
+            next_masks.append(next_mask)
+            next_depths.append(next_depth)
+        return obs, depths, next_depths, pcds, exs, ins, masks, next_masks
+
     # nerf[6]---
 
     def _act_preprocess_inputs(self, observation):
@@ -982,7 +1025,10 @@ class QAttentionPerActBCAgent(Agent):
         # 整体上移后
         # obs, pcd = self._preprocess_inputs(replay_sample)
         # 其实不用带Mani的也一样，都是5个返回值
-        obs, next_obs_rgb, depth, next_depth, pcd, extrinsics, next_extrinsics, intrinsics, next_intrinsics, gt_mask, next_gt_mask = self._mani_preprocess_inputs(replay_sample)
+        if self.cfg.neural_renderer.use_nerf_picture:
+            obs, depth, next_depth, pcd, extrinsics, intrinsics, gt_mask, next_gt_mask = self._nerf_preprocess_inputs(replay_sample)        
+        else:
+            obs, next_obs_rgb, depth, next_depth, pcd, extrinsics, next_extrinsics, intrinsics, next_intrinsics, gt_mask, next_gt_mask = self._mani_preprocess_inputs(replay_sample)
         # next_gt_mask
 
         # # batch size
@@ -1028,6 +1074,7 @@ class QAttentionPerActBCAgent(Agent):
                 nerf_multi_view_rgb_path = nerf_multi_view_rgb_path[:, view_dix]
                 nerf_multi_view_depth_path = nerf_multi_view_depth_path[:, view_dix]
                 nerf_multi_view_camera_path = nerf_multi_view_camera_path[:, view_dix]
+                # print(nerf_multi_view_camera_path)
 
                 next_view_dix = np.random.randint(0, num_view_by_user)
                 nerf_next_multi_view_rgb_path = nerf_next_multi_view_rgb_path[:, next_view_dix]
@@ -1675,29 +1722,38 @@ class QAttentionPerActBCAgent(Agent):
                     )                
             
                 # NOTE: [1, h, w, 3]  # 均为图片质量
-                rgb_gt = obs[5][0][0].permute(1, 2, 0)/ 2 + 0.5
-                rgb_render = rgb_render[0]
+                rgb_gt = obs[5][0][0].permute(1, 2, 0)[:, :,[0,1,2]]/ 2 + 0.5 #3 256 256 ->  256,256,3# RGB BGR
+                # print("rgb_gt.shape",rgb_gt.shape) # 256,256,3
+                # test
+                rgb_render1= obs[5][0][0].permute(1, 2, 0)[:, :,[0,2,1]] #GRB [2,1,0]bgr蓝色   [1,0,2]grb绿色 [201]brg深绿色
+                # rgb_render1 = rgb_render[0]
+                # print("rgb_render1.shape",rgb_render1.shape) # 256,256,3
+                
+                
+                rgb_render = rgb_render[0]/ 2 + 0.5
+                
                 # psnr = PSNR_torch(rgb_render, rgb_gt) 
                 if next_rgb_render is not None: # 双手rgb
-                    next_rgb_gt = next_obs_rgb[5][0].permute(1, 2, 0)/ 2 + 0.5  #左手后的正视图(why?)
-                    next_rgb_render = next_rgb_render[0]
+                    next_rgb_gt = next_obs_rgb[5][0].permute(1, 2, 0)[:, :,[2,1,0]] / 2 + 0.5  #左手后的正视图(why?)
+                    next_rgb_render1 = next_rgb_render[0]
+                    next_rgb_render = next_rgb_render[0]/ 2 + 0.5
                     # psnr_dyna = PSNR_torch(next_rgb_render, next_rgb_gt) # 不能对应视图（无参考意义）
                 if next_rgb_render_right is not None:
-                    next_rgb_render_right = next_rgb_render_right[0]
+                    next_rgb_render_right = next_rgb_render_right[0] / 2 + 0.5 
                     # psnr_dyna_right = PSNR_torch(next_rgb_render_right, next_rgb_gt)
                 # print("next_render_mask is not None", next_render_mask is not None)
                 exclude_gtleft_mask1 = None
                 if next_render_mask is not None: # 去掉训练的left mask
-                    next_render_mask_left = next_render_mask[0]  # gt时不需要这个
+                    next_render_mask_left = next_render_mask[0] / 2 + 0.5  # gt时不需要这个
 
                 next_rgb_render_right_result = None
                 exclude_left_mask1 = None
                 if next_left_mask_gen is not None:
-                    next_gt_mask = next_left_mask_gen[0]
+                    next_gt_mask = next_left_mask_gen[0] / 2 + 0.5
                 if render_mask_novel is not None:
-                    render_mask_novel = render_mask_novel[0] 
+                    render_mask_novel = render_mask_novel[0] / 2 + 0.5 
                 if next_render_mask_right is not None:
-                    next_render_mask_right = next_render_mask_right[0]
+                    next_render_mask_right = next_render_mask_right[0] /2 +0.5
 
                 # 创建目录 'recon' 用于保存可视化结果。 
                 os.makedirs('recon', exist_ok=True)
@@ -1705,6 +1761,7 @@ class QAttentionPerActBCAgent(Agent):
                 # plot three images in one row with subplots: 用子图在一行中绘制三个图像：
                 # src, tgt, pred
                 rgb_src =  obs[0][0].squeeze(0).permute(1, 2, 0)  / 2 + 0.5
+                # print("rgb_src",rgb_src)
                 # 绘制源图像（rgb_src）、目标图像（rgb_gt）、渲染图像（rgb_render）、
                 # 特征嵌入（embed_render 和 gt_embed_render）
                 # 以及下一步骤的图像（next_rgb_gt 和 next_rgb_render）。
@@ -1719,6 +1776,9 @@ class QAttentionPerActBCAgent(Agent):
                 axs[0, 2].imshow(rgb_render.cpu().numpy())
                 # axs[0, 2].title.set_text('psnr={:.2f}'.format(psnr))
                 axs[0, 2].title.set_text('now rgb')
+
+                axs[0, 4].imshow(rgb_render1.cpu().numpy())
+                axs[0, 4].title.set_text('now rgb1')
                 # pred embed
                 # embed_render = visualize_feature_map_by_clustering(embed_render.permute(0,3,1,2), num_cluster=4)
                 embed_render = visualize_feature_map_by_normalization(embed_render.permute(0,3,1,2))    # range from -1 to 1
@@ -1739,7 +1799,10 @@ class QAttentionPerActBCAgent(Agent):
                     # Ours
                     # print("05") # 
                     axs[0, 5].imshow(next_rgb_render.cpu().numpy())
+                    print("most important next_rgb_render",next_rgb_render)
                     axs[0, 5].title.set_text('next left rgb')
+                    axs[1, 3].imshow(next_rgb_render1.cpu().numpy())
+                    axs[1, 3].title.set_text('next left rgb1')
                     # axs[0, 5].title.set_text('next psnr={:.2f}'.format(psnr_dyna))
                 if next_rgb_render_right is not None: # 右臂动作后的rgb
                     # print("15") # 
@@ -1759,6 +1822,7 @@ class QAttentionPerActBCAgent(Agent):
                 if next_render_mask_left is not None: # 去除右臂后的左臂mask
                     # print("12")
                     axs[1, 2].imshow(next_render_mask_left.cpu().numpy())
+                    # print("next_render_mask_left", next_render_mask_left)
                     axs[1, 2].title.set_text('next mask left gen')
                 if exclude_left_mask1 is not None: # 去除右臂后的左臂mask [1,1]的可视化
                     # print("13")
@@ -1768,6 +1832,7 @@ class QAttentionPerActBCAgent(Agent):
                     # print("14")
                     axs[1, 4].imshow(next_gt_mask.cpu().numpy())
                     axs[1, 4].title.set_text('next gt left mask')
+                    print("next_gt_mask 都是gt", next_gt_mask)
 
                 # remove axis
                 for ax in axs.flat:

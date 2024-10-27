@@ -97,8 +97,6 @@ def create_replay(batch_size: int, timesteps: int,
             # color, height, width 新增depth
             ObservationElement("%s_rgb" % cname,(3,image_size[1],image_size[0],),np.float32,))
         observation_elements.append(
-            ObservationElement('%s_next_rgb' % cname, (3, image_size[1], image_size[0]), np.float32))
-        observation_elements.append(
             ObservationElement('%s_depth' % cname, (1, image_size[1], image_size[0]), np.float32))
         observation_elements.append(
             ObservationElement('%s_next_depth' % cname, (1, image_size[1], image_size[0]), np.float32))
@@ -117,12 +115,14 @@ def create_replay(batch_size: int, timesteps: int,
         observation_elements.append(
             ObservationElement("%s_camera_extrinsics" % cname,(4,4,),np.float32,))
         observation_elements.append(
-            ObservationElement("%s_next_camera_extrinsics" % cname,(4,4,),np.float32,))
-        observation_elements.append(
-            ObservationElement("%s_camera_intrinsics" % cname,(3,3,),np.float32,))        
-        observation_elements.append(
-            ObservationElement("%s_next_camera_intrinsics" % cname,(3,3,),np.float32,))      
-
+            ObservationElement("%s_camera_intrinsics" % cname,(3,3,),np.float32,))      
+        if  not cfg.method.neural_renderer.use_nerf_picture:
+            observation_elements.append(
+                ObservationElement("%s_next_camera_extrinsics" % cname,(4,4,),np.float32,))  
+            observation_elements.append(
+                ObservationElement("%s_next_camera_intrinsics" % cname,(3,3,),np.float32,))      
+            observation_elements.append(
+                ObservationElement('%s_next_rgb' % cname, (3, image_size[1], image_size[0]), np.float32))
         """
         observation_elements.append(
             ObservationElement('%s_rgb' % cname, (3, *image_size,), np.float32))
@@ -139,11 +139,12 @@ def create_replay(batch_size: int, timesteps: int,
         #------加了nerf和-------------------------------------------------------------
 
     #-------------------------------NERF----------------------------------------------
-    print("cfg.method.neural_renderer.use_nerf_picture",cfg.method.neural_renderer.use_nerf_picture)
+    print("launch_utils.py cfg.method.neural_renderer.use_nerf_picture",cfg.method.neural_renderer.use_nerf_picture)
     if  cfg.method.neural_renderer.use_nerf_picture:
         # for nerf img, exs, ins
         # 使用 append 时，添加的对象会作为一个单一的元素（无论它本身是一个列表还是其他类型）。
         # 使用 extend 时，添加的对象（必须是可迭代的）会被拆分，其元素会被逐个添加到列表中。
+        # print("## ")
         observation_elements.append(
             ObservationElement('nerf_multi_view_rgb', (num_view_for_nerf,), np.object_))
         # ------------------------2024.8.5-----------------------------------------------------------------
@@ -667,6 +668,7 @@ def fill_multi_task_replay(cfg: DictConfig,
             task = tasks[int(task_idx)]
             model_device = torch.device('cuda:%s' % (e_idx % torch.cuda.device_count())
                                         if torch.cuda.is_available() else 'cpu')    # NOT USED
+            print("launch_utils.py")
             p = Process(target=fill_replay, args=(cfg,
                                                   obs_config,
                                                   rank,

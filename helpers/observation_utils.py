@@ -94,8 +94,9 @@ def extract_obs_unimanual(cfg,
     for camera_name in cameras:
         obs_dict["%s_camera_extrinsics" % camera_name] = obs.misc["%s_camera_extrinsics" % camera_name]
         obs_dict["%s_camera_intrinsics" % camera_name] = obs.misc["%s_camera_intrinsics" % camera_name]
-        obs_dict["%s_next_camera_extrinsics" % camera_name] = obs.misc["%s_next_camera_extrinsics" % camera_name]
-        obs_dict["%s_next_camera_intrinsics" % camera_name] = obs.misc["%s_next_camera_intrinsics" % camera_name]
+        if not cfg.method.neural_renderer.use_nerf_picture:
+            obs_dict["%s_next_camera_extrinsics" % camera_name] = obs.misc["%s_next_camera_extrinsics" % camera_name]
+            obs_dict["%s_next_camera_intrinsics" % camera_name] = obs.misc["%s_next_camera_intrinsics" % camera_name]
 
     # add timestep to low_dim_state
     time = (1.0 - (t / float(episode_length - 1))) * 2.0 - 1.0
@@ -152,7 +153,7 @@ def extract_obs_bimanual(cfg,
 
     
     # Mani增加---------------------------------------------
-    # print("cfg.method.neural_renderer.use_nerf_picture = ",cfg.method.neural_renderer.use_nerf_picture)
+    # print("obs utils.py cfg.method.neural_renderer.use_nerf_picture = ",cfg.method.neural_renderer.use_nerf_picture)
     if cfg.method.neural_renderer.use_nerf_picture:
         if obs.nerf_multi_view_rgb is not None:
             nerf_multi_view_rgb = obs.nerf_multi_view_rgb
@@ -245,8 +246,9 @@ def extract_obs_bimanual(cfg,
     for camera_name in cameras:
         obs_dict["%s_camera_extrinsics" % camera_name] = obs.misc["%s_camera_extrinsics" % camera_name]
         obs_dict["%s_camera_intrinsics" % camera_name] = obs.misc["%s_camera_intrinsics" % camera_name]
-        obs_dict["%s_next_camera_extrinsics" % camera_name] = obs.misc["%s_next_camera_extrinsics" % camera_name]
-        obs_dict["%s_next_camera_intrinsics" % camera_name] = obs.misc["%s_next_camera_intrinsics" % camera_name]
+        if not cfg.method.neural_renderer.use_nerf_picture:
+            obs_dict["%s_next_camera_extrinsics" % camera_name] = obs.misc["%s_next_camera_extrinsics" % camera_name]
+            obs_dict["%s_next_camera_intrinsics" % camera_name] = obs.misc["%s_next_camera_intrinsics" % camera_name]
         
     # add timestep to low_dim_state 
     # 将 TimeStep 添加到low_dim_state
@@ -275,14 +277,15 @@ def extract_obs_bimanual(cfg,
     #     print("helpers observation_utils.py --- right_grip_mat[key]", right_grip_mat[key])
 
     # Mani NERF 新增----------------------------------
+    # print("obs utils.py cfg.method.neural_renderer.use_nerf_picture = ",cfg.method.neural_renderer.use_nerf_picture)
     if cfg.method.neural_renderer.use_nerf_picture:
-        if nerf_multi_view_rgb is not None:
-            obs_dict['nerf_multi_view_rgb'] = nerf_multi_view_rgb
-            # ---------在这里会输出一堆地址（21个一组）----------------------------------------------------------
-            # print("helpers observation_utils.py --- obs_dict[nerf_multi_view_rgb]",obs_dict['nerf_multi_view_rgb'])
-            # -------------------------------------------------------------------
-            obs_dict['nerf_multi_view_depth'] = nerf_multi_view_depth
-            obs_dict['nerf_multi_view_camera'] = nerf_multi_view_camera
+        # if nerf_multi_view_rgb is not None:
+        obs_dict['nerf_multi_view_rgb'] = nerf_multi_view_rgb
+        # ---------在这里会输出一堆地址（21个一组）----------------------------------------------------------
+        # print("helpers observation_utils.py --- obs_dict[nerf_multi_view_rgb]",obs_dict['nerf_multi_view_rgb'])
+        # -------------------------------------------------------------------
+        obs_dict['nerf_multi_view_depth'] = nerf_multi_view_depth
+        obs_dict['nerf_multi_view_camera'] = nerf_multi_view_camera
 
         # for next frame prediction
         if next_obs is not None:

@@ -67,7 +67,7 @@ class NeuralRenderer(nn.Module):
         self.model_name = cfg.foundation_model_name
         self.d_embed = cfg.d_embed
         self.loss_embed_fn = cfg.loss_embed_fn
-        self.CrossEntropyLoss = nn.CrossEntropyLoss()
+        self.CrossEntropyLoss = nn.CrossEntropyLoss(reduction='mean') 
 
         if self.model_name == "diffusion":
             from odise.modeling.meta_arch.ldm import LdmFeatureExtractor
@@ -131,6 +131,16 @@ class NeuralRenderer(nn.Module):
         MIN_DENOMINATOR = 1e-12
         gt_mask = (gt_mask - gt_mask.min()) / (gt_mask.max() - gt_mask.min() + MIN_DENOMINATOR)
         loss_mask = l2_loss(render_mask, gt_mask)
+        return loss_mask
+
+    def _mask_ce_loss_fn(self, render_mask, gt_mask):
+        """
+        render_embed: [bs, h, w, 3]
+        gt_embed: [bs, h, w, 3]
+        """
+        MIN_DENOMINATOR = 1e-12
+        render_mask = (render_mask - render_mask.min()) / (render_mask.max() - render_mask.min() + MIN_DENOMINATOR)
+        loss_mask = self.CrossEntropyLoss(render_mask, gt_mask)
         return loss_mask
 
     def _save_gradient(self, name):
@@ -812,23 +822,25 @@ class NeuralRenderer(nn.Module):
                         # left_mask = (gt_mask1 > left_min - 1) & (gt_mask1 < left_max + 1)
                         # next_gt_mask_label[left_mask] = torch.tensor([0, 0, 1], dtype=torch.float32) 
 
-                        gt_mask_label = self.mask_onehot(gt_mask)
-                        next_gt_mask_label = self.mask_onehot(next_gt_mask)
-                        # print("gt_mask_label = ",gt_mask_label.shape, gt_mask_label)
-                        # print("next_gt_mask_label = ",next_gt_mask_label.shape, next_gt_mask_label) # [1 256 256 3]
-                        device = gt_mask.device  # 获取 next_gt_rgb 的设备
-                        gt_mask_label = gt_mask_label.to(device)
-                        next_gt_mask_label = next_gt_mask_label.to(device)
-
+                        # gt_mask_label = self.mask_onehot(gt_mask) # 100 010  001
+                        # next_gt_mask_label = self.mask_onehot(next_gt_mask) # [1 256 256 3]
+                        # device = gt_mask.device  # 获取 next_gt_rgb 的设备
+                        # gt_mask_label = gt_mask_label.to(device)
+                        # next_gt_mask_label = next_gt_mask_label.to(device)
+                        gt_mask_label = self.mask_label(gt_mask) # 100 010  001
+                        next_gt_mask_label = self.mask_label(next_gt_mask)
+                        print("gt_mask_label = ",gt_mask_label.shape,gt_mask_label)
+                        print("next_gt_mask_label = ",next_gt_mask_label.shape,next_gt_mask_label)
                         # 1 当前场景的mask 训练  loss_dyna_mask_novel
                         data =self.pts2render_mask_gen(data, bg_color=self.bg_mask)
-                        render_mask_novel = data['novel_view']['mask_gen'].permute(0, 2, 3, 1) # [1,3，128, 128] -> [1,128, 128, 3]                           
+                        render_mask_novel = data['novel_view']['mask_gen'] # .permute(0, 2, 3, 1) # [1,3，128, 128] -> [1,128, 128, 3]                           
                         # 忽略特定的标签（例如空白背景类）
                         # CrossEntropyLoss = nn.CrossEntropyLoss(ignore_index=self.ignore_label)
                         # 接收两个参数：logit（模型输出的 logits）和 label（真实标签）
                         # abel 被减去 1。这个操作是为了将背景类（通常 ID 为 0）转移到 -1，使得 CrossEntropyLoss 可以正确忽略这个类别。
                         # crossentropy_loss = lambda logit, label: CrossEntropyLoss(logit, label-1)
                         loss_dyna_mask_novel = self.CrossEntropyLoss(render_mask_novel, gt_mask_label) # mask现阶段的
+                        render_mask_novel = render_mask_novel.permute(0, 2, 3, 1)
 
                         # 2 GRB total(Follower)  先对left预测（最后的结果） loss_dyna_follower  左臂 RGB Loss   
                         # 也可以说是双手结果
@@ -839,8 +851,10 @@ class NeuralRenderer(nn.Module):
 
                         # 3 next mask train (pre - left(mask) ) next_loss_dyna_mask_left  左臂 Mask Loss
                         data['left_next'] =self.pts2render_mask_gen(data['left_next'], bg_color=self.bg_mask)
-                        next_render_mask = data['left_next']['novel_view']['mask_gen'].permute(0, 2, 3, 1) # [1,3，128, 128] -> [1,128, 128, 3]
+                        next_render_mask = data['left_next']['novel_view']['mask_gen'] # .permute(0, 2, 3, 1) # [1,3，128, 128] -> [1,128, 128, 3]
+                        # print('next_render_mask', next_render_mask.shape,next_gt_mask_label.shape)
                         next_loss_dyna_mask_left = self.CrossEntropyLoss(next_render_mask, next_gt_mask_label) # mask去左臂的mask
+                        next_render_mask = next_render_mask.permute(0, 2, 3, 1) # [1,3，128, 128] -> [1,128, 128, 3]
 
                         # gen mask and exclude
                         # data['left_next'] =self.pts2render_mask_gen(data['left_next'], bg_color=self.bg_color)
@@ -864,9 +878,10 @@ class NeuralRenderer(nn.Module):
                         
                         # 5 Mask loss_dyna_mask_next_right 右臂mask训练（和now一样 无用）
                         data['right_next'] =self.pts2render_mask_gen(data['right_next'], bg_color=self.bg_color)
-                        next_render_mask_right = data['right_next']['novel_view']['mask_gen'].permute(0, 2, 3, 1)
+                        next_render_mask_right = data['right_next']['novel_view']['mask_gen'] # .permute(0, 2, 3, 1)
                         # CrossEntropyLoss = nn.CrossEntropyLoss(ignore_index=self.ignore_label)
                         next_loss_dyna_mask_right = self.CrossEntropyLoss(next_render_mask_right, next_gt_mask_label)
+                        next_render_mask_right = next_render_mask_right.permute(0, 2, 3, 1) # [1,128, 128, 3]
 
                         # pre mask = right +left    
                         next_loss_dyna_mask = next_loss_dyna_mask_left * ( 1 - self.cfg.lambda_mask_right ) + next_loss_dyna_mask_right * self.cfg.lambda_mask_right  # 右臂权重小一点
@@ -1260,7 +1275,7 @@ class NeuralRenderer(nn.Module):
         # exclude_left_mask = (next_left_mask_gen > 2.5) | (next_left_mask_gen < 1.5) # 原来 值的方式来判断
         # print("before",next_left_mask_gen.shape)
         class_indices = torch.argmax(next_left_mask_gen, dim=-1)
-        # print("class_indices = ", class_indices.shape,class_indices)
+        print("class_indices = ", class_indices.shape,class_indices)
 
         # 初始化最终的分类标签
         # final_class_labels = torch.zeros_like(class_indices, dtype=torch.long)
@@ -1296,6 +1311,21 @@ class NeuralRenderer(nn.Module):
         gt_mask_label[right_mask] = torch.tensor([0, 1, 0], dtype=torch.float32)  # 右手的独热编码                  
         left_mask = (gt_mask1 > left_min - 1) & (gt_mask1 < left_max + 1)
         gt_mask_label[left_mask] = torch.tensor([0, 0, 1], dtype=torch.float32) 
+
+
+        # # Tensor写法（mask标签归类 0：bg    1:ritght    2:left）
+        # # gt_mask_label = torch.zeros_like(gt_mask, dtype=torch.uint8)
+        # gt_mask_label = torch.zeros_like(gt_mask, dtype=torch.long)
+        # gt_mask_label[(gt_mask > right_min-1) & (gt_mask < right_max+1)] = 1
+        # gt_mask_label[(gt_mask > left_min-1) & (gt_mask < left_max+1)] = 2
+        # # next_gt_mask_label = torch.zeros_like(next_gt_mask, dtype=torch.uint8)
+        # next_gt_mask_label = torch.zeros_like(next_gt_mask, dtype=torch.long)
+        # next_gt_mask_label[(next_gt_mask > right_min-1) & (next_gt_mask < right_max+1)] = 1
+        # next_gt_mask_label[(next_gt_mask > left_min-1) & (next_gt_mask < left_max+1)] = 2
+
+
+
+        # gt_mask_label = torch.clamp(gt_mask_label, 0, 1)
                         # # gt_mask = gt_mask[indx].permute(0, 2, 3, 1).repeat(1, 1, 1, 3)  # 复制三次，得到 [1,128, 128, 3]
                         # gt_mask = gt_mask.repeat(1, 3, 1, 1)  #  [1,3,256,256]
                         # # gt_mask = F.interpolate(gt_mask, size=(128, 128), mode='bilinear', align_corners=False).permute(0, 2, 3, 1)
@@ -1339,4 +1369,21 @@ class NeuralRenderer(nn.Module):
                         # next_gt_mask_label[(next_gt_mask > right_min-1) & (next_gt_mask < right_max+1), 1] = 1  # 右手
                         # next_gt_mask_label[(next_gt_mask > left_min-1) & (next_gt_mask < left_max+1), 2] = 1  # 左手
 
+        return gt_mask_label
+
+    def mask_label(self,gt_mask):
+        right_min, right_max, left_min, left_max = 53, 73, 94, 114
+
+
+        # Tensor写法（mask标签归类 0：bg    1:ritght    2:left）
+        # gt_mask_label = torch.zeros_like(gt_mask, dtype=torch.uint8)
+        gt_mask = gt_mask.squeeze(-1)
+        gt_mask_label = torch.zeros_like(gt_mask, dtype=torch.long)
+        gt_mask_label[(gt_mask > right_min-1) & (gt_mask < right_max+1)] = 1
+        gt_mask_label[(gt_mask > left_min-1) & (gt_mask < left_max+1)] = 2
+        # # next_gt_mask_label = torch.zeros_like(next_gt_mask, dtype=torch.uint8)
+        # next_gt_mask_label = torch.zeros_like(next_gt_mask, dtype=torch.long)
+        # next_gt_mask_label[(next_gt_mask > right_min-1) & (next_gt_mask < right_max+1)] = 1
+        # next_gt_mask_label[(next_gt_mask > left_min-1) & (next_gt_mask < left_max+1)] = 2
+        
         return gt_mask_label
