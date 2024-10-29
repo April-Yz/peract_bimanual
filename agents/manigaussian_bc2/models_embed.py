@@ -97,7 +97,7 @@ class GeneralizableGSEmbedNet(nn.Module):
         self.opacity_activation = torch.sigmoid
         self.rotation_activation = torch.nn.functional.normalize    # [B, N, 4]
         self.max_sh_degree = cfg.mlp.max_sh_degree
-        self.mask_activation = torch.sigmoid
+        # self.mask_activation = torch.sigmoid
 
         # we move xyz, rot
         self.use_dynamic_field = cfg.use_dynamic_field

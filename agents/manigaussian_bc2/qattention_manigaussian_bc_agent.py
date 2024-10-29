@@ -273,19 +273,12 @@ class QFunction(nn.Module):
         right_trans, right_rot_and_grip,right_ignore_collisions,\
         left_trans,left_rot_and_grip_out,left_collision_out= split_pred
         q_trans=torch.cat((right_trans, left_trans), dim=1) 
-        # left 的取名代表bimanual风格可能代表的东西不一样
         q_rot_and_grip=torch.cat((right_rot_and_grip, left_rot_and_grip_out), dim=1)
         q_ignore_collisions=torch.cat((right_ignore_collisions, left_collision_out), dim=1)
-        # voxel_grid_feature=torch.cat((voxel_grid_feature, voxel_grid_feature),dim=1)
-        # print("在qfunction中出现的q_trans=",q_trans.shape) #[1,2,100,100,100]print("q_rot_and_grip=",q_rot_and_grip.shape)     # [1,436]print("q_ignore_collisions=",q_ignore_collisions.shape) # [1,4]print("---------voxel_grid_feature=",voxel_grid_feature.shape) # [1,128,100,100]print("multi_scale_voxel_list=",multi_scale_voxel_list.shape)print("lang_embedd=",lang_embedd.shape)print("voxel_grid=",voxel_grid.shape)print("proprio=",proprio.shape)print("lang_goal_emb=",lang_goal_emb.shape)print("lang_token_embs=",lang_token_embs.shape)
-        # 但是好像是None print("-------------prev_layer_voxel_grid=",prev_layer_voxel_grid.shape)
-        # print("bounds=",bounds.shape)
-        # 但是好像是None print("prev_bounds=",prev_bounds.shape)
-        # !!新 ----------------------------------------------------------------
-        # neural rendering as an auxiliary loss # 神经渲染作为辅助损失
         rendering_loss_dict = {}
         if use_neural_rendering:    # train default: True; eval default: False
             if self.cfg.neural_renderer.use_nerf_picture:
+                print("nerf的train运行状态")
                 # prepare nerf rendering
                 # 提取焦距
                 focal = camera_intrinsics[0][:, 0, 0]  # [SB]
@@ -297,50 +290,179 @@ class QFunction(nn.Module):
                     gt_rgb = nerf_target_rgb    # [1,128,128,3]
                     gt_pose = nerf_target_pose @ self._coord_trans # remember to do this # 将目标的世界坐标系转换为相机坐标系
                     gt_depth = nerf_target_depth
-                    # todo 加一个radom i 随机相机
-                    # import random
-                    # random_int = random.randint(0, 5)
-                    # selected_indices = [5, 2] # 5:front 2:overhead
-                    # gt_mask_camera_intrinsic = camera_intrinsics[selected_indices]
-                    # gt_mask_camera_extrinsic = camera_extrinsics[selected_indices]
-                    # gt_mask = gt_mask[selected_indices]
-                    # next_gt_mask = next_gt_mask[selected_indices]
-                    # gt_maskdepth = depth[selected_indices]
-                    # next_gt_maskdepth = next_depth[selected_indices]
-                    # 创建空列表用于存储选定索引对应的值
-                    gt_mask_camera_intrinsic = []
-                    gt_mask_camera_extrinsic = []
-                    gt_mask1 = []  # 为了避免和原始变量名冲突，重命名为 gt_mask_list
-                    next_gt_mask1 = []
-                    gt_maskdepth =[]
-                    next_gt_maskdepth = []
-                    # 使用 append 方法添加索引 2 和 5 对应的值
-                    for idx in [5,2]:
-                        gt_mask_camera_intrinsic.append(camera_intrinsics[idx])
-                        gt_mask_camera_extrinsic.append(camera_extrinsics[idx])
-                        gt_mask1.append(gt_mask[idx])
-                        next_gt_mask1.append(next_gt_mask[idx])
-                        gt_maskdepth.append(depth[idx])
-                        next_gt_maskdepth.append(next_depth[idx])
-                    # (新增！！！改变)We only use the front camera  我们只使用前置摄像头
-                    rgb_0 = rgb[5] # rgb[0]
-                    depth_0 = depth[5]
-                    pcd_0 = pcd[5]
-                    # mask_0 = mask[0]   # print(mask_0.shape) torch.Size([1, 1, 256, 256])
+                    if self.cfg.neural_renderer.mask_gen =='gt': # 需要两个mask+depth视角
+                        # todo 加一个radom i 随机相机
+                        # import random
+                        # random_int = random.randint(0, 5)
+                        # selected_indices = [5, 2] # 5:front 2:overhead
+                        # gt_mask_camera_intrinsic = camera_intrinsics[selected_indices]
+                        # gt_mask_camera_extrinsic = camera_extrinsics[selected_indices]
+                        # gt_mask = gt_mask[selected_indices]
+                        # next_gt_mask = next_gt_mask[selected_indices]
+                        # gt_maskdepth = depth[selected_indices]
+                        # next_gt_maskdepth = next_depth[selected_indices]
+                        # 创建空列表用于存储选定索引对应的值
+                        gt_mask_camera_intrinsic = []
+                        gt_mask_camera_extrinsic = []
+                        gt_mask1 = []  # 为了避免和原始变量名冲突，重命名为 gt_mask_list
+                        next_gt_mask1 = []
+                        gt_maskdepth =[]
+                        next_gt_maskdepth = []
+                        # 使用 append 方法添加索引 2 和 5 对应的值
+                        for idx in [5,2]:
+                            gt_mask_camera_intrinsic.append(camera_intrinsics[idx])
+                            gt_mask_camera_extrinsic.append(camera_extrinsics[idx])
+                            gt_mask1.append(gt_mask[idx])
+                            next_gt_mask1.append(next_gt_mask[idx])
+                            gt_maskdepth.append(depth[idx])
+                            next_gt_maskdepth.append(next_depth[idx])
+                        # (新增！！！改变)We only use the front camera  我们只使用前置摄像头
+                        rgb_0 = rgb[5] # rgb[0]
+                        depth_0 = depth[5]
+                        pcd_0 = pcd[5]
+                        # mask_0 = mask[0]   # print(mask_0.shape) torch.Size([1, 1, 256, 256])
 
-                    # render loss（改变）神经渲染 后面是一些相关数据字典通过dotmap处理后的数据，可用.访问，但是无用
-                    # 所以就是在这里加入grounded sam结果了
-                    # print("\033[0;32;40maction in bc agent.py\033[0m",action) [1,16]
-                    # print(action.shape) # torch.Size([1, 16])
+                        # render loss（改变）神经渲染 后面是一些相关数据字典通过dotmap处理后的数据，可用.访问，但是无用
+                        # 所以就是在这里加入grounded sam结果了
+                        # print("\033[0;32;40maction in bc agent.py\033[0m",action) [1,16]
+                        # print(action.shape) # torch.Size([1, 16])
 
+                        rendering_loss_dict, _ = self._neural_renderer(
+                            rgb=rgb_0, pcd=pcd_0, depth=depth_0, # 第一个视角下的颜色 点云数据 深度
+                            language=lang_embedd, # 语言目标
+                            dec_fts=voxel_grid_feature, # 体素网格特征，可能用于3D体素渲染
+                            gt_rgb=gt_rgb,  gt_depth=gt_depth, focal=focal,  # 真实（Ground Truth）的图像
+                            c=c, 
+                            gt_pose=gt_pose, gt_intrinsic=nerf_target_camera_intrinsic, \
+                            lang_goal=lang_goal, 
+                            next_gt_pose=nerf_next_target_pose, next_gt_intrinsic=nerf_next_target_camera_intrinsic, # 内外（pose）参
+                            next_gt_rgb=nerf_next_target_rgb, step=step, action=action,
+                            training=True, 
+                            gt_mask=gt_mask1, 
+                            gt_mask_camera_extrinsic=gt_mask_camera_extrinsic, gt_mask_camera_intrinsic=gt_mask_camera_intrinsic, next_gt_mask = next_gt_mask1,
+                            gt_maskdepth = gt_maskdepth, next_gt_maskdepth = next_gt_maskdepth,
+                            )
+                    elif self.cfg.neural_renderer.mask_gen =='pre': # 需要一个mask视角（target）
+                        # todo 加一个radom i 随机相机
+                        # import random
+                        # random_int = random.randint(0, 5)
+                        random_int = 5
+                        # selected_indices = [5, 2] # 5:front 2:overhead
+                        gt_mask = gt_mask[random_int]
+                        gt_maskdepth = depth[random_int] #？有用吗
+                        gt_mask_camera_intrinsic = camera_intrinsics[random_int]
+                        gt_mask_camera_extrinsic = camera_extrinsics[random_int]
+                        
+                        next_gt_mask = next_gt_mask[random_int]
+                        next_gt_maskdepth = next_depth[random_int]
+                        next_gt_mask_camera_intrinsic = next_camera_intrinsics[random_int]
+                        next_gt_mask_camera_extrinsic = next_camera_extrinsics[random_int]
+                         
+                        # 创建空列表用于存储选定索引对应的值
+                        # gt_mask_camera_intrinsic = []
+                        # gt_mask_camera_extrinsic = []
+                        # gt_mask1 = []  # 为了避免和原始变量名冲突，重命名为 gt_mask_list
+                        # next_gt_mask1 = []
+                        # gt_maskdepth =[]
+                        # next_gt_maskdepth = []
+                        # # 使用 append 方法添加索引 2 和 5 对应的值
+                        # for idx in [5,2]:
+                        #     gt_mask_camera_intrinsic.append(camera_intrinsics[idx])
+                        #     gt_mask_camera_extrinsic.append(camera_extrinsics[idx])
+                        #     gt_mask1.append(gt_mask[idx])
+                        #     next_gt_mask1.append(next_gt_mask[idx])
+                        #     gt_maskdepth.append(depth[idx])
+                        #     next_gt_maskdepth.append(next_depth[idx])
+                        # (新增！！！改变)We only use the front camera  我们只使用前置摄像头
+                        rgb_0 = rgb[5] # rgb[0]
+                        depth_0 = depth[5]
+                        pcd_0 = pcd[5]
+                        # mask_0 = mask[0]   # print(mask_0.shape) torch.Size([1, 1, 256, 256])
+
+                        # render loss（改变）神经渲染 后面是一些相关数据字典通过dotmap处理后的数据，可用.访问，但是无用
+                        # 所以就是在这里加入grounded sam结果了
+                        # print("\033[0;32;40maction in bc agent.py\033[0m",action) [1,16]
+                        # print(action.shape) # torch.Size([1, 16])
+
+                        rendering_loss_dict, _ = self._neural_renderer(
+                            rgb=rgb_0, pcd=pcd_0, depth=depth_0, # 第一个视角下的颜色 点云数据 深度
+                            language=lang_embedd, # 语言目标
+                            dec_fts=voxel_grid_feature, # 体素网格特征，可能用于3D体素渲染
+                            gt_rgb=gt_rgb,  gt_depth=gt_depth, focal=focal,  # 真实（Ground Truth）的图像
+                            c=c, 
+                            gt_pose=gt_pose, gt_intrinsic=nerf_target_camera_intrinsic, \
+                            lang_goal=lang_goal, 
+                            next_gt_pose=nerf_next_target_pose, next_gt_intrinsic=nerf_next_target_camera_intrinsic, # 内外（pose）参
+                            next_gt_rgb=nerf_next_target_rgb, step=step, action=action,
+                            training=True, 
+                            gt_mask=gt_mask1, 
+                            gt_mask_camera_extrinsic=gt_mask_camera_extrinsic, gt_mask_camera_intrinsic=gt_mask_camera_intrinsic, next_gt_mask = next_gt_mask1,
+                            gt_maskdepth = gt_maskdepth, next_gt_maskdepth = next_gt_maskdepth,
+                            )
+                else:   # 对应前面没有nerf图片那个if，好像不用判断了
+                    # # if we do not have additional multi-view data, we use input view as reconstruction target
+                    #  如果没有额外的多视图数据，我们就使用输入视图作为重建目标
+                    rendering_loss_dict = {
+                        'loss': 0.,
+                        'loss_rgb': 0.,
+                        'loss_embed': 0.,
+                        'l1': 0.,
+                        'psnr': 0.,
+                        }
+            else: # nonerf 使用六个camera的数据重建 重要：不再是128*128 （其实可以在前面加一个使用gt的情况）
+                # prepare nerf rendering
+                # 提取焦距
+                focal = camera_intrinsics[0][:, 0, 0]  # [SB]
+                cx = 256 / 2 # 128 / 2 # 相机中心坐标cx,cy
+                cy = 256 / 2 # 128 / 2
+                c = torch.tensor([cx, cy], dtype=torch.float32).unsqueeze(0) #[1,2]
+                if nerf_target_rgb is not None:
+                    gt_rgb = nerf_target_rgb    # [1,128,128,3]
+                    gt_pose = nerf_target_pose  # @ self._coord_trans # remember to do this # 将目标的世界坐标系转换为相机坐标系
+                    gt_depth = nerf_target_depth
+
+                    """  # 目标 输入：正视图 输出：侧视图上面都是正确的样子
+                num_view = len(rgb)-1
+                num_view_by_user = 1 # self.cfg.num_view_for_nerf
+                # compute interval first先算区间
+                assert num_view_by_user <= num_view, f'num_view_by_user {num_view_by_user} should be less than num_view {num_view}'
+                interval = (num_view-1) // num_view_by_user # 21//20?
+                # print(f"interval: {interval} num_view: {num_view} num_view_by_user: {num_view_by_user}")
+                # nerf_multi_view_rgb_path = nerf_multi_view_rgb_path[:, ::interval]
+
+                options = list(range(0, num_view-1, interval))
+                # print(f"options: {options}")
+                if len(options)>1:
+                    random_int = random.randint(options)
+                else:
+                    random_int = options[0]
+                random_int = 0 # 临时
+                gt_rgb = rgb[random_int]
+                gt_depth = depth[random_int]
+                gt_intrinsic = camera_intrinsics[random_int]
+                gt_extrinsic = camera_extrinsics[random_int]
+                gt_mask1 = gt_mask[random_int]
+
+                next_gt_rgb = next_obs_rgb[random_int]
+                next_gt_mask1 = next_gt_mask[random_int]
+                next_gt_depth = next_depth[random_int]
+                next_gt_intrinsic = next_camera_intrinsics[random_int]
+                next_gt_extrinsic = next_camera_extrinsics[random_int] """ 
+                    
+                    # (新增！！！改变)We only use the front camera  使用前置摄像头作为输入
+                    input_indx=2
+                    rgb_0 = rgb[input_indx] # rgb[0]
+                    depth_0 = depth[input_indx]
+                    pcd_0 = pcd[input_indx]
+                    mask_0 = gt_mask[input_indx]   # print(mask_0.shape) torch.Size([1, 1, 256, 256])
                     rendering_loss_dict, _ = self._neural_renderer(
                         rgb=rgb_0, pcd=pcd_0, depth=depth_0, # 第一个视角下的颜色 点云数据 深度
                         language=lang_embedd, # 语言目标
                         dec_fts=voxel_grid_feature, # 体素网格特征，可能用于3D体素渲染
                         gt_rgb=gt_rgb,  gt_depth=gt_depth, focal=focal,  # 真实（Ground Truth）的图像
-                        c=c, 
-                        gt_pose=gt_pose, gt_intrinsic=nerf_target_camera_intrinsic, \
-                        lang_goal=lang_goal, 
+                        c=c, lang_goal=lang_goal,
+                        gt_pose=gt_pose, gt_intrinsic=nerf_target_camera_intrinsic,
+                         
                         next_gt_pose=nerf_next_target_pose, next_gt_intrinsic=nerf_next_target_camera_intrinsic, # 内外（pose）参
                         next_gt_rgb=nerf_next_target_rgb, step=step, action=action,
                         training=True, 
@@ -358,39 +480,7 @@ class QFunction(nn.Module):
                         'l1': 0.,
                         'psnr': 0.,
                         }
-            else: # 使用六个camera的数据重建 重要：不再是128*128 （其实可以在前面加一个使用gt的情况）
-                # prepare nerf rendering
-                # 提取焦距
-                focal = camera_intrinsics[0][:, 0, 0]  # [SB]
-                cx = 256 / 2 # 128 / 2 # 相机中心坐标cx,cy
-                cy = 256 / 2 # 128 / 2
-                c = torch.tensor([cx, cy], dtype=torch.float32).unsqueeze(0) #[1,2]
-                # if nerf_target_rgb is not None:
-                #     gt_rgb = nerf_target_rgb    # [1,128,128,3]
-                #     gt_pose = nerf_target_pose @ self._coord_trans # remember to do this # 将目标的世界坐标系转换为相机坐标系
-                #     gt_depth = nerf_target_depth
-
-                # 目标 输入：正视图 输出：侧视图上面都是正确的样子
-                random_int = random.randint(0, 4)
-                gt_rgb = rgb[random_int]
-                gt_depth = depth[random_int]
-                gt_intrinsic = camera_intrinsics[random_int]
-                gt_extrinsic = camera_extrinsics[random_int]
-                gt_mask1 = gt_mask[random_int]
-
-                next_gt_rgb = next_obs_rgb[random_int]
-                next_gt_mask1 = next_gt_mask[random_int]
-                next_gt_depth = next_depth[random_int]
-                next_gt_intrinsic = next_camera_intrinsics[random_int]
-                next_gt_extrinsic = next_camera_extrinsics[random_int]
-                    
-                # (新增！！！改变)We only use the front camera  使用前置摄像头作为输入
-                rgb_0 = rgb[5] # rgb[0]
-                depth_0 = depth[5]
-                pcd_0 = pcd[5]
-                mask_0 = gt_mask[5]   # print(mask_0.shape) torch.Size([1, 1, 256, 256])
-
-                rendering_loss_dict, _ = self._neural_renderer(
+                    """ rendering_loss_dict, _ = self._neural_renderer(
                     rgb=rgb_0, pcd=pcd_0, depth=depth_0,  # 输入 第一个视角下的颜色 点云数据 深度
                     language=lang_embedd, # 语言目标
                     mask=mask_0, # （也作为mlp的输入 目前还没有）
@@ -409,7 +499,7 @@ class QFunction(nn.Module):
                     next_gt_mask = next_gt_mask1,
                     gt_maskdepth = next_gt_depth, next_gt_maskdepth = next_gt_depth,
                     # next_gt_depth = next_gt_depth ? 除了可视化和计算凸包一无是处
-                    )
+                    )  """
 
         # return split_pred, voxel_grid
         # return q_trans, q_rot_and_grip, q_ignore_collisions, voxel_grid, rendering_loss_dict
@@ -474,7 +564,9 @@ class QFunction(nn.Module):
         # voxel_grid_feature = torch.cat((voxel_grid_feature, voxel_grid_feature), dim=1)
         # prepare nerf rendering            准备Nerf渲染?
         # We only use the front camera      我们只使用前置摄像头
-        if self.cfg.neural_renderer.use_nerf_picture:
+        # if self.cfg.neural_renderer.use_nerf_picture:
+        if self.cfg.neural_renderer.mask_gen =='gt': # 需要多传输两个视角的gt_mask 其实pre也要这边？
+            print("带mask的可视化")
             gt_mask = [gt_mask[5],gt_mask[2]]
             # print("gt_mask",gt_mask,gt_mask[0].shape)
             gt_mask_camera_extrinsic = [camera_extrinsics[5], camera_extrinsics[2]]
@@ -483,8 +575,8 @@ class QFunction(nn.Module):
             next_gt_mask = [next_gt_mask[5],next_gt_mask[2]]
             next_gt_maskdepth = [next_gt_maskdepth[5],next_gt_maskdepth[2]]
             _, ret_dict = self._neural_renderer(
-                    pcd=pcd[0],                 # 点云数据（Point Cloud Data）的第一个元素，可能是一个3D点云表示
-                    rgb=rgb[0],                 # ：RGB图像数据的第一个元素，表示场景的颜色信息。
+                    pcd=pcd[5],                 # 点云数据（Point Cloud Data）的第一个元素，可能是一个3D点云表示
+                    rgb=rgb[5],                 # ：RGB图像数据的第一个元素，表示场景的颜色信息。
                     dec_fts=voxel_grid_feature, # 解码特征，可能是指从体素网格中提取的特征。
                     language=lang_embedd,       # 语言嵌入，可能表示与任务相关的自然语言处理结果。
                     gt_pose=tgt_pose,           # 目标姿态（Ground Truth Pose），真实的姿态信息，用于训练或评估
@@ -505,44 +597,99 @@ class QFunction(nn.Module):
                     gt_maskdepth = gt_maskdepth, 
                     next_gt_maskdepth = next_gt_maskdepth,
                     )
-        else:
-            random_int = random.randint(0, 4)
-            gt_rgb = rgb[random_int]
-            # gt_depth = depth[random_int]
-            gt_intrinsic = camera_intrinsics[random_int]
-            gt_extrinsic = camera_extrinsics[random_int]
-            gt_mask1 = gt_mask[random_int]
-
-            next_gt_rgb = next_obs_rgb[random_int]
-            next_gt_mask = next_gt_mask[random_int]
-            # next_gt_depth = next_depth[random_int]
-            next_gt_intrinsic = next_camera_intrinsics[random_int]
-            next_gt_extrinsic = next_camera_extrinsics[random_int]
-            rgb_0 = rgb[5] # rgb[0]
-            # depth_0 = depth[5]
-            pcd_0 = pcd[5]
-            mask_0 = gt_mask[5]   
+        elif self.cfg.neural_renderer.mask_gen =='pre': # 需要多传输两个视角的gt_mask 其实pre也要这边？
+            print("带mask的 pre 可视化")
+            gt_mask = [gt_mask[5],gt_mask[2]]
+            # print("gt_mask",gt_mask,gt_mask[0].shape)
+            gt_mask_camera_extrinsic = [camera_extrinsics[5], camera_extrinsics[2]]
+            gt_mask_camera_intrinsic= [camera_intrinsics[5],camera_intrinsics[2]]
+            gt_maskdepth = [gt_maskdepth[5],gt_maskdepth[2]]
+            next_gt_mask = [next_gt_mask[5],next_gt_mask[2]]
+            next_gt_maskdepth = [next_gt_maskdepth[5],next_gt_maskdepth[2]]
             _, ret_dict = self._neural_renderer(
-                rgb=rgb_0, pcd=pcd_0, #depth=depth_0,
-                language=lang_embedd,  
+                    pcd=pcd[5],                 # 点云数据（Point Cloud Data）的第一个元素，可能是一个3D点云表示
+                    rgb=rgb[5],                 # ：RGB图像数据的第一个元素，表示场景的颜色信息。
                     dec_fts=voxel_grid_feature, # 解码特征，可能是指从体素网格中提取的特征。
-                    gt_pose=gt_extrinsic, gt_intrinsic=gt_intrinsic, # 相机的内在参数，描述相机的光学特性。
+                    language=lang_embedd,       # 语言嵌入，可能表示与任务相关的自然语言处理结果。
+                    gt_pose=tgt_pose,           # 目标姿态（Ground Truth Pose），真实的姿态信息，用于训练或评估
+                    gt_intrinsic=tgt_intrinsic, # 相机的内在参数，描述相机的光学特性。
                     # for providing gt embed
-                    gt_rgb=gt_rgb,     # 神经辐射场（Neural Radiance Fields, NeRF）的目标RGB图像，用作渲染的参考。
+                    gt_rgb=nerf_target_rgb,     # 神经辐射场（Neural Radiance Fields, NeRF）的目标RGB图像，用作渲染的参考。
                     lang_goal=lang_goal,        # 语言目标，可能表示任务的语言描述或指令。    
-                    next_gt_rgb=next_gt_rgb,       # 下一个目标RGB图像，可能用于生成序列中的下一帧。
-                    next_gt_pose=next_gt_extrinsic,     # 下一个目标姿态。
-                    next_gt_intrinsic=next_gt_intrinsic,        # 下一个目标相机的内在参数。
+                    next_gt_rgb=nerf_next_target_rgb,       # 下一个目标RGB图像，可能用于生成序列中的下一帧。
+                    next_gt_pose=nerf_next_target_pose,     # 下一个目标姿态。
+                    next_gt_intrinsic=nerf_next_target_camera_intrinsic,        # 下一个目标相机的内在参数。
                     step=step,
                     action=action,                          # 当前执行的动作。
                     training=False,
-                    gt_mask=gt_mask1,
-                    # gt_mask_camera_extrinsic=gt_mask_camera_extrinsic, 
-                    # gt_mask_camera_intrinsic= gt_mask_camera_intrinsic,
+                    gt_mask=gt_mask,
+                    gt_mask_camera_extrinsic=gt_mask_camera_extrinsic, 
+                    gt_mask_camera_intrinsic= gt_mask_camera_intrinsic,
                     next_gt_mask = next_gt_mask,
                     gt_maskdepth = gt_maskdepth, 
                     next_gt_maskdepth = next_gt_maskdepth,
                     )
+        else:  # 不用mask了
+            print("无mask可视化，走这里就对了")
+            _, ret_dict = self._neural_renderer(
+                    pcd=pcd[5],                 # 点云数据（Point Cloud Data）的第一个元素，可能是一个3D点云表示
+                    rgb=rgb[5],                 # ：RGB图像数据的第一个元素，表示场景的颜色信息。
+                    dec_fts=voxel_grid_feature, # 解码特征，可能是指从体素网格中提取的特征。
+                    language=lang_embedd,       # 语言嵌入，可能表示与任务相关的自然语言处理结果。
+                    gt_pose=tgt_pose,           # 目标姿态（Ground Truth Pose），真实的姿态信息，用于训练或评估
+                    gt_intrinsic=tgt_intrinsic, # 相机的内在参数，描述相机的光学特性。
+                    # for providing gt embed
+                    gt_rgb=nerf_target_rgb,     # 神经辐射场（Neural Radiance Fields, NeRF）的目标RGB图像，用作渲染的参考。
+                    lang_goal=lang_goal,        # 语言目标，可能表示任务的语言描述或指令。    
+                    next_gt_rgb=nerf_next_target_rgb,       # 下一个目标RGB图像，可能用于生成序列中的下一帧。
+                    next_gt_pose=nerf_next_target_pose,     # 下一个目标姿态。
+                    next_gt_intrinsic=nerf_next_target_camera_intrinsic,        # 下一个目标相机的内在参数。
+                    step=step,
+                    action=action,                          # 当前执行的动作。
+                    training=False,
+                    )
+        # else:
+        #     # random_int = random.randint(0, 4)
+        #     random_int = 0 # target
+        #     gt_rgb = rgb[random_int]
+        #     # gt_depth = depth[random_int]
+        #     gt_intrinsic = camera_intrinsics[random_int]
+        #     gt_extrinsic = camera_extrinsics[random_int]
+        #     gt_mask1 = gt_mask[random_int]
+
+        #     next_gt_rgb = next_obs_rgb[random_int]
+        #     next_gt_mask = next_gt_mask[random_int]
+        #     # next_gt_depth = next_depth[random_int]
+        #     next_gt_intrinsic = next_camera_intrinsics[random_int]
+        #     next_gt_extrinsic = next_camera_extrinsics[random_int]
+
+        #     input_indx=2
+        #     rgb_0 = rgb[input_indx] # rgb[0]
+        #     # depth_0 = depth[5]
+        #     pcd_0 = pcd[input_indx]
+        #     mask_0 = gt_mask[input_indx]   
+
+        #     _, ret_dict = self._neural_renderer(
+        #         rgb=rgb_0, pcd=pcd_0, #depth=depth_0,
+        #         language=lang_embedd,  
+        #             dec_fts=voxel_grid_feature, # 解码特征，可能是指从体素网格中提取的特征。
+        #             gt_pose=gt_extrinsic, gt_intrinsic=gt_intrinsic, # 相机的内在参数，描述相机的光学特性。
+        #             # for providing gt embed
+        #             gt_rgb=gt_rgb,     # 神经辐射场（Neural Radiance Fields, NeRF）的目标RGB图像，用作渲染的参考。
+        #             lang_goal=lang_goal,        # 语言目标，可能表示任务的语言描述或指令。    
+        #             next_gt_rgb=next_gt_rgb,       # 下一个目标RGB图像，可能用于生成序列中的下一帧。
+        #             next_gt_pose=next_gt_extrinsic,     # 下一个目标姿态。
+        #             next_gt_intrinsic=next_gt_intrinsic,        # 下一个目标相机的内在参数。
+        #             step=step,
+        #             action=action,                          # 当前执行的动作。
+        #             training=False,
+        #             gt_mask=gt_mask1,
+        #             # gt_mask_camera_extrinsic=gt_mask_camera_extrinsic, 
+        #             # gt_mask_camera_intrinsic= gt_mask_camera_intrinsic,
+        #             next_gt_mask = next_gt_mask,
+        #             gt_maskdepth = gt_maskdepth, 
+        #             next_gt_maskdepth = next_gt_maskdepth,
+        #             )
 
 
         # ----------------------------------------------------------------------    
@@ -829,6 +976,7 @@ class QAttentionPerActBCAgent(Agent):
                 depth = replay_sample['%s_depth' % n]
                 next_depth = replay_sample['%s_next_depth'%n]
                 pcd = replay_sample['%s_point_cloud' % n]
+                print("pcd=",pcd)
                 extin = replay_sample['%s_camera_extrinsics' % n]
                 next_extin = replay_sample['%s_next_camera_extrinsics' % n]
                 intin = replay_sample['%s_camera_intrinsics' % n]
@@ -1117,6 +1265,34 @@ class QAttentionPerActBCAgent(Agent):
                 nerf_next_target_camera_intrinsic = torch.from_numpy(np.stack(nerf_next_target_camera_intrinsics)).float().to(device)
 
             # nerf[1]-------------------------
+        else: # no nerf 还有问题
+            num_view = len(self._camera_names) -1 # ? front
+            num_view_by_user = 1 # self.cfg.num_view_for_nerf
+            # compute interval first
+            # 先算区间
+            assert num_view_by_user <= num_view, f'num_view_by_user {num_view_by_user} should be less than num_view {num_view}'
+            interval = (num_view-1) // num_view_by_user # 21//20?
+            # print(f"interval: {interval} num_view: {num_view} num_view_by_user: {num_view_by_user}")
+            # nerf_multi_view_rgb_path = nerf_multi_view_rgb_path[:, ::interval]
+            options = list(range(0, num_view-1, interval))
+            # print(f"options: {options}")
+            if len(options)>1:
+                random_int = random.randint(options)
+            else:
+                random_int = options[0]
+
+            random_int = 0 # 临时
+            nerf_target_rgb = obs[random_int][0]
+            nerf_target_depth = depth[random_int]
+            nerf_target_camera_intrinsic = intrinsics[random_int]
+            nerf_target_pose = extrinsics[random_int]
+            gt_mask1 = gt_mask[random_int]
+
+            nerf_next_target_rgb = next_obs_rgb[random_int]
+            # next_gt_mask1 = next_gt_mask[random_int]
+            nerf_next_target_depth = next_depth[random_int]
+            nerf_next_target_camera_intrinsic = next_intrinsics[random_int]
+            nerf_next_target_pose = next_extrinsics[random_int]            
 
 
 
@@ -1155,14 +1331,10 @@ class QAttentionPerActBCAgent(Agent):
         # obs, pcd = self._preprocess_inputs(replay_sample)
         # 其实不用带Mani的也一样，都是5个返回值
         # obs, depth, pcd, extrinsics, intrinsics = self._mani_preprocess_inputs(replay_sample)
-
         # # batch size
         # bs = pcd[0].shape[0]
-
         # We can move the point cloud w.r.t to the other robot's cooridinate system
         # similar to apply_se3_augmentation
-        #
-
         # SE(3) augmentation of point clouds and actions   SE(3) 增强点云和action
         if self._transform_augmentation:
             from voxel import augmentation
@@ -1258,38 +1430,59 @@ class QAttentionPerActBCAgent(Agent):
             )
         else:
             q, voxel_grid, rendering_loss_dict = self._q(
-                obs,
-                depth, # nerf new
-                proprio,
-                pcd,
-                extrinsics, # nerf new although augmented, not used
-                intrinsics, # nerf new
-                lang_goal_emb,
-                lang_token_embs,
-                bounds,
-                prev_layer_bounds,
-                prev_layer_voxel_grid,
-                # nerf[3]---------------------
-                use_neural_rendering=self.use_neural_rendering,
-                # nerf_target_rgb=nerf_target_rgb,
-                # nerf_target_depth=nerf_target_depth,
-                # nerf_target_pose=nerf_target_camera_extrinsic,
-                # nerf_target_camera_intrinsic=nerf_target_camera_intrinsic,
+                obs,depth, proprio,pcd,extrinsics,intrinsics, lang_goal_emb,lang_token_embs,bounds,prev_layer_bounds, 
+                prev_layer_voxel_grid,use_neural_rendering=self.use_neural_rendering, # 没变的参数
+                nerf_target_rgb=nerf_target_rgb, 
+                nerf_target_depth=nerf_target_depth,
+                nerf_target_pose=nerf_target_camera_extrinsic,
+                nerf_target_camera_intrinsic=nerf_target_camera_intrinsic,
                 lang_goal=lang_goal,
-                # nerf_next_target_rgb=nerf_next_target_rgb,
-                # nerf_next_target_depth=nerf_next_target_depth,
-                # nerf_next_target_pose=nerf_next_target_camera_extrinsic,
-                # nerf_next_target_camera_intrinsic=nerf_next_target_camera_intrinsic,
+                nerf_next_target_rgb=nerf_next_target_rgb,
+                nerf_next_target_depth=nerf_next_target_depth,
+                nerf_next_target_pose=nerf_next_target_camera_extrinsic,
+                nerf_next_target_camera_intrinsic=nerf_next_target_camera_intrinsic,
                 step=step,
                 action=action_gt,
+                # （相对于不用mask时）增加了mask 和 next depth
                 gt_mask=gt_mask,
                 next_gt_mask =next_gt_mask,
                 next_depth=next_depth,
-                next_obs_rgb = next_obs_rgb,
-                next_camera_intrinsics = next_intrinsics,
-                next_camera_extrinsics=next_extrinsics,
-                # nerf[3]---------------------
             )
+
+            # q, voxel_grid, rendering_loss_dict = self._q(
+            #     obs,
+            #     depth, # nerf new
+            #     proprio,
+            #     pcd,
+            #     extrinsics, # nerf new although augmented, not used
+            #     intrinsics, # nerf new
+            #     lang_goal_emb,
+            #     lang_token_embs,
+            #     bounds,
+            #     prev_layer_bounds,
+            #     prev_layer_voxel_grid,
+            #     # nerf[3]---------------------
+            #     use_neural_rendering=self.use_neural_rendering,
+            #     # nerf_target_rgb=nerf_target_rgb,
+            #     # nerf_target_depth=nerf_target_depth,
+            #     # nerf_target_pose=nerf_target_camera_extrinsic,
+            #     # nerf_target_camera_intrinsic=nerf_target_camera_intrinsic,
+            #     lang_goal=lang_goal,
+            #     # nerf_next_target_rgb=nerf_next_target_rgb,
+            #     # nerf_next_target_depth=nerf_next_target_depth,
+            #     # nerf_next_target_pose=nerf_next_target_camera_extrinsic,
+            #     # nerf_next_target_camera_intrinsic=nerf_next_target_camera_intrinsic,
+            #     step=step,
+            #     action=action_gt,
+            #     gt_mask=gt_mask,
+            #     next_gt_mask =next_gt_mask,
+            #     next_depth=next_depth,
+                   # 下面这些写在上面的target里了 
+            #     next_obs_rgb = next_obs_rgb,
+            #     next_camera_intrinsics = next_intrinsics,
+            #     next_camera_extrinsics=next_extrinsics,
+            #     # nerf[3]---------------------
+            # )
 
         (
             right_q_trans,
@@ -1308,11 +1501,9 @@ class QAttentionPerActBCAgent(Agent):
         ) = self._q.choose_highest_action(
             right_q_trans, right_q_rot_grip, right_q_collision
         )
-        # print(" ")
         # print("\033[0;32;40mright_coords\033[0m",right_coords) #[41,58,21]
         # print("right_rot_and_grip_indicies",right_rot_and_grip_indicies) #[0,36,70,0]
         # print("right_ignore_collision_indicies",right_ignore_collision_indicies) #[[1]]
-        # print(" ")
 
         (
             left_coords,
@@ -1598,8 +1789,9 @@ class QAttentionPerActBCAgent(Agent):
                     psnr_dyna_right = PSNR_torch(next_rgb_render_right, next_rgb_gt)
                 # print("next_render_mask is not None", next_render_mask is not None)
                 exclude_gtleft_mask1 = None
+                next_gt_rgbmask = None
                 if next_render_mask is not None:
-                    next_gt_mask = next_render_mask[0] * 200 # gt时不需要这个
+                    next_gt_rgbmask = next_render_mask[0] * 200 # gt时不需要这个
                     # exclude_left_gt_mask = ((next_gt_mask > 2.5) | (next_gt_mask < 1.5))
                     # exclude_gtleft_mask1 =  torch.full((exclude_left_gt_mask.shape[0], exclude_left_gt_mask.shape[1], 3), 255, dtype=torch.uint8,device='cpu')
                     # exclude_gtleft_mask1 = exclude_gtleft_mask1 * exclude_left_gt_mask.cpu()
@@ -1625,10 +1817,7 @@ class QAttentionPerActBCAgent(Agent):
                 import matplotlib.pyplot as plt
                 # plot three images in one row with subplots: 用子图在一行中绘制三个图像：
                 # src, tgt, pred
-                rgb_src =  obs[0][0].squeeze(0).permute(1, 2, 0)  / 2 + 0.5
-                # 绘制源图像（rgb_src）、目标图像（rgb_gt）、渲染图像（rgb_render）、
-                # 特征嵌入（embed_render 和 gt_embed_render）
-                # 以及下一步骤的图像（next_rgb_gt 和 next_rgb_render）。
+                rgb_src =  obs[5][0].squeeze(0).permute(1, 2, 0)  / 2 + 0.5
                 fig, axs = plt.subplots(2, 7, figsize=(15, 3))   # 使用 matplotlib 创建一个包含1行7->8列子图的图形
                 # src
                 axs[0, 0].imshow(rgb_src.cpu().numpy())    # 在子图 axs[0] 上显示名为 rgb_src 的图像数
@@ -1682,9 +1871,9 @@ class QAttentionPerActBCAgent(Agent):
                     # print("13")
                     axs[1, 3].imshow(exclude_left_mask1.cpu().numpy())
                     axs[1, 3].title.set_text('exclude_left_mask')
-                if next_gt_mask is not None: # gt 中去除左臂mask后的mask # 去除右臂后的左臂mask
-                    # print("14")
-                    axs[1, 4].imshow(next_gt_mask.cpu().numpy())
+                if next_gt_rgbmask is not None: # gt 中去除左臂mask后的mask # 去除右臂后的左臂mask
+                #     # print("14")
+                    axs[1, 4].imshow(next_gt_rgbmask.cpu().numpy())
                     axs[1, 4].title.set_text('exclude_gt_left_mask')
 
                 # remove axis
@@ -1693,6 +1882,34 @@ class QAttentionPerActBCAgent(Agent):
                 plt.tight_layout()
             else:
                 rgb_render, next_rgb_render, embed_render, gt_embed_render, \
+                    render_mask_novel, next_render_mask, next_render_mask_right, next_rgb_render_right, next_left_mask_gen= self._q.render(
+                    rgb_pcd=obs,
+                    proprio=proprio,
+                    pcd=pcd,
+                    camera_extrinsics=extrinsics, 
+                    camera_intrinsics=intrinsics,
+                    lang_goal_emb=lang_goal_emb,
+                    lang_token_embs=lang_token_embs,
+                    bounds=bounds,
+                    prev_bounds=prev_layer_bounds,
+                    prev_layer_voxel_grid=prev_layer_voxel_grid,
+                    tgt_pose=nerf_target_camera_extrinsic,
+                    tgt_intrinsic=nerf_target_camera_intrinsic,
+                    nerf_target_rgb=nerf_target_rgb,
+                    lang_goal=lang_goal,
+                    nerf_next_target_rgb=nerf_next_target_rgb,
+                    nerf_next_target_depth=nerf_next_target_depth,
+                    nerf_next_target_pose=nerf_next_target_camera_extrinsic,
+                    nerf_next_target_camera_intrinsic=nerf_next_target_camera_intrinsic,
+                    step=step,
+                    action=action_gt,
+                    gt_mask=gt_mask,
+                    next_gt_mask =next_gt_mask,
+                    # gt_mask_camera_extrinsic=camera_extrinsics, gt_mask_camera_intrinsic=camera_intrinsics,
+                    gt_maskdepth=depth,
+                    next_gt_maskdepth=next_depth,
+                    )
+                """ rgb_render, next_rgb_render, embed_render, gt_embed_render, \
                     render_mask_novel, next_render_mask, next_render_mask_right, next_rgb_render_right, next_left_mask_gen= self._q.render(
                     rgb_pcd=obs,
                     proprio=proprio,
@@ -1719,22 +1936,26 @@ class QAttentionPerActBCAgent(Agent):
                     next_obs_rgb=next_obs_rgb,
                     next_camera_intrinsics=next_intrinsics,
                     next_camera_extrinsics=next_extrinsics,
-                    )                
-            
+                    )      """           
+                rgb_gt = obs[0][0][0].permute(1, 2, 0)
+                rgb_render = rgb_render[0]
+                print(rgb_gt.shape, rgb_render.shape)
+                psnr = PSNR_torch(rgb_render, rgb_gt)             
                 # NOTE: [1, h, w, 3]  # 均为图片质量
-                rgb_gt = obs[5][0][0].permute(1, 2, 0)[:, :,[0,1,2]]/ 2 + 0.5 #3 256 256 ->  256,256,3# RGB BGR
+                rgb_gt = obs[0][0][0].permute(1, 2, 0)/ 2 + 0.5 # 正视图3 256 256 ->  256,256,3# RGB BGR   [:, :,[0,1,2]]
                 # print("rgb_gt.shape",rgb_gt.shape) # 256,256,3
-                # test
-                rgb_render1= obs[5][0][0].permute(1, 2, 0)[:, :,[0,2,1]] #GRB [2,1,0]bgr蓝色   [1,0,2]grb绿色 [201]brg深绿色
-                # rgb_render1 = rgb_render[0]
+                test_gt= obs[0][0][0].permute(1, 2, 0) #GRB [2,1,0]bgr蓝色   [1,0,2]grb绿色 [201]brg深绿色  [:, :,[0,2,1]]
+                # 渲染结果
+                rgb_render1 = rgb_render # [0]
+                # psnr = PSNR_torch(rgb_render, rgb_gt) 
+                psnr = PSNR_torch(rgb_render, test_gt) 
                 # print("rgb_render1.shape",rgb_render1.shape) # 256,256,3
-                
-                
-                rgb_render = rgb_render[0]/ 2 + 0.5
-                
+                rgb_render = rgb_render/ 2 + 0.5 # [0]
+                next_render_mask_left=None
+                # next_render_mask_right=None
                 # psnr = PSNR_torch(rgb_render, rgb_gt) 
                 if next_rgb_render is not None: # 双手rgb
-                    next_rgb_gt = next_obs_rgb[5][0].permute(1, 2, 0)[:, :,[2,1,0]] / 2 + 0.5  #左手后的正视图(why?)
+                    next_rgb_gt = next_obs_rgb[5][0].permute(1, 2, 0) / 2 + 0.5  #左手后的正视图(why?)  [:, :,[2,1,0]]
                     next_rgb_render1 = next_rgb_render[0]
                     next_rgb_render = next_rgb_render[0]/ 2 + 0.5
                     # psnr_dyna = PSNR_torch(next_rgb_render, next_rgb_gt) # 不能对应视图（无参考意义）
@@ -1748,8 +1969,9 @@ class QAttentionPerActBCAgent(Agent):
 
                 next_rgb_render_right_result = None
                 exclude_left_mask1 = None
+                next_gt_mask1 = None
                 if next_left_mask_gen is not None:
-                    next_gt_mask = next_left_mask_gen[0] / 2 + 0.5
+                    next_gt_mask1 = next_left_mask_gen[0] / 2 + 0.5
                 if render_mask_novel is not None:
                     render_mask_novel = render_mask_novel[0] / 2 + 0.5 
                 if next_render_mask_right is not None:
@@ -1760,7 +1982,7 @@ class QAttentionPerActBCAgent(Agent):
                 import matplotlib.pyplot as plt
                 # plot three images in one row with subplots: 用子图在一行中绘制三个图像：
                 # src, tgt, pred
-                rgb_src =  obs[0][0].squeeze(0).permute(1, 2, 0)  / 2 + 0.5
+                rgb_src =  obs[5][0].squeeze(0).permute(1, 2, 0)  / 2 + 0.5
                 # print("rgb_src",rgb_src)
                 # 绘制源图像（rgb_src）、目标图像（rgb_gt）、渲染图像（rgb_render）、
                 # 特征嵌入（embed_render 和 gt_embed_render）
@@ -1768,17 +1990,20 @@ class QAttentionPerActBCAgent(Agent):
                 fig, axs = plt.subplots(2, 7, figsize=(15, 3))   # 使用 matplotlib 创建一个包含1行7->8列子图的图形
                 # src
                 axs[0, 0].imshow(rgb_src.cpu().numpy())    # 在子图 axs[0] 上显示名为 rgb_src 的图像数
-                axs[0, 0].title.set_text('src')            # 设置子图 axs[0] 的标题为 'src'，这可能代表“源图像”（source image）
+                axs[0, 0].title.set_text('src(front)')            # 设置子图 axs[0] 的标题为 'src'，这可能代表“源图像”（source image）
                 # tgt
                 axs[0, 1].imshow(rgb_gt.cpu().numpy())
-                axs[0, 1].title.set_text('tgt')
+                axs[0, 1].title.set_text('tgt (over left)')
+                # tgt 原版（偏黑）
+                axs[1, 1].imshow(test_gt.cpu().numpy())
+                axs[1, 1].title.set_text('yuan tgt1')
                 # pred rgb
                 axs[0, 2].imshow(rgb_render.cpu().numpy())
-                # axs[0, 2].title.set_text('psnr={:.2f}'.format(psnr))
-                axs[0, 2].title.set_text('now rgb')
+                axs[0, 2].title.set_text('now rgb psnr={:.2f}'.format(psnr))
+                # axs[0, 2].title.set_text('now rgb')
 
-                axs[0, 4].imshow(rgb_render1.cpu().numpy())
-                axs[0, 4].title.set_text('now rgb1')
+                axs[1, 2].imshow(rgb_render1.cpu().numpy())
+                axs[1, 2].title.set_text('yuanban now rgb1')
                 # pred embed
                 # embed_render = visualize_feature_map_by_clustering(embed_render.permute(0,3,1,2), num_cluster=4)
                 embed_render = visualize_feature_map_by_normalization(embed_render.permute(0,3,1,2))    # range from -1 to 1
@@ -1828,11 +2053,11 @@ class QAttentionPerActBCAgent(Agent):
                     # print("13")
                     axs[1, 3].imshow(exclude_left_mask1.cpu().numpy())
                     axs[1, 3].title.set_text('exclude_left_mask')
-                if next_gt_mask is not None: # gt 中去除左臂mask后的mask # 去除右臂后的左臂mask
+                if next_gt_mask1 is not None: # gt 中去除左臂mask后的mask # 去除右臂后的左臂mask
                     # print("14")
-                    axs[1, 4].imshow(next_gt_mask.cpu().numpy())
+                    axs[1, 4].imshow(next_gt_mask1.cpu().numpy())
                     axs[1, 4].title.set_text('next gt left mask')
-                    print("next_gt_mask 都是gt", next_gt_mask)
+                    print("next_gt_mask1 都是gt", next_gt_mask1)
 
                 # remove axis
                 for ax in axs.flat:

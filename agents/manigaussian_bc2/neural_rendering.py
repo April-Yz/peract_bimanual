@@ -488,11 +488,25 @@ class NeuralRenderer(nn.Module):
                 vis.image(depth_vis, win='front_depth', opts=dict(title='front_depth'))
                 vis.image(render_novel[0].permute(2, 0, 1).detach().cpu().numpy(), win='render_novel', opts=dict(title='render_novel'))
                 vis.image(gt_rgb[0].permute(2, 0, 1).detach().cpu().numpy(), win='gt_novel', opts=dict(title='gt_novel'))
+            
+            loss = 0.
 
             # Ll1 = l1_loss(render_novel, gt_rgb) 
+            # loss_dyna_mask = torch.tensor(0.) 
             if self.mask_gen == 'nonerf':
                 gt_rgb = gt_rgb.permute(0,2,3,1) # [1, 3, 256, 256] ->[1, 256, 256, 3]
                 gt_mask =gt_mask.permute(0,2,3,1) # [1, 1, 256, 256] ->[1, 256, 256, 1]
+                # gt_mask_label = self.mask_label(gt_mask) # 100 010  001
+                # # print("gt_mask_label = ",gt_mask_label.shape,gt_mask_label)
+                # # 1 当前场景的mask 训练  loss_dyna_mask_novel
+                # data =self.pts2render_mask_gen(data, bg_color=self.bg_mask)
+                # render_mask_novel = data['novel_view']['mask_gen'] # .permute(0, 2, 3, 1) # [1,3，128, 128] -> [1,128, 128, 3]                           
+                # loss_dyna_mask_novel = self.CrossEntropyLoss(render_mask_novel, gt_mask_label) # mask现阶段的
+                # render_mask_novel = render_mask_novel.permute(0, 2, 3, 1)
+                # loss_dyna_mask = loss_dyna_mask_novel
+                # lambda_mask = 0 # 1  if step >= 40000 else 0
+                # loss += loss_dyna_mask * lambda_mask # * 0.001
+                
                 # print("render_novel.shape",render_novel.shape)
                 # print("gt_rgb.shape",gt_rgb.shape)
                 if self.use_dynamic_field:
@@ -504,7 +518,7 @@ class NeuralRenderer(nn.Module):
             # PSNR好像表示图片质量？
             psnr = PSNR_torch(render_novel, gt_rgb)
 
-            loss = 0.
+
             # loss_rgb = self.cfg.lambda_l1 * Ll1 + self.cfg.lambda_ssim * Lssim
             loss_rgb = Ll1
             # 1 LGeo?
@@ -827,20 +841,19 @@ class NeuralRenderer(nn.Module):
                         # device = gt_mask.device  # 获取 next_gt_rgb 的设备
                         # gt_mask_label = gt_mask_label.to(device)
                         # next_gt_mask_label = next_gt_mask_label.to(device)
-                        gt_mask_label = self.mask_label(gt_mask) # 100 010  001
-                        next_gt_mask_label = self.mask_label(next_gt_mask)
-                        print("gt_mask_label = ",gt_mask_label.shape,gt_mask_label)
+
+                        next_gt_mask_label = self.mask_label(next_gt_mask)                        
                         print("next_gt_mask_label = ",next_gt_mask_label.shape,next_gt_mask_label)
-                        # 1 当前场景的mask 训练  loss_dyna_mask_novel
-                        data =self.pts2render_mask_gen(data, bg_color=self.bg_mask)
-                        render_mask_novel = data['novel_view']['mask_gen'] # .permute(0, 2, 3, 1) # [1,3，128, 128] -> [1,128, 128, 3]                           
-                        # 忽略特定的标签（例如空白背景类）
-                        # CrossEntropyLoss = nn.CrossEntropyLoss(ignore_index=self.ignore_label)
-                        # 接收两个参数：logit（模型输出的 logits）和 label（真实标签）
-                        # abel 被减去 1。这个操作是为了将背景类（通常 ID 为 0）转移到 -1，使得 CrossEntropyLoss 可以正确忽略这个类别。
-                        # crossentropy_loss = lambda logit, label: CrossEntropyLoss(logit, label-1)
-                        loss_dyna_mask_novel = self.CrossEntropyLoss(render_mask_novel, gt_mask_label) # mask现阶段的
-                        render_mask_novel = render_mask_novel.permute(0, 2, 3, 1)
+                        # # 1 当前场景的mask 训练  loss_dyna_mask_novel
+                        # data =self.pts2render_mask_gen(data, bg_color=self.bg_mask)
+                        # render_mask_novel = data['novel_view']['mask_gen'] # .permute(0, 2, 3, 1) # [1,3，128, 128] -> [1,128, 128, 3]                           
+                        # # 忽略特定的标签（例如空白背景类）
+                        # # CrossEntropyLoss = nn.CrossEntropyLoss(ignore_index=self.ignore_label)
+                        # # 接收两个参数：logit（模型输出的 logits）和 label（真实标签）
+                        # # abel 被减去 1。这个操作是为了将背景类（通常 ID 为 0）转移到 -1，使得 CrossEntropyLoss 可以正确忽略这个类别。
+                        # # crossentropy_loss = lambda logit, label: CrossEntropyLoss(logit, label-1)
+                        # loss_dyna_mask_novel = self.CrossEntropyLoss(render_mask_novel, gt_mask_label) # mask现阶段的
+                        # render_mask_novel = render_mask_novel.permute(0, 2, 3, 1)
 
                         # 2 GRB total(Follower)  先对left预测（最后的结果） loss_dyna_follower  左臂 RGB Loss   
                         # 也可以说是双手结果
@@ -905,7 +918,7 @@ class NeuralRenderer(nn.Module):
                         loss_dyna = torch.tensor(0.)
                         loss_reg = torch.tensor(0.)      
                         loss_LF = torch.tensor(0.)
-                        loss_dyna_mask = torch.tensor(0.) 
+                        # loss_dyna_mask = torch.tensor(0.) 
 
             loss_dict = {
                 'loss': loss,
@@ -1017,25 +1030,26 @@ class NeuralRenderer(nn.Module):
                                 data['right_next'] = self.pts2render(data['right_next'], bg_color=self.bg_color)
                                 next_render_rgb_right = data['right_next']['novel_view']['img_pred'].permute(0, 2, 3, 1) # [1,128, 128, 3]
                     elif not self.use_nerf_picture: 
+                        gt_rgb = gt_rgb.permute(0,2,3,1) # [1, 3, 256, 256] ->[1, 256, 256, 3]
+                        gt_mask =gt_mask.permute(0,2,3,1)
+                        gt_mask_label = self.mask_onehot(gt_mask)
+                        data =self.pts2render_mask_gen(data, bg_color=self.bg_mask)
+                        render_mask_novel = data['novel_view']['mask_gen'].permute(0, 2, 3, 1) # [1,3，128, 128] -> [1,128, 128, 3]                           
+                        # print("1",render_mask_novel.shape,render_mask_novel) # [1,256,256,3]
+                        render_mask_novel = self.generate_final_class_labels(render_mask_novel)
+                        # print("2",render_mask_novel.shape,render_mask_novel) # [1,3, 256,256]
+                        render_mask_novel = render_mask_novel.unsqueeze(3).repeat(1, 1, 1, 3)
+                        render_mask_novel = render_novel * render_mask_novel # 反正背景都是False不用加
+
                         if self.use_dynamic_field and (next_gt_rgb is not None and gt_mask is not None):
-                            gt_rgb = gt_rgb.permute(0,2,3,1) # [1, 3, 256, 256] ->[1, 256, 256, 3]
-                            gt_mask =gt_mask.permute(0,2,3,1)
                             next_gt_rgb = next_gt_rgb.permute(0,2,3,1)
                             next_gt_mask = next_gt_mask.permute(0,2,3,1)
                             # 注意：这里的图片都是256*256的
-                            gt_mask_label = self.mask_onehot(gt_mask)
                             next_gt_mask_label = self.mask_onehot(next_gt_mask)
                             # device = gt_mask.device  # 获取 next_gt_rgb 的设备
                             # gt_mask_label = gt_mask_label.to(device)
                             # next_gt_mask_label = next_gt_mask_label.to(device)
                             # 1 当前场景的mask 训练  loss_dyna_mask_novel
-                            data =self.pts2render_mask_gen(data, bg_color=self.bg_mask)
-                            render_mask_novel = data['novel_view']['mask_gen'].permute(0, 2, 3, 1) # [1,3，128, 128] -> [1,128, 128, 3]                           
-                            # print("1",render_mask_novel.shape,render_mask_novel) # [1,256,256,3]
-                            render_mask_novel = self.generate_final_class_labels(render_mask_novel)
-                            # print("2",render_mask_novel.shape,render_mask_novel) # [1,3, 256,256]
-                            render_mask_novel = render_mask_novel.unsqueeze(3).repeat(1, 1, 1, 3)
-                            render_mask_novel = render_novel * render_mask_novel # 反正背景都是False不用加
 
                             # 2 GRB total(Follower)  先对left预测（最后的结果） loss_dyna_follower  左臂 RGB Loss   
                             # 也可以说是双手结果

@@ -446,6 +446,7 @@ class UniformReplayBuffer(ReplayBuffer):
             #     arg_shape = tuple()
                 # print(store_element.name, ": None  ",arg_shape)
             store_element_shape = tuple(store_element.shape)
+            # if arg_shape != store_element_shape:
             if arg_shape != store_element_shape:
                 # print("store_element.name=",store_element.name)
                 # print("store_element=",store_element)
