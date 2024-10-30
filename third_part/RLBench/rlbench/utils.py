@@ -180,13 +180,13 @@ def get_stored_demos(amount: int, image_paths: bool, dataset_root: str,
             obs[i].misc['descriptions'] = descriptions
            
             for camera_name, camera_config in obs_config.camera_configs.items(): 
-                if  not obs_config.nerf_multi_view:               
-                    if i>0:
-                        obs[i-1].misc[f'{camera_name}_next_camera_extrinsics'] = obs[i].misc[f'{camera_name}_camera_extrinsics']
-                        obs[i-1].misc[f'{camera_name}_next_camera_intrinsics'] = obs[i].misc[f'{camera_name}_camera_intrinsics']
-                    if i==num_steps-1:
-                        obs[i].misc[f'{camera_name}_next_camera_extrinsics'] = obs[i].misc[f'{camera_name}_camera_extrinsics']
-                        obs[i].misc[f'{camera_name}_next_camera_intrinsics'] = obs[i].misc[f'{camera_name}_camera_intrinsics']    
+                # if  not obs_config.nerf_multi_view:               
+                if i>0:
+                    obs[i-1].misc[f'{camera_name}_next_camera_extrinsics'] = obs[i].misc[f'{camera_name}_camera_extrinsics']
+                    obs[i-1].misc[f'{camera_name}_next_camera_intrinsics'] = obs[i].misc[f'{camera_name}_camera_intrinsics']
+                if i==num_steps-1:
+                    obs[i].misc[f'{camera_name}_next_camera_extrinsics'] = obs[i].misc[f'{camera_name}_camera_extrinsics']
+                    obs[i].misc[f'{camera_name}_next_camera_intrinsics'] = obs[i].misc[f'{camera_name}_camera_intrinsics']    
                                 
                 if camera_config.rgb:
                     # print("--------------camera_config.rgb@@@@@@@@@@@@@@")
@@ -195,11 +195,11 @@ def get_stored_demos(amount: int, image_paths: bool, dataset_root: str,
                     image_path = os.path.join(data_path, image_name)
                     image = np.array(_resize_if_needed(Image.open(image_path), camera_config.image_size))
                     obs[i].perception_data[f"{camera_name}_rgb"] = image
-                    if  not obs_config.nerf_multi_view:
-                        if i>0:
-                            obs[i-1].perception_data[f"{camera_name}_next_rgb"] = image
-                        if i==num_steps-1:
-                            obs[i].perception_data[f"{camera_name}_next_rgb"] = image
+                    # if  not obs_config.nerf_multi_view:
+                    if i>0:
+                        obs[i-1].perception_data[f"{camera_name}_next_rgb"] = image
+                    if i==num_steps-1:
+                        obs[i].perception_data[f"{camera_name}_next_rgb"] = image
 
                 if camera_config.depth or camera_config.point_cloud:
                     # print("-------------- camera_config.point_cloud camera_config.depth------------")

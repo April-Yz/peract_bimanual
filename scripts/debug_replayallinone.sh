@@ -36,23 +36,22 @@ batch_size=1 # 1 #4 # 2
 tasks=[bimanual_pick_plate]
 num_view_for_nerf=21 #1 #21
 # for debug
-use_dynamic_field=False
+use_dynamic_field=True #False
 demo=1 # 100
 episode_length=2 #25 # 20 # 4
 save_freq=10000
 camera_resolution="[256,256]"
 training_iterations=100001
-field_type='bimanual' # 'LF' # 'BIMANUAL' 'bimanual' 'LF'
-lambda_dyna=0.1
+field_type='LF' # 'LF' # 'BIMANUAL' 'bimanual' 'LF'
+lambda_dyna=0.1 #0.1
 lambda_reg=0.0
 render_freq=100 #2000
-replay_path="/data1/zjyang/program/peract_bimanual/replay/debug/nerf"
-lambda_nerf=0.01 # 0.01
+replay_path="/data1/zjyang/program/peract_bimanual/replay/debug/all"
+lambda_nerf=1.0 # 0.01 # 0.01
 mask_gt_rgb=True
 warm_up=0
 
-
-mask_gen='a' # 'nonerf' #'gt' # 'pre' 'None'
+mask_gen='pre' # 'nonerf' #'gt' # 'pre' 'None'
 use_nerf_picture=True #False
 image_width=128 #256
 image_height=128 #256
@@ -62,6 +61,7 @@ tmux select-pane -t 0
 # peract rlbench
 tmux send-keys "conda activate rlbench; 
 CUDA_VISIBLE_DEVICES=${train_gpu}  QT_AUTO_SCREEN_SCALE_FACTOR=0 TORCH_DISTRIBUTED_DEBUG=DETAIL python train.py method=$method \
+        method.lambda_bc=0 \
         rlbench.task_name=${exp_name} \
         framework.logdir=${logdir} \
         rlbench.demo_path=${train_demo_path} \

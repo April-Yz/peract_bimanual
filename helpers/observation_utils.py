@@ -94,9 +94,9 @@ def extract_obs_unimanual(cfg,
     for camera_name in cameras:
         obs_dict["%s_camera_extrinsics" % camera_name] = obs.misc["%s_camera_extrinsics" % camera_name]
         obs_dict["%s_camera_intrinsics" % camera_name] = obs.misc["%s_camera_intrinsics" % camera_name]
-        if not cfg.method.neural_renderer.use_nerf_picture:
-            obs_dict["%s_next_camera_extrinsics" % camera_name] = obs.misc["%s_next_camera_extrinsics" % camera_name]
-            obs_dict["%s_next_camera_intrinsics" % camera_name] = obs.misc["%s_next_camera_intrinsics" % camera_name]
+        # if not cfg.method.neural_renderer.use_nerf_picture:
+        obs_dict["%s_next_camera_extrinsics" % camera_name] = obs.misc["%s_next_camera_extrinsics" % camera_name]
+        obs_dict["%s_next_camera_intrinsics" % camera_name] = obs.misc["%s_next_camera_intrinsics" % camera_name]
 
     # add timestep to low_dim_state
     time = (1.0 - (t / float(episode_length - 1))) * 2.0 - 1.0
@@ -246,9 +246,9 @@ def extract_obs_bimanual(cfg,
     for camera_name in cameras:
         obs_dict["%s_camera_extrinsics" % camera_name] = obs.misc["%s_camera_extrinsics" % camera_name]
         obs_dict["%s_camera_intrinsics" % camera_name] = obs.misc["%s_camera_intrinsics" % camera_name]
-        if not cfg.method.neural_renderer.use_nerf_picture:
-            obs_dict["%s_next_camera_extrinsics" % camera_name] = obs.misc["%s_next_camera_extrinsics" % camera_name]
-            obs_dict["%s_next_camera_intrinsics" % camera_name] = obs.misc["%s_next_camera_intrinsics" % camera_name]
+        # if not cfg.method.neural_renderer.use_nerf_picture:
+        obs_dict["%s_next_camera_extrinsics" % camera_name] = obs.misc["%s_next_camera_extrinsics" % camera_name]
+        obs_dict["%s_next_camera_intrinsics" % camera_name] = obs.misc["%s_next_camera_intrinsics" % camera_name]
         
     # add timestep to low_dim_state 
     # 将 TimeStep 添加到low_dim_state

@@ -62,6 +62,7 @@ tmux select-pane -t 0
 # peract rlbench
 tmux send-keys "conda activate rlbench; 
 CUDA_VISIBLE_DEVICES=${train_gpu}  QT_AUTO_SCREEN_SCALE_FACTOR=0 TORCH_DISTRIBUTED_DEBUG=DETAIL python train.py method=$method \
+        method.lambda_bc=0 \
         rlbench.task_name=${exp_name} \
         framework.logdir=${logdir} \
         rlbench.demo_path=${train_demo_path} \

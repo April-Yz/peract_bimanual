@@ -116,13 +116,13 @@ def create_replay(batch_size: int, timesteps: int,
             ObservationElement("%s_camera_extrinsics" % cname,(4,4,),np.float32,))
         observation_elements.append(
             ObservationElement("%s_camera_intrinsics" % cname,(3,3,),np.float32,))      
-        if  not cfg.method.neural_renderer.use_nerf_picture:
-            observation_elements.append(
-                ObservationElement("%s_next_camera_extrinsics" % cname,(4,4,),np.float32,))  
-            observation_elements.append(
-                ObservationElement("%s_next_camera_intrinsics" % cname,(3,3,),np.float32,))      
-            observation_elements.append(
-                ObservationElement('%s_next_rgb' % cname, (3, image_size[1], image_size[0]), np.float32))
+        # if  not cfg.method.neural_renderer.use_nerf_picture:
+        observation_elements.append(
+            ObservationElement("%s_next_camera_extrinsics" % cname,(4,4,),np.float32,))  
+        observation_elements.append(
+            ObservationElement("%s_next_camera_intrinsics" % cname,(3,3,),np.float32,))      
+        observation_elements.append(
+            ObservationElement('%s_next_rgb' % cname, (3, image_size[1], image_size[0]), np.float32))
         """
         observation_elements.append(
             ObservationElement('%s_rgb' % cname, (3, *image_size,), np.float32))
