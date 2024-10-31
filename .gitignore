@@ -11,9 +11,9 @@ scripts/test_demo
 .ttm
 # third_part/RLBench/rlbench/robot_ttms
 # third_part/RLBench/rlbench/task_ttms
-third_part/RLBench/tests/unit/assets/
-third_part/RLBench/urdfs/panda/meshes/
-third_part/RLBench/tutorials/tutorial_images/
+# third_part/RLBench/tests/unit/assets/
+# third_part/RLBench/urdfs/panda/meshes/
+# third_part/RLBench/tutorials/tutorial_images/
 third_part/GroundingDINO/weights/
 log-mani/
 third_party/
