@@ -71,8 +71,8 @@ class GeneralizableGSEmbedNet(nn.Module):
         self.d_latent = d_latent = cfg.d_latent # 128 (要不要改成256？)
         self.d_lang = d_lang = cfg.d_lang   # 128
         self.d_out = sum(split_dimensions)
-        # print(colored(f"self.d_in {self.d_in}", "red"))  # 
-        # print(colored(f"self.d_out {self.d_out}", "red"))  # 26
+        print(colored(f"self.d_in {self.d_in}", "red"))  # 39
+        print(colored(f"self.d_out {self.d_out}", "red"))  # 26-> 29(mask) 如果变成29就对了
 
         self.encoder = ResnetFC(
                 d_in=d_in, # xyz                    # 39
@@ -284,7 +284,7 @@ class GeneralizableGSEmbedNet(nn.Module):
         """
 
         # 输出语句中是准确的写法
-        SB, N, _ = data['xyz'].shape
+        SB, N, _ = data['xyz'].shape # 1 65536
         NS = self.num_views_per_obj # 1
         # print("SB=",SB,", N=",N,", NS=",NS)
 
@@ -361,10 +361,10 @@ class GeneralizableGSEmbedNet(nn.Module):
         data['scale_maps'] = scale_maps                                 # [1, 65536, 3]
         data['opacity_maps'] = self.opacity_activation(opacity_maps)    # [1, 65536, 1]    
         data['feature_maps'] = feature_maps # [B, N, 3]                   [1, 65536, 3]
-        data['mask_maps'] = mask_maps #self.mask_activation(mask_maps) #10.24 新增变成[0,1] 可以吗？                 [B, N, 3]  [1, 65536, 3]
+        data['mask_maps'] = mask_maps #self.mask_activation(mask_maps) #10.24  [B, N, 3]  [1, 65536, 3]
         # print(data['xyz_maps'].shape ,data['sh_maps'].shape,data['rot_maps'].shape,data['scale_maps'].shape,data['opacity_maps'].shape,data['feature_maps'].shape)
         # torch.Size([1, 65536, 3]) torch.Size([1, 65536, 4, 3]) torch.Size([1, 65536, 4]) torch.Size([1, 65536, 3]) torch.Size([1, 65536, 1]) torch.Size([1, 65536, 3])
-
+        data['mask_maps'] = data['mask_maps'] *100
         # Dynamic Modeling: predict next gaussian maps
         # 动态建模：预测下一个高斯映射
         # print("self.field_type = ",self.field_type)

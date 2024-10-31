@@ -259,8 +259,10 @@ class VoxelGrid(nn.Module):
         self, coords, coord_features=None, coord_bounds=None,
          only_features=False, return_density=False # nerf中的参数
     ):
+        # 初始化体素缩放参数和边界最小值
         voxel_indicy_denmominator = self._voxel_indicy_denmominator
         res, bb_mins = self._res, self._bb_mins
+        # 如果提供了坐标边界，则更新边界和分辨率
         if coord_bounds is not None:
             bb_mins = coord_bounds[..., 0:3]
             bb_maxs = coord_bounds[..., 3:6]
@@ -268,45 +270,58 @@ class VoxelGrid(nn.Module):
             res = bb_ranges / (self._dims_orig.float() + MIN_DENOMINATOR)
             voxel_indicy_denmominator = res + MIN_DENOMINATOR
 
+        # 将坐标的最小值向后平移一个单位
         bb_mins_shifted = bb_mins - res  # shift back by one
+        # 计算体素索引：对坐标进行缩放和平移，并进行取整操作
         floor = torch.floor(
             (coords - bb_mins_shifted.unsqueeze(1))
             / voxel_indicy_denmominator.unsqueeze(1)
         ).int()
+        # 限制体素索引在网格维度范围内
         voxel_indices = torch.min(floor, self._dims_m_one)
         voxel_indices = torch.max(voxel_indices, self._dims_m_one_zeros)
 
         # BS x NC x 3
+        # 体素值初始化为坐标值
         voxel_values = coords
         if coord_features is not None:
+            # 如果提供了特征信息，将坐标值和特征信息拼接
             voxel_values = torch.cat([voxel_values, coord_features], -1)
 
+        # 获取坐标数量
         _, num_coords, _ = voxel_indices.shape
         # BS x N x (num_batch_dims + 2)
+        # 生成批次索引和体素索引的组合
         all_indices = torch.cat(
             [self._tiled_batch_indices[:, :num_coords], voxel_indices], -1
         )
 
         # BS x N x 4
+        # 初始化体素值，并包含批次和最大坐标值
         voxel_values_pruned_flat = torch.cat(
             [voxel_values, self._ones_max_coords[:, :num_coords]], -1
         )
 
         # BS x x_max x y_max x z_max x 4
+        # 将体素值和索引散布到三维网格中，形成体素网格
         scattered = self._scatter_nd(
             all_indices.view([-1, 1 + 3]),
             voxel_values_pruned_flat.view(-1, self._voxel_feature_size),
         )
 
+        # 裁剪得到有效区域的体素
         vox = scattered[:, 1:-1, 1:-1, 1:-1]
+        # 如果启用每个体素中心坐标，则计算并添加到体素信息中
         if INCLUDE_PER_VOXEL_COORD:
             res_expanded = res.unsqueeze(1).unsqueeze(1).unsqueeze(1)
             res_centre = (res_expanded * self._index_grid) + res_expanded / 2.0
             coord_positions = (
                 res_centre + bb_mins_shifted.unsqueeze(1).unsqueeze(1).unsqueeze(1)
             )[:, 1:-1, 1:-1, 1:-1]
+            # 将体素中心坐标添加到体素网格中
             vox = torch.cat([vox[..., :-1], coord_positions, vox[..., -1:]], -1)
 
+        # 添加体素占用通道
         occupied = (vox[..., -1:] > 0).float()
         vox = torch.cat([vox[..., :-1], occupied], -1)
 
@@ -315,12 +330,13 @@ class VoxelGrid(nn.Module):
             [vox[..., :-1], self._index_grid[:, :-2, :-2, :-2] / self._voxel_d,
             vox[..., -1:]], -1)
         
+        # 根据 only_features 和 return_density 参数返回相应的结果
         if not only_features:
             if return_density:
                 return vox, occupied
             else:
                 return vox
-        else: # remove the occupancy channel, coords and indices
+        else: # remove the occupancy channel, coords and indices  # 仅返回体素特征，去除占用、坐标和索引
             return vox[..., :-7]
         
         # return torch.cat(

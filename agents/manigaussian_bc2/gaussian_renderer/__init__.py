@@ -186,8 +186,12 @@ def render_mask(data, idx, pts_xyz, rotations, scales, opacity, bg_color, pts_rg
     # if len(mask.shape) == 1 or mask.shape[-1] == 1: # [W, H, 1] -> [W, H, 3] repeat([1,3])最后一维复制三次
         # mask = mask.squeeze().unsqueeze(-1).repeat([1,3]).cuda()
     # 预想的方法，但是好像不对，格式 [65536,3] 
-    if len(mask.shape) == 2: 
+    # print("in render mask.shape",mask.shape)
+    # target：[h,w,3]
+    mask = torch.tensor(mask).cuda()
+    if len(mask.shape) == 2:  
         mask = mask.reshape(256,256,3)
+        # mask = mask.reshape(128,128,3)
     elif (len(mask.shape) == 3 and mask.shape[-1] == 1):
         mask = mask.repeat([1,3])
         # mask = mask.squeeze()  # 移除多余的维度
@@ -197,7 +201,7 @@ def render_mask(data, idx, pts_xyz, rotations, scales, opacity, bg_color, pts_rg
     # mask = mask.reshape(256,256,3)
     # print("2 mask.shape",mask.shape)
     # 将 mask 移动到 GPU 上
-    mask = torch.tensor(mask).cuda()
+    # mask = torch.tensor(mask).cuda()
     # ############################for mask################################
 
     # If precomputed colors are provided, use them. Otherwise, SH -> RGB conversion will be done by rasterizer.
@@ -316,11 +320,14 @@ def render_mask_gen(data, idx, pts_xyz, rotations, scales, opacity, bg_color, pt
     # if len(mask.shape) == 2 or (len(mask.shape) == 3 and mask.shape[-1] == 1):
     #     mask = mask.squeeze()  # 移除多余的维度
     #     mask = mask_to_rgb(mask)  # 使用之前定义的函数转换为RGB
+    print("in gen mask.shape",mask.shape)
     mask = mask.reshape(256,256,3)
+    # mask = mask.reshape(128,128,3)
+    # print("in gen mask.shape",mask.shape)
 
     # 将 mask 移动到 GPU 上
     # mask = torch.tensor(mask).cuda()
-    mask = mask = mask.clone().detach().cuda()
+    mask = mask.clone().detach().cuda()
     # ############################for mask################################
 
     # If precomputed colors are provided, use them. Otherwise, SH -> RGB conversion will be done by rasterizer.

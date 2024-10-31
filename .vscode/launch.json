@@ -1,0 +1,56 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "ManiGaussian_BC2 train",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "train.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            // "cwd": "/mnt/disk_1/guanxing/ManiGaussian/",
+            "env": {
+                "CUDA_VISIBLE_DEVICES": "0,1",
+                "QT_AUTO_SCREEN_SCALE_FACTOR": "0",
+                "TORCH_DISTRIBUTED_DEBUG": "DETAIL"
+            },
+            "args": [
+                "method=ManiGaussian_BC2",
+                "method.lambda_bc=0",
+                "rlbench.task_name=dual_push_buttons",
+                "framework.logdir=/data1/zjyang/program/peract_bimanual/log-mani/debug",
+                "rlbench.demo_path=/data1/zjyang/program/peract_bimanual/data2/train_data",
+                "rlbench.num_view_for_nerf=21",
+                "method.neural_renderer.use_nerf_picture=True",
+                "framework.save_freq=10000",
+                "framework.start_seed=0",
+                "framework.use_wandb=False",
+                "framework.training_iterations=100001",
+                "ddp.num_devices=2",
+                "replay.batch_size=1",
+                "ddp.master_port=12345",
+                "rlbench.tasks=dual_push_buttons",
+                "rlbench.demos=1",
+                "replay.path=/data1/zjyang/program/peract_bimanual/replay/debug/all",
+                "rlbench.episode_length=2",
+                "rlbench.camera_resolution=[256,256]",
+                "method.neural_renderer.lambda_nerf=1.0",
+                "method.neural_renderer.render_freq=100",
+                "method.neural_renderer.image_width=128",
+                "method.neural_renderer.image_height=128",
+                "method.neural_renderer.lambda_embed=0.0",
+                "method.neural_renderer.lambda_dyna=0.1",
+                "method.neural_renderer.lambda_reg=0.0",
+                "method.neural_renderer.foundation_model_name=null",
+                "method.neural_renderer.use_dynamic_field=False",
+                "method.neural_renderer.field_type='LF'",
+                "method.neural_renderer.mask_gen='pre'",
+                "method.neural_renderer.dataset.mask_gt_rgb=True",
+                "method.neural_renderer.next_mlp.warm_up=0"
+            ]
+        },
+    ]
+}

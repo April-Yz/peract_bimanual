@@ -764,6 +764,13 @@ class UniformReplayBuffer(ReplayBuffer):
                                 next_state_index % self._replay_capacity,
                                 terminal_stack_tp1)
                         else:
+                            # print(f"len(batch_arrays) = {len(batch_arrays)}") # 182
+                            # print("batch_element",batch_element) # 0
+                            # print(element_array[batch_element]) # [[None None*21]]
+                            # print("element.name",element.name) 
+                            # print("state_index",state_index)
+                            # print("terminal_stack",terminal_stack)
+                            # print( f"self._get_element_stack(  ##{store[element.name]}##  ,#{state_index}#, #{terminal_stack}#) === #{self._get_element_stack(store[element.name],state_index, terminal_stack)}")
                             element_array[
                                 batch_element] = self._get_element_stack(
                                 store[element.name],

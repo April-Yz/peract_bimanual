@@ -1218,6 +1218,7 @@ class QAttentionPerActBCAgent(Agent):
                 # sample one target img
                 # 一个目标图像样本 !! 
                 view_dix = np.random.randint(0, num_view_by_user)
+                view_dix = 10
                 # !! [:, view_dix]：这是NumPy的切片语法，用于从数组中选择一个子集。冒号:表示选择所有行，而view_dix是一个索引，指定了要选择的列（或视角）。
                 # !! nerf_multi_view_rgb_path[:, view_dix]：这行代码的结果是一个新数组，只包含原始数组中第view_dix列的数据，即特定视角的所有图像路径。
                 nerf_multi_view_rgb_path = nerf_multi_view_rgb_path[:, view_dix]
@@ -1950,7 +1951,8 @@ class QAttentionPerActBCAgent(Agent):
                         psnr_dyna = PSNR_torch(next_rgb_render, next_rgb_gt)
                     if next_rgb_render_right is not None:
                         next_rgb_render_right = next_rgb_render_right[0]
-                        psnr_dyna_right = PSNR_torch(next_rgb_render_right, next_rgb_gt)
+                        # test
+                        # psnr_dyna_right = PSNR_torch(next_rgb_render_right, next_rgb_gt)
 
                     # print("next_render_mask is not None", next_render_mask is not None)
                     # exclude_gtleft_mask1 = None
@@ -1982,6 +1984,7 @@ class QAttentionPerActBCAgent(Agent):
                     # plot three images in one row with subplots: 用子图在一行中绘制三个图像：
                     # src, tgt, pred
                     rgb_src =  obs[5][0].squeeze(0).permute(1, 2, 0)  / 2 + 0.5
+                    mask_src = gt_mask[5].squeeze(0).permute(1, 2, 0) / 2 + 0.5
                     fig, axs = plt.subplots(2, 7, figsize=(15, 3))   # 使用 matplotlib 创建一个包含1行7->8列子图的图形
                     # src
                     axs[0, 0].imshow(rgb_src.cpu().numpy())    # 在子图 axs[0] 上显示名为 rgb_src 的图像数
@@ -2016,7 +2019,8 @@ class QAttentionPerActBCAgent(Agent):
                     if next_rgb_render_right is not None: # 右臂动作后的rgb
                         # print("15") # 
                         axs[1, 5].imshow(next_rgb_render_right.cpu().numpy())
-                        axs[1, 5].title.set_text('next right psnr={:.2f}'.format(psnr_dyna_right))
+                        axs[1, 5].title.set_text('gt mask')
+                        # axs[1, 5].title.set_text('next right psnr={:.2f}'.format(psnr_dyna_right))
 
                     if render_mask_novel is not None:
                         # print("10")
@@ -2033,16 +2037,24 @@ class QAttentionPerActBCAgent(Agent):
 
                     if next_rgb_render_right_result is not None: # 去除右臂后的左臂mask
                         # print("12")
+                        # 如果无next则是train mask的结果
                         axs[1, 2].imshow(next_rgb_render_right_result.cpu().numpy())
+                        # if
                         axs[1, 2].title.set_text('next exclude_left_rgb')
+                    
+                    axs[1, 3].imshow(mask_src.cpu().numpy()) 
+                    axs[1, 3].title.set_text('mask_src')
+
                     if exclude_left_mask1 is not None: # 去除右臂后的左臂mask [1,1]的可视化
                         # print("13")
                         axs[1, 3].imshow(exclude_left_mask1.cpu().numpy())
                         axs[1, 3].title.set_text('exclude_left_mask')
                     if next_gt_rgbmask is not None: # gt 中去除左臂mask后的mask # 去除右臂后的左臂mask
                     #     # print("14")
-                        axs[1, 4].imshow(next_gt_rgbmask.cpu().numpy())
-                        axs[1, 4].title.set_text('exclude_left_mask * render_left')
+                        # axs[1, 4].imshow(next_gt_rgbmask.cpu().numpy())
+                        # axs[1, 4].title.set_text('exclude_left_mask * render_left')
+                        axs[1, 2].imshow(next_gt_rgbmask.cpu().numpy())
+                        axs[1, 2].title.set_text('vis gt')
                     if next_render_mask_right is not None:
                         axs[1, 4].imshow(next_render_mask_right.cpu().numpy())
                         axs[1, 4].title.set_text('exclude_right * render_right')
