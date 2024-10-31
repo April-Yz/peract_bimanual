@@ -1912,7 +1912,7 @@ class QAttentionPerActBCAgent(Agent):
                 elif self.cfg.neural_renderer.mask_gen =='pre':
                     rgb_render, next_rgb_render, embed_render, gt_embed_render, \
                         render_mask_novel,render_mask_gtrgb, next_render_mask, next_render_mask_right,\
-                              next_rgb_render_right, next_left_mask_gen,= self._q.render(
+                        next_rgb_render_right, next_left_mask_gen,= self._q.render(
                         rgb_pcd=obs,proprio=proprio,pcd=pcd,camera_extrinsics=extrinsics, camera_intrinsics=intrinsics,
                         lang_goal_emb=lang_goal_emb,lang_token_embs=lang_token_embs,bounds=bounds,
                         prev_bounds=prev_layer_bounds,
@@ -2022,13 +2022,16 @@ class QAttentionPerActBCAgent(Agent):
                         axs[1, 5].title.set_text('gt mask')
                         # axs[1, 5].title.set_text('next right psnr={:.2f}'.format(psnr_dyna_right))
 
+                    axs[1, 0].imshow(mask_src.cpu().numpy()) 
+                    axs[1, 0].title.set_text('mask_src')
+
                     if render_mask_novel is not None:
                         # print("10")
-                        axs[1, 0].imshow(render_mask_novel.cpu().numpy()) # 训练得到的当前mask
-                        axs[1, 0].title.set_text('mask*renderrgb now')
+                        axs[1, 1].imshow(render_mask_novel.cpu().numpy()) # 训练得到的当前mask
+                        axs[1, 1].title.set_text('mask*renderrgb now')
                     if render_mask_gtrgb is not None:
-                        axs[1, 1].imshow(render_mask_gtrgb.cpu().numpy()) # 训练得到的当前mask
-                        axs[1, 1].title.set_text('mask*gtrgb now')
+                        axs[1, 2].imshow(render_mask_gtrgb.cpu().numpy()) # 训练得到的当前mask
+                        axs[1, 2].title.set_text('mask*gtrgb now')
 
                     if next_render_mask_left is not None:   # gen left mask
                         # print("11")
@@ -2042,8 +2045,7 @@ class QAttentionPerActBCAgent(Agent):
                         # if
                         axs[1, 2].title.set_text('next exclude_left_rgb')
                     
-                    axs[1, 3].imshow(mask_src.cpu().numpy()) 
-                    axs[1, 3].title.set_text('mask_src')
+
 
                     if exclude_left_mask1 is not None: # 去除右臂后的左臂mask [1,1]的可视化
                         # print("13")
@@ -2057,7 +2059,8 @@ class QAttentionPerActBCAgent(Agent):
                         axs[1, 2].title.set_text('vis gt')
                     if next_render_mask_right is not None:
                         axs[1, 4].imshow(next_render_mask_right.cpu().numpy())
-                        axs[1, 4].title.set_text('exclude_right * render_right')
+                        axs[1, 4].title.set_text('vis gen mask')
+                        # axs[1, 4].title.set_text('exclude_right * render_right')
 
                     # remove axis
                     for ax in axs.flat:

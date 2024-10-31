@@ -59,7 +59,7 @@ class NeuralRenderer(nn.Module):
         self.scale = cfg.dataset.scale
         # 定义类别数
         self.num_classes = 3
-        self.use_CEloss =0 #1
+        self.use_CEloss =1 #1
 
         # gs regressor 应该不用改
         self.gs_model = GeneralizableGSEmbedNet(cfg, with_gs_render=True)
@@ -69,6 +69,7 @@ class NeuralRenderer(nn.Module):
         self.d_embed = cfg.d_embed
         self.loss_embed_fn = cfg.loss_embed_fn
         self.CrossEntropyLoss = nn.CrossEntropyLoss(reduction='mean') 
+        self.criterion_nll = nn.NLLLoss()
 
         if self.model_name == "diffusion":
             from odise.modeling.meta_arch.ldm import LdmFeatureExtractor
@@ -126,7 +127,9 @@ class NeuralRenderer(nn.Module):
     
     def _mask_loss_fn(self, render_mask, gt_mask):
         if self.use_CEloss:
-            loss = self.CrossEntropy(render_mask, gt_mask)
+            render_mask = torch.log(render_mask/ 2 + 0.5)
+            loss = self.criterion_nll (render_mask, gt_mask)
+            # loss = self.CrossEntropyLoss(render_mask, gt_mask)
         else:
             render_mask = render_mask.permute(0, 3, 1, 2)
             gt_mask =gt_mask.permute(0, 3, 1, 2)
@@ -501,12 +504,10 @@ class NeuralRenderer(nn.Module):
             data = self.gs_model(data) # GeneralizableGSEmbedNet(cfg, with_gs_render=True)
 
             # Gaussian Render
-            # if self.field_type !='LF'
             data = self.pts2render(data, bg_color=self.bg_color) # default: [0, 0, 0]
 
             # Loss L(GEO) 当前场景一致性损失 Current Scence Consistency Loss
-            # permute置换  将张量的维度从原来的顺序重新排列为新的顺序  
-            # predicetion预测: [1, 3, 128, 128] -> [1, 128, 128, 3]
+            # permute置换  将张量的维度从原来的顺序重新排列为新的顺序 
             render_novel = data['novel_view']['img_pred'].permute(0, 2, 3, 1)   # [1, 128, 128, 3]
 
             # visdom 视界(可视化数据用的) Manigaussian2 中是False bash中好像也没有指定
@@ -548,13 +549,11 @@ class NeuralRenderer(nn.Module):
             elif self.mask_gen == 'pre':
                 # 1 当前场景的mask 训练  loss_dyna_mask_novel
                 data =self.pts2render_mask(data, bg_color=self.bg_mask)
-                # render_mask_novel = data['novel_view']['mask_pred'].permute(0, 2, 3, 1) # [1,3，128, 128] -> [1,128, 128, 3]                           
                 # print("1 gt_mask_label = ",gt_mask_label.shape, gt_mask_label)              # [1 128 128]
                 # print("2 render_mask_novel = ",render_mask_novel.shape, render_mask_novel)  # [1 3 128 128]
-
                 if self.use_CEloss==1:
-                    render_mask_novel = data['novel_view']['mask_pred']
-                    loss_dyna_mask_novel = self.CrossEntropyLoss(render_mask_novel, gt_mask_label) #gt_mask) # mask现阶段的 _mask_loss_fn
+                    render_mask_novel = data['novel_view']['mask_pred'] # 1 3 128 128 
+                    loss_dyna_mask_novel = self._mask_loss_fn(render_mask_novel, gt_mask_label) #gt_mask) # mask现阶段的 _mask_loss_fn
                     render_mask_novel = render_mask_novel.permute(0, 2, 3, 1)
                     # # print("render_mask_novel = ",render_mask_novel.shape)
                     # # next_render_mask_right = self.vis_labels(render_mask_novel) # debug 的时候用一下
@@ -564,11 +563,11 @@ class NeuralRenderer(nn.Module):
                     loss_dyna_mask_novel = self._mask_loss_fn(render_mask_novel, gt_mask_label)  # gt_mask) # mask现阶段的 _mask_loss_fn
                 # loss_dyna_mask_novel = self._mask_loss_fn(render_mask_novel, gt_mask_label)  # gt_mask) # mask现阶段的 _mask_loss_fn
 
-                print("loss_dyna_mask_novel = ",loss_dyna_mask_novel)    
+                # print("loss_dyna_mask_novel = ",loss_dyna_mask_novel)    
 
                 if not self.use_dynamic_field:
                     loss_dyna_mask = loss_dyna_mask_novel
-                    lambda_mask =1   # if step >= 10000 else 0
+                    lambda_mask =1   if step >= 1000 else 0
                     loss += loss_dyna_mask * lambda_mask # * 0.001
                 else:
                     loss_dyna_mask = loss_dyna_mask_novel * (1 - self.cfg.lambda_next_loss_mask)
@@ -579,18 +578,10 @@ class NeuralRenderer(nn.Module):
             # PSNR好像表示图片质量？
             psnr = PSNR_torch(render_novel, gt_rgb)
 
-
             # loss_rgb = self.cfg.lambda_l1 * Ll1 + self.cfg.lambda_ssim * Lssim
             loss_rgb = Ll1
             # 1 LGeo?
-            # #############################################debug mask######################
-            debug =1 # 1 test 0正常
-            if debug==0:
-                loss += loss_rgb
-            else:
-                loss += loss_rgb * 0
-                # loss += loss_dyna_mask
-            # #############################################debug mask######################
+            loss += loss_rgb
 
             # 语义（optional）
             if gt_embed is not None:
@@ -1078,9 +1069,17 @@ class NeuralRenderer(nn.Module):
                         data =self.pts2render_mask(data, bg_color=self.bg_mask)
                         if self.use_CEloss==1:
                             render_mask_novel = data['novel_view']['mask_pred'].permute(0, 2, 3, 1)
-                            print("render_mask_novel",render_mask_novel.shape) # [1 3 128 128]
+                            render_mask_novel1 = render_mask_novel
+                            print("render_mask_novel",render_mask_novel.shape) # [1 128 128 3]
                             render_mask_novel = self.generate_final_class_labels(render_mask_novel)
-                            render_mask_novel = render_mask_novel.unsqueeze(3).repeat(1, 1, 1, 3)
+                            
+                            next_render_mask_right = self.vis_labels(render_mask_novel1)
+                            gt_mask1 = self.mask_onehot(gt_mask)
+                            # gt_mask1 =gt_mask1.permute(0, 3, 1, 2)
+                            print("gt_mask1",gt_mask1.shape,gt_mask1) # 1 128 128 3 
+                            next_render_rgb_right =  self.vis_labels(gt_mask1)
+                            render_mask_novel = self.generate_final_class_labels(render_mask_novel1) # 1 128 128
+                            render_mask_novel = render_mask_novel.unsqueeze(3).repeat(1, 1, 1, 3)   # 1 128 128 3
                             render_mask_gtrgb = gt_rgb * render_mask_novel
                             render_mask_novel = render_novel * render_mask_novel
                         else:
@@ -1280,17 +1279,17 @@ class NeuralRenderer(nn.Module):
         assert bs == 1, "batch size should be 1"
         # 公式2中 时刻i 的状态（θ 多了f 高级语义特征）
         i = 0
-        xyz_i = data['xyz_maps'][i, :, :]
-        feature_i = data['sh_maps'][i, :, :, :] # [16384, 4, 3]
-        rot_i = data['rot_maps'][i, :, :]
-        scale_i = data['scale_maps'][i, :, :]
-        opacity_i = data['opacity_maps'][i, :, :]
+        xyz_i = data['xyz_maps'][i, :, :].detach() 
+        feature_i = data['sh_maps'][i, :, :, :].detach()  # [16384, 4, 3]
+        rot_i = data['rot_maps'][i, :, :].detach() 
+        scale_i = data['scale_maps'][i, :, :].detach() 
+        opacity_i = data['opacity_maps'][i, :, :].detach() 
         precomputed_mask_i = data['mask_maps'][i, :, :] # mask  [1, 65536, 3]
         # precomputed_mask_i = precomputed_mask_i.reshape(1,256,256,3).permute(0,3,1,2) # [1, 65536, 3] -> [1, 3, 256, 256]
         # if self.mask_gen =='pre':    
             # precomputed_mask_i = F.interpolate(precomputed_mask_i, size=(128, 128), mode='bilinear', align_corners=False) # [1 3 256 256] -> [1 3 128 128]
         # precomputed_mask_i = precomputed_mask_i.squeeze(0).permute(1,2,0)
-        feature_language_i = data['feature_maps'][i, :, :]  # [B, N, 3]   [1, 65536, 3]  
+        feature_language_i = data['feature_maps'][i, :, :].detach()   # [B, N, 3]   [1, 65536, 3]  
         
 
         # 渲染返回字典  render应该是用来渲染的  from agents.manigaussian_bc2.gaussian_renderer import render
@@ -1312,18 +1311,18 @@ class NeuralRenderer(nn.Module):
         assert bs == 1, "batch size should be 1"
         # 公式2中 时刻i 的状态（θ 多了f 高级语义特征）
         i = 0
-        xyz_i = data['xyz_maps'][i, :, :]       # [65536, 3]
-        feature_i = data['sh_maps'][i, :, :, :] # [16384(现在应该是256 * 256), 4, 3]
-        rot_i = data['rot_maps'][i, :, :]
-        scale_i = data['scale_maps'][i, :, :]
-        opacity_i = data['opacity_maps'][i, :, :]
+        xyz_i = data['xyz_maps'][i, :, :].detach()       # [65536, 3]
+        feature_i = data['sh_maps'][i, :, :, :].detach()  # [16384(现在应该是256 * 256), 4, 3]
+        rot_i = data['rot_maps'][i, :, :].detach() 
+        scale_i = data['scale_maps'][i, :, :].detach() 
+        opacity_i = data['opacity_maps'][i, :, :].detach() 
         precomputed_mask_i = data['mask_maps'][i, :, :] # mask  [1, 65536, 3]
         # precomputed_mask_i = precomputed_mask_i.reshape(1,256,256,3).permute(0,3,1,2) # [1, 65536, 3] -> [1, 3, 256, 256]
         # if self.mask_gen =='pre':    
         #     precomputed_mask_i = F.interpolate(precomputed_mask_i, size=(128, 128), mode='bilinear', align_corners=False) # [1 3 256 256] -> [1 3 128 128]
         # precomputed_mask_i = precomputed_mask_i.squeeze(0).permute(1,2,0)
         
-        feature_language_i = data['feature_maps'][i, :, :]  # [B, N, 3]   [1, 65536, 3]  
+        feature_language_i = data['feature_maps'][i, :, :].detach()   # [B, N, 3]   [1, 65536, 3]  
         
 
         # 渲染返回字典  render应该是用来渲染的  from agents.manigaussian_bc2.gaussian_renderer import render
@@ -1560,8 +1559,8 @@ class NeuralRenderer(nn.Module):
         # gt_mask_label = torch.zeros_like(gt_mask, dtype=torch.uint8)
         gt_mask = gt_mask.squeeze(-1)
         gt_mask_label = torch.zeros_like(gt_mask, dtype=torch.float32)
-        gt_mask_label[(gt_mask > right_min-1) & (gt_mask < right_max+1)] = 1.0
-        gt_mask_label[(gt_mask > left_min-1) & (gt_mask < left_max+1)] = 2.0
+        gt_mask_label[(gt_mask > right_min-1) & (gt_mask < right_max+1)] = 100.0
+        gt_mask_label[(gt_mask > left_min-1) & (gt_mask < left_max+1)] = 200.0
         gt_mask_label = gt_mask_label.unsqueeze(-1).repeat(1,1,1,3)         
         return gt_mask_label
 

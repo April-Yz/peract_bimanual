@@ -364,7 +364,7 @@ class GeneralizableGSEmbedNet(nn.Module):
         data['mask_maps'] = mask_maps #self.mask_activation(mask_maps) #10.24  [B, N, 3]  [1, 65536, 3]
         # print(data['xyz_maps'].shape ,data['sh_maps'].shape,data['rot_maps'].shape,data['scale_maps'].shape,data['opacity_maps'].shape,data['feature_maps'].shape)
         # torch.Size([1, 65536, 3]) torch.Size([1, 65536, 4, 3]) torch.Size([1, 65536, 4]) torch.Size([1, 65536, 3]) torch.Size([1, 65536, 1]) torch.Size([1, 65536, 3])
-        data['mask_maps'] = data['mask_maps'] *100
+        # data['mask_maps'] = data['mask_maps'] *100
         # Dynamic Modeling: predict next gaussian maps
         # 动态建模：预测下一个高斯映射
         # print("self.field_type = ",self.field_type)
