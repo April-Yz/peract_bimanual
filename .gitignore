@@ -7,10 +7,10 @@ third_part/CoppeliaSim_Edu_V4_1_0_Ubuntu20_04
 # third_part/pyrep
 # third_part/YARR
 scripts/test_demo
-third_part/RLBench/rlbench/assets
+# third_part/RLBench/rlbench/assets
 .ttm
-third_part/RLBench/rlbench/robot_ttms
-third_part/RLBench/rlbench/task_ttms
+# third_part/RLBench/rlbench/robot_ttms
+# third_part/RLBench/rlbench/task_ttms
 third_part/RLBench/tests/unit/assets/
 third_part/RLBench/urdfs/panda/meshes/
 third_part/RLBench/tutorials/tutorial_images/
