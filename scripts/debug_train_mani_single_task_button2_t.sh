@@ -50,7 +50,7 @@ replay_path="/data1/zjyang/program/peract_bimanual/replay/debug/nerf"
 lambda_nerf=0.01 # 0.01
 mask_gt_rgb=True
 warm_up=0
-
+lambda_embed=1.0
 
 mask_gen='a' # 'nonerf' #'gt' # 'pre' 'None'
 use_nerf_picture=True #False
@@ -86,10 +86,10 @@ CUDA_VISIBLE_DEVICES=${train_gpu}  QT_AUTO_SCREEN_SCALE_FACTOR=0 TORCH_DISTRIBUT
         method.neural_renderer.render_freq=${render_freq} \
         method.neural_renderer.image_width=${image_width} \
         method.neural_renderer.image_height=${image_height} \
-        method.neural_renderer.lambda_embed=0.0 \
+        method.neural_renderer.lambda_embed=${lambda_embed} \
         method.neural_renderer.lambda_dyna=${lambda_dyna} \
         method.neural_renderer.lambda_reg=${lambda_reg} \
-        method.neural_renderer.foundation_model_name=null \
+        method.neural_renderer.foundation_model_name=diffusion \
         method.neural_renderer.use_dynamic_field=${use_dynamic_field} \
         method.neural_renderer.field_type=${field_type} \
         method.neural_renderer.mask_gen=${mask_gen} \
@@ -97,7 +97,7 @@ CUDA_VISIBLE_DEVICES=${train_gpu}  QT_AUTO_SCREEN_SCALE_FACTOR=0 TORCH_DISTRIBUT
         method.neural_renderer.next_mlp.warm_up=${warm_up} 
 
 "
-# remove 0.ckpt
+# remove 0.ckpt null
 # rm -rf logs/${exp_name}/seed${seed}/weights/0
 rm -rf log-mani/${exp_name}/${exp_name}/${method}/seed${seed}/weights/0
 

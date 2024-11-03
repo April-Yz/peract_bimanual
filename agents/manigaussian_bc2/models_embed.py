@@ -253,25 +253,18 @@ class GeneralizableGSEmbedNet(nn.Module):
         :return (B, Feat)
         """
         xyz_voxel_space = xyz.clone()
-
         xyz_voxel_space = xyz_voxel_space * 2 - 1.0 # [0,1]->[-1,1]
 
         # unsqueeze the point cloud to also have 5 dim
         xyz_voxel_space = xyz_voxel_space.unsqueeze(1).unsqueeze(1)   
         # 在第二和第三维度上增加两个维度，使得 xyz_voxel_space 的形状变为 [B, 1, 1, N, 3]
-        # xyz_voxel_space: [bs, 1, 1, N, 3]
-        # print("def sample_in_canonical_voxel(self, xyz, voxel_feat): xyz_voxel_space.shape=", xyz_voxel_space.shape) # [2,1,1,16384,3]
-        # sample in voxel space 体素空间中的样本
-        # print("def sample_in_canonical_voxel(self, xyz, voxel_feat): voxel_feat.shape=", voxel_feat.shape) # [2,1,100,100,100]
+        # xyz_voxel_space: [bs, 1, 1, N, 3]print("def sample_in_canonical_voxel(self, xyz, voxel_feat): xyz_voxel_space.shape=", xyz_voxel_space.shape) # [2,1,1,16384,3]sample in voxel space 体素空间中的样本print("def sample_in_canonical_voxel(self, xyz, voxel_feat): voxel_feat.shape=", voxel_feat.shape) # [2,1,100,100,100]
         point_feature = F.grid_sample(voxel_feat, xyz_voxel_space, align_corners=True, mode='bilinear')
-        # print("point_feature.shape=", point_feature.shape)                                                  # [2,1,1,1,16384]
-        # [bs, 128, 1, 1, N]
+        # print("point_feature.shape=", point_feature.shape)            # [2,1,1,1,16384] [bs, 128, 1, 1, N]
         # squeeze back to point cloud shape 
         point_feature = point_feature.squeeze(2).squeeze(2).permute(0, 2, 1)                                                            
-        # 使用 squeeze 方法移除第二和第三维度（它们的大小为1），然后使用 permute 方法重新排列张量的形状，使其变为 [B, N, 128]。
-        # [bs, N, 128]
+        # 使用 squeeze 方法移除第二和第三维度（它们的大小为1），然后使用 permute 方法重新排列张量的形状，使其变为 [B, N, 128]。  [bs, N, 128]
         # print("def sample_in_canonical_voxel(self, xyz, voxel_feat): point_feature.shape=", point_feature.shape) # [2,16384,1]
-
         return point_feature
 
     def forward(self, data):
@@ -282,8 +275,6 @@ class GeneralizableGSEmbedNet(nn.Module):
 
         Predict gaussian parameter maps
         """
-
-        # 输出语句中是准确的写法
         SB, N, _ = data['xyz'].shape # 1 65536
         NS = self.num_views_per_obj # 1
         # print("SB=",SB,", N=",N,", NS=",NS)
@@ -292,16 +283,13 @@ class GeneralizableGSEmbedNet(nn.Module):
         # print("first canon_xyz.shape=[1,65536,128]",canon_xyz.shape)     # real [1,65536,3]   [2,16384,3]
         data['canon_xyz'] = canon_xyz # gt mask临时用一下
         # volumetric sampling 体积采样 
-        point_latent = self.sample_in_canonical_voxel(canon_xyz, data['dec_fts']) # [bs, N, 128]->[bs, 128, N] bs是批次大小，N是体素的数量，128是特征维度。
-                                                                                  # [2,16384,1] bs=2 N=128 128  
+        point_latent = self.sample_in_canonical_voxel(canon_xyz, data['dec_fts']) # [bs, N, 128]->[bs, 128, N] bs是批次大小，N是体素的数量，128是特征维度。  # [2,16384,1] bs=2 N=128 128  
         # print("point_latent.shape=[1,65536,128]-----------",point_latent.shape) # real [1,65536,3]               # [2,16384,1] 应该是 [1,16384,128]
         point_latent = point_latent.reshape(-1, self.d_latent)  # (SB * NS * B, latent)  [N, 128] [65536,128]        N=256 [256*128]  
-
         # print("point_latent.shape=[65536,128]---------point没问题256*128",point_latent.shape,self.d_latent)
         # print("canon_xyz.shape=[1,65536,3]",canon_xyz.shape)     # 输出z_feature张量的形状    [2,16384,3] N=16384
         if self.use_xyz:    # True
             z_feature = canon_xyz.reshape(-1, 3)  # (SB*B, 3)   [1*65536,3]    将canon_xyz重塑为形状(SB*B, 3)的张量，其中每个元素包含3个坐标值。
-
         # print("z_feature.shape= before code  = [65536,3]   ",z_feature.shape)     # 输出z_feature张量的形状
         if self.use_code:    # True
             # Positional encoding (no viewdirs) 位置编码（无 viewdirs）

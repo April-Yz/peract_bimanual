@@ -12,7 +12,7 @@ import agents.manigaussian_bc2.utils as utils
 from agents.manigaussian_bc2.models_embed import GeneralizableGSEmbedNet
 from agents.manigaussian_bc2.loss import l1_loss, l2_loss, cosine_loss, ssim
 from agents.manigaussian_bc2.graphics_utils import getWorld2View2, getProjectionMatrix, focal2fov
-from agents.manigaussian_bc2.gaussian_renderer import render,render_mask, render_mask_gen
+from agents.manigaussian_bc2.gaussian_renderer import render,render_mask, render_mask_gen,render1
 from agents.manigaussian_bc2.project_hull import label_point_cloud, points_inside_convex_hull, \
     depth_mask_to_3d, project_3d_to_2d, create_2d_mask_from_convex_hull, merge_arrays, merge_tensors
 import visdom
@@ -59,7 +59,7 @@ class NeuralRenderer(nn.Module):
         self.scale = cfg.dataset.scale
         # 定义类别数
         self.num_classes = 3
-        self.use_CEloss =1 #1
+        self.use_CEloss =1 # 1
 
         # gs regressor 应该不用改
         self.gs_model = GeneralizableGSEmbedNet(cfg, with_gs_render=True)
@@ -124,16 +124,160 @@ class NeuralRenderer(nn.Module):
         else:
             cprint(f"loss_embed_fn {self.loss_embed_fn} is not implemented", "yellow")
         return loss_embed
-    
-    def _mask_loss_fn(self, render_mask, gt_mask):
-        if self.use_CEloss:
-            render_mask = torch.log(render_mask/ 2 + 0.5)
-            loss = self.criterion_nll (render_mask, gt_mask)
-            # loss = self.CrossEntropyLoss(render_mask, gt_mask)
+
+    def ele_multip_in_chunks(self, feat_expanded, masks_expanded, chunk_size=5):
+        # 逐块元素乘法运算
+        result = torch.zeros_like(feat_expanded)
+        for i in range(0, feat_expanded.size(0), chunk_size):
+            end_i = min(i + chunk_size, feat_expanded.size(0))
+            for j in range(0, feat_expanded.size(1), chunk_size):
+                end_j = min(j + chunk_size, feat_expanded.size(1))
+                chunk_feat = feat_expanded[i:end_i, j:end_j]
+                chunk_mask = masks_expanded[i:end_i, j:end_j].float()
+
+                result[i:end_i, j:end_j] = chunk_feat * chunk_mask
+        return result
+
+    def mask_feature_mean(self, feat_map, gt_masks, image_mask=None, return_var=False):
+        """Compute the average instance features within each mask.
+        feat_map: [C=6, H, W]         the instance features of the entire image
+        gt_masks: [num_mask, H, W]  num_mask boolean masks
+        计算每个掩码内的平均实例特征。
+        feat_map：[C=6, H, W]整张图像的实例特征
+        gt_masks: [num_mask, H, W] num_mask 布尔掩码
+        """
+        num_mask, H, W = gt_masks.shape
+
+        # expand feat and masks for batch processing 扩展批量处理的功能和掩码
+        feat_expanded = feat_map.unsqueeze(0).expand(num_mask, *feat_map.shape)  # [num_mask, C, H, W]
+        masks_expanded = gt_masks.unsqueeze(1).expand(-1, feat_map.shape[0], -1, -1)  # [num_mask, C, H, W]
+        if image_mask is not None:  # image level mask 图像级掩模 (alpha) 
+            image_mask_expanded = image_mask.unsqueeze(0).expand(num_mask, feat_map.shape[0], -1, -1)
+
+        # average features within each mask 每个掩模内的平均特征
+        if image_mask is not None:
+            masked_feats = feat_expanded * masks_expanded.float() * image_mask_expanded.float()
+            mask_counts = (masks_expanded * image_mask_expanded.float()).sum(dim=(2, 3))
         else:
-            render_mask = render_mask.permute(0, 3, 1, 2)
+            # masked_feats = feat_expanded * masks_expanded.float()  # [num_mask, C, H, W] may cause OOM
+            masked_feats = self.ele_multip_in_chunks(feat_expanded, masks_expanded, chunk_size=5)   # in chuck to avoid OOM  # 按块处理以避免内存溢出
+            mask_counts = masks_expanded.sum(dim=(2, 3))  # [num_mask, C]
+
+        # the number of pixels within each mask 每个掩模内的像素数
+        mask_counts = mask_counts.clamp(min=1)
+
+        # the mean features of each mask 每个掩模的平均特征
+        sum_per_channel = masked_feats.sum(dim=[2, 3])
+        mean_per_channel = sum_per_channel / mask_counts    # [num_mask, C]
+
+        if not return_var: # default
+            return mean_per_channel   # [num_mask, C]
+        # else:
+        #     # calculate variance
+        #     # masked_for_variance = torch.where(masks_expanded.bool(), masked_feats - mean_per_channel.unsqueeze(-1).unsqueeze(-1), torch.zeros_like(masked_feats))
+        #     masked_for_variance = process_in_chunks(masks_expanded, masked_feats, mean_per_channel, chunk_size=5) # in chunk to avoid OOM
+
+        #     # variance_per_channel = (masked_for_variance ** 2).sum(dim=[2, 3]) / mask_counts    # [num_mask, 6]
+        #     variance_per_channel = calculate_variance_in_chunks(masked_for_variance, mask_counts, chunk_size=5)   # in chuck to avoid OOM
+
+        #     # mean and variance
+        #     mean = mean_per_channel.mean(dim=1)          # [num_mask]，not used
+        #     variance = variance_per_channel.mean(dim=1)  # [num_mask]
+
+        #     return mean_per_channel, variance, mask_counts[:, 0]   # [num_mask, C], [num_mask], [num_mask]
+
+    def cohesion_loss(self, feat_map, gt_mask, feat_mean_stack):
+        """intra-mask smoothing loss. Eq.(1) in the paper
+        Constrain the feature of each pixel within the mask to be close to the mean feature of that mask.
+        掩模内平滑损失。论文中的式(1)将掩模内每个像素的特征限制为接近该掩模的平均特征。
+        """
+        N, H, W = gt_mask.shape
+        C = feat_map.shape[0]
+        # expand feat_map [6, H, W] to [N, 6, H, W]
+        feat_map_expanded = feat_map.unsqueeze(0).expand(N, C, H, W)
+        # expand mean feat [N, 6] to [N, 6, H, W]
+        feat_mean_stack_expanded = feat_mean_stack.unsqueeze(-1).unsqueeze(-1).expand(N, C, H, W)
+        
+        # fature distance     计算特征距离   masked_feat：通过将扩展后的特征图与掩码相乘，得到的结果只保留了掩码为 1 的位置（即特定实例的特征），其余位置将为 0。最终形状仍为 [𝑁,6,𝐻,𝑊][N,6,H,W]。
+        masked_feat = feat_map_expanded * gt_mask.unsqueeze(1)           # [N, 6, H, W]  # [N, 6, H, W]*[N,1,H,W]，只保留 gt_mask 为 1 的位置
+        dist = (masked_feat - feat_mean_stack_expanded).norm(p=2, dim=1) # [N, H, W]     # 计算每个像素的特征距离，结果为 [N, H, W]   .norm(p=2, dim=1)：这个方法计算在特征维度（即通道维度，大小为6）上的 L2 范数（欧几里得距离），得到的结果是一个形状为 [𝑁,𝐻,𝑊[N,H,W] 的张量，表示每个样本的每个像素与其对应平均特征之间的距离。
+        
+        # per mask feature distance (loss) 每个掩模特征距离（损失）
+        masked_dist = dist * gt_mask    # [N, H, W] # [N, H, W]，只保留 gt_mask 为 1 的位置
+        loss_per_mask = masked_dist.sum(dim=[1, 2]) / gt_mask.sum(dim=[1, 2]).clamp(min=1) # 对每个 mask 的距离求和并归一化
+
+        return loss_per_mask.mean()
+
+
+    def separation_loss(self,feat_mean_stack):
+        """ inter-mask contrastive loss Eq.(2) in the paper
+        Constrain the instance features within different masks to be as far apart as possible.
+        论文中的掩模间对比损失方程（2）将不同蒙版内的实例特征限制为尽可能远离
+        """
+        N, _ = feat_mean_stack.shape  # 获取特征均值堆栈的数量 N
+
+        # expand feat_mean_stack[N, 6] to [N, N, C] 将 feat_mean_stack 从 [N, 6] 扩展到 [N, N, C]
+        feat_expanded = feat_mean_stack.unsqueeze(1).expand(-1, N, -1)    # [N, N, C]
+        feat_transposed = feat_mean_stack.unsqueeze(0).expand(N, -1, -1)  # [N, N, C]
+        
+        # distance  计算特征之间的平方距离
+        diff_squared = (feat_expanded - feat_transposed).pow(2).sum(2) # [N, N]
+        
+        # Calculate the inverse of the distance to enhance discrimination 计算距离的倒数以增强区分性
+        epsilon = 1     # 1e-6  # 1e-6，避免除以零的常数
+        inverse_distance = 1.0 / (diff_squared + epsilon)  # [N, N]
+        # Exclude diagonal elements (distance from itself) and calculate the mean inverse distance
+        # 排除对角元素（自身的距离），并计算平均倒数距离
+        mask = torch.eye(N, device=feat_mean_stack.device).bool() # 创建单位矩阵掩码
+        inverse_distance.masked_fill_(mask, 0)                    # 将对角线元素设为 0，避免对自身距离的影响  
+
+        # note: weight   权重计算
+        # sorted by distance  根据距离排序
+        sorted_indices = inverse_distance.argsort().argsort()   # [N, N]，对距离进行排序 
+        loss_weight = (sorted_indices.float() / (N - 1)) * (1.0 - 0.1) + 0.1    # scale to 0.1 - 1.0, [N, N]   # 将权重缩放到 0.1 - 1.0 的范围
+        # small weight
+        # if iteration > 35_000:   # 如果迭代次数大于 35,000
+            # loss_weight[loss_weight < 0.9] = 0.1   # 将小于 0.9 的权重设为 0.1
+        # inverse_distance *= loss_weight     # [N, N] 应用权重
+
+        # final loss
+        loss = inverse_distance.sum() / (N * (N - 1))
+
+        return loss
+
+    def _mask_loss_fn(self, render_mask, gt_mask):
+        
+        if self.use_CEloss == 1:
+            # render_mask = torch.log(render_mask/ 2 + 0.5)
+            print("render_mask = ",render_mask)
+            render_mask = torch.log(render_mask)
+            loss = self.criterion_nll (render_mask, gt_mask)
+        elif self.use_CEloss == 2:
+            loss = self.CrossEntropyLoss(render_mask, gt_mask)
+        elif self.use_CEloss == 3:
+            rendered_ins_feat = render_mask[0,:,:,:]
+            mask_bool = gt_mask[0,:,:,:]
+            # (0) compute the average instance features within each mask. [num_mask, 6]
+            # rendered_silhouette 即透明度 需要render做的
+            feat_mean_stack = self.mask_feature_mean(rendered_ins_feat, mask_bool) #, image_mask=rendered_silhouette)
+            # (1) intra-mask smoothing loss. Eq.(1) in the paper
+            loss_cohesion = self.cohesion_loss(rendered_ins_feat, mask_bool, feat_mean_stack)
+            # (2) inter-mask contrastive loss Eq.(2) in the paper
+            loss_separation = self.separation_loss(feat_mean_stack)
+            # total loss, opt.loss_weight: 0.1
+            loss = loss_separation + 0.1 * loss_cohesion # opt.loss_weight
+        elif self.use_CEloss == 0:
+            render_mask = (render_mask.permute(0, 3, 1, 2)/2 + 0.5) * (self.num_classes-1)
             gt_mask =gt_mask.permute(0, 3, 1, 2)
-            loss = (1.0 - 0.2) * l1_loss(render_mask, gt_mask) + 0.2 * (1.0 - ssim(render_mask, gt_mask))
+            loss = 0.8 * l1_loss(render_mask, gt_mask) + 0.2 * (1.0 - ssim(render_mask, gt_mask))
+        elif self.use_CEloss == 4:
+            render_mask = render_mask.permute(0, 3, 1, 2) * (self.num_classes-1)
+            gt_mask =gt_mask.permute(0, 3, 1, 2)
+            loss = 0.8 * l1_loss(render_mask, gt_mask) + 0.2 * (1.0 - ssim(render_mask, gt_mask))
+        elif self.use_CEloss == 5: # 用render的language
+            render_mask = render_mask.permute(0, 3, 1, 2) * (self.num_classes-1)
+            gt_mask =gt_mask.permute(0, 3, 1, 2)
+            loss = self._mask_ce_loss_fn(render_mask, gt_mask)
 
         return loss
 
@@ -473,23 +617,28 @@ class NeuralRenderer(nn.Module):
             gt_mask = F.interpolate(gt_mask, size=(128, 128), mode='bilinear', align_corners=False)
             # print("2 mask",gt_mask.shape)
             gt_mask =gt_mask.permute(0,2,3,1) # [1, 1, 256, 256] ->[1, 256, 256, 1]
-            if self.use_CEloss ==1:
-                gt_mask_label = self.mask_label_onehot(gt_mask)
-
-            else:
-                test_onehot = self.mask_onehot(gt_mask) # [1 128 128 3]
-                device = gt_mask.device  # 获取 next_gt_rgb 的设备 print("test.shape",test.shape,test)  
-                test_onehot = test_onehot.to(device).permute(0, 3, 1, 2)  # [1 128 128 3] -> [1 3 128 128]
+            if self.use_CEloss >=1 and self.use_CEloss <= 3:
+                gt_mask_label = self.mask_label_onehot(gt_mask) # 1 128 128 [target 0 1 2]
+                # test_onehot = self.mask_onehot(gt_mask) # [1 128 128 3]
+                # device = gt_mask.device  # 获取 next_gt_rgb 的设备 print("test.shape",test.shape,test)  
+                # test_onehot = test_onehot.to(device).permute(0, 3, 1, 2)  # [1 128 128 3] -> [1 3 128 128]
+                # loss_test = self._mask_loss_fn(test_onehot,gt_mask_label)   
+                # print("loss_test = ",loss_test)
                 # test_onehot = test_onehot.repeat(1, 1, 1, 3)
+            elif self.use_CEloss == 0:
+
                 # print("3 mask",gt_mask.shape)
                 gt_mask_label = self.mask_label(gt_mask) # [1 128 128 3]   
-                gt_mask_label_test = self.mask_label_onehot(gt_mask)
-                test_onehot1 = self.one_hot_encode(gt_mask_label_test,3)
-                loss_test = self.CrossEntropyLoss(test_onehot,gt_mask_label_test)    
-                loss_test1 = self.CrossEntropyLoss(test_onehot1,gt_mask_label_test)  
-                print("loss_test = ",loss_test)
-                print("loss_test1 = ",loss_test1)         
-                # print("4 gt_mask_label = ",gt_mask_label.shape, gt_mask_label_test)
+                    # gt_mask_label_test = self.mask_label_onehot(gt_mask)
+                    # test_onehot1 = self.one_hot_encode(gt_mask_label_test,3)
+                    # loss_test1 = self.CrossEntropyLoss(test_onehot1,gt_mask_label_test)  
+                    # print("loss_test1 = ",loss_test1)         
+                # print("L1gt_mask_label =[000 111 222]",gt_mask_label.shape, gt_mask_label)
+            elif self.use_CEloss == 4:
+                gt_mask_label = self.mask_label(gt_mask) 
+                gt_mask = gt_mask_label
+            elif self.use_CEloss == 5: # 用render的language
+                gt_mask_label = self.mask_label(gt_mask)    # [1 128 128 1] -> [1 128 128 3] [000 / 111 / 222]
             if self.use_dynamic_field:
                 next_gt_mask = F.interpolate(next_gt_mask, size=(128, 128), mode='bilinear', align_corners=False)
                 next_gt_mask =next_gt_mask.permute(0,2,3,1) # [1, 1, 256, 256] ->[1, 256, 256, 1]
@@ -506,9 +655,11 @@ class NeuralRenderer(nn.Module):
             # Gaussian Render
             data = self.pts2render(data, bg_color=self.bg_color) # default: [0, 0, 0]
 
+            
             # Loss L(GEO) 当前场景一致性损失 Current Scence Consistency Loss
             # permute置换  将张量的维度从原来的顺序重新排列为新的顺序 
             render_novel = data['novel_view']['img_pred'].permute(0, 2, 3, 1)   # [1, 128, 128, 3]
+            
 
             # visdom 视界(可视化数据用的) Manigaussian2 中是False bash中好像也没有指定
             if self.cfg.visdom: # False
@@ -524,6 +675,32 @@ class NeuralRenderer(nn.Module):
                 vis.image(gt_rgb[0].permute(2, 0, 1).detach().cpu().numpy(), win='gt_novel', opts=dict(title='gt_novel'))
             
             loss = 0.
+            Ll1 = l2_loss(render_novel, gt_rgb) # loss_now_rgb
+            # Ll1 = l2_loss(render_novel, gt_mask) # loss_now_rgb
+            # Lssim = 1.0 - ssim(render_novel, gt_rgb)
+            Lssim = 0.
+            # PSNR好像表示图片质量？
+            psnr = PSNR_torch(render_novel, gt_rgb)
+
+            # loss_rgb = self.cfg.lambda_l1 * Ll1 + self.cfg.lambda_ssim * Lssim
+            loss_rgb = Ll1
+            # 1 LGeo?
+            loss += loss_rgb
+
+            # 语义（optional）
+            if gt_embed is not None:
+                # 比较真实和render的embed 应该是语义Lsem
+                gt_embed = gt_embed.permute(0, 2, 3, 1) # channel last
+                render_embed = data['novel_view']['embed_pred'].permute(0, 2, 3, 1)
+
+                # DEBUG gradient    debug 梯度
+                # render_embed_grad = render_embed.register_hook(self._save_gradient('render_embed'))
+
+                loss_embed = self._embed_loss_fn(render_embed, gt_embed)
+                # 2 loss(LGeo? + embed是啥 应该是语义Lsem) = loss_rgb + self.cfg.lambda_embed * loss_embed
+                loss += self.cfg.lambda_embed * loss_embed
+            else:
+                loss_embed = torch.tensor(0.)
 
             # Ll1 = l1_loss(render_novel, gt_rgb) 
             loss_dyna_mask = torch.tensor(0.) 
@@ -551,52 +728,43 @@ class NeuralRenderer(nn.Module):
                 data =self.pts2render_mask(data, bg_color=self.bg_mask)
                 # print("1 gt_mask_label = ",gt_mask_label.shape, gt_mask_label)              # [1 128 128]
                 # print("2 render_mask_novel = ",render_mask_novel.shape, render_mask_novel)  # [1 3 128 128]
-                if self.use_CEloss==1:
+                if self.use_CEloss==1 or self.use_CEloss==2:
                     render_mask_novel = data['novel_view']['mask_pred'] # 1 3 128 128 
                     loss_dyna_mask_novel = self._mask_loss_fn(render_mask_novel, gt_mask_label) #gt_mask) # mask现阶段的 _mask_loss_fn
                     render_mask_novel = render_mask_novel.permute(0, 2, 3, 1)
                     # # print("render_mask_novel = ",render_mask_novel.shape)
                     # # next_render_mask_right = self.vis_labels(render_mask_novel) # debug 的时候用一下
                     # # render_mask_novel = self.generate_final_class_labels(render_mask_novel)                
-                else:
+                elif self.use_CEloss == 0:
                     render_mask_novel = data['novel_view']['mask_pred'].permute(0, 2, 3, 1)
                     loss_dyna_mask_novel = self._mask_loss_fn(render_mask_novel, gt_mask_label)  # gt_mask) # mask现阶段的 _mask_loss_fn
                 # loss_dyna_mask_novel = self._mask_loss_fn(render_mask_novel, gt_mask_label)  # gt_mask) # mask现阶段的 _mask_loss_fn
-
                 # print("loss_dyna_mask_novel = ",loss_dyna_mask_novel)    
+                elif self.use_CEloss == 3:
+                    render_mask_novel = data['novel_view']['mask_pred'] # 1 3 128 128 
+                    one_hot = F.one_hot(gt_mask_label.type(torch.int64), num_classes=3) #int(instance_num.item() + 1))
+                    gt_mask_label = one_hot.permute(0,3, 1, 2)
+                    loss_dyna_mask_novel = self._mask_loss_fn(render_mask_novel, gt_mask_label) #gt_mask) # mask现阶段的 _mask_loss_fn
+                    render_mask_novel = render_mask_novel.permute(0, 2, 3, 1)    
+                elif self.use_CEloss == 4:
+                    # data =self.pts2render_mask(data, bg_color=self.bg_mask)
+                    # render_novel = data['novel_view']['mask_pred'].permute(0, 2, 3, 1)
+                    render_mask_novel = data['novel_view']['mask_pred'].permute(0, 2, 3, 1) # 1 3 128 128 
+                    loss_dyna_mask_novel = self._mask_loss_fn(render_mask_novel, gt_mask_label) #gt_mask) # mask现阶段的 _mask_loss_fn
+                    render_mask_novel = render_mask_novel.permute(0, 2, 3, 1)                    
+                elif self.use_CEloss == 5:
+                    data =self.pts2render1(data, bg_color=self.bg_color)
+                    render_mask_novel = data['novel_view']['embed_pred'].permute(0, 2, 3, 1) 
+                    loss_dyna_mask_novel = self._mask_loss_fn(render_mask_novel, gt_mask_label)  
+       
 
-                if not self.use_dynamic_field:
+                if not self.use_dynamic_field and self.use_CEloss != 6:
                     loss_dyna_mask = loss_dyna_mask_novel
                     lambda_mask =1   if step >= 1000 else 0
                     loss += loss_dyna_mask * lambda_mask # * 0.001
-                else:
+                elif self.use_CEloss != 6:
                     loss_dyna_mask = loss_dyna_mask_novel * (1 - self.cfg.lambda_next_loss_mask)
 
-            Ll1 = l2_loss(render_novel, gt_rgb) # loss_now_rgb
-            # Lssim = 1.0 - ssim(render_novel, gt_rgb)
-            Lssim = 0.
-            # PSNR好像表示图片质量？
-            psnr = PSNR_torch(render_novel, gt_rgb)
-
-            # loss_rgb = self.cfg.lambda_l1 * Ll1 + self.cfg.lambda_ssim * Lssim
-            loss_rgb = Ll1
-            # 1 LGeo?
-            loss += loss_rgb
-
-            # 语义（optional）
-            if gt_embed is not None:
-                # 比较真实和render的embed 应该是语义Lsem
-                gt_embed = gt_embed.permute(0, 2, 3, 1) # channel last
-                render_embed = data['novel_view']['embed_pred'].permute(0, 2, 3, 1)
-
-                # DEBUG gradient    debug 梯度
-                # render_embed_grad = render_embed.register_hook(self._save_gradient('render_embed'))
-
-                loss_embed = self._embed_loss_fn(render_embed, gt_embed)
-                # 2 loss(LGeo? + embed是啥 应该是语义Lsem) = loss_rgb + self.cfg.lambda_embed * loss_embed
-                loss += self.cfg.lambda_embed * loss_embed
-            else:
-                loss_embed = torch.tensor(0.)
 
             # next frame prediction 下一帧预测 Ldyna(optional)
             if self.field_type == 'bimanual':
@@ -1067,7 +1235,7 @@ class NeuralRenderer(nn.Module):
                                 next_render_rgb_right = data['right_next']['novel_view']['img_pred'].permute(0, 2, 3, 1) # [1,128, 128, 3]                                
                     elif self.mask_gen == 'pre':   # LF + 自己 train mask   
                         data =self.pts2render_mask(data, bg_color=self.bg_mask)
-                        if self.use_CEloss==1:
+                        if self.use_CEloss>=1 and self.use_CEloss<=3:
                             render_mask_novel = data['novel_view']['mask_pred'].permute(0, 2, 3, 1)
                             render_mask_novel1 = render_mask_novel
                             print("render_mask_novel",render_mask_novel.shape) # [1 128 128 3]
@@ -1082,8 +1250,9 @@ class NeuralRenderer(nn.Module):
                             render_mask_novel = render_mask_novel.unsqueeze(3).repeat(1, 1, 1, 3)   # 1 128 128 3
                             render_mask_gtrgb = gt_rgb * render_mask_novel
                             render_mask_novel = render_novel * render_mask_novel
-                        else:
+                        elif self.use_CEloss == 0:
                             render_mask_novel = data['novel_view']['mask_pred'].permute(0, 2, 3, 1)
+                            render_mask_novel = render_mask_novel*(self.num_classes-1)
                             next_render_mask_right = self.vis_labelsL1(render_mask_novel) # debug 的时候用一下
                             # render_mask_novel = self.generate_final_class_labels(render_mask_novel)
                             # render_mask_novel = render_mask_novel.unsqueeze(3).repeat(1, 1, 1, 3)
@@ -1097,8 +1266,42 @@ class NeuralRenderer(nn.Module):
                             render_mask_gtrgb = gt_rgb * render_mask_novel
                             print("render_mask_novel = ",render_mask_novel.shape,render_mask_novel)
                             render_mask_novel = render_novel * render_mask_novel
-                        
-                        
+                        elif self.use_CEloss == 4:
+                            render_mask_novel = render_novel
+                            render_mask_novel = render_mask_novel*(self.num_classes-1)
+                            next_render_mask_right = self.vis_labelsL1(render_mask_novel) # debug 的时候用一下
+                            # render_mask_novel = self.generate_final_class_labels(render_mask_novel)
+                            # render_mask_novel = render_mask_novel.unsqueeze(3).repeat(1, 1, 1, 3)
+                            render_mask_novel = self.generate_final_class_labels_L1(render_mask_novel)
+
+                            # 可视化gt left 但是
+                            next_render_mask = self.vis_labelsL1(gt_mask_label)
+                            next_render_rgb_right  = self.generate_final_class_labels_L1(gt_mask_label)
+                            next_render_rgb_right = gt_rgb * next_render_rgb_right
+                            
+                            render_mask_gtrgb = gt_rgb * render_mask_novel
+                            print("render_mask_novel = ",render_mask_novel.shape,render_mask_novel)
+                            render_mask_novel = render_novel * render_mask_novel                           
+                        elif self.use_CEloss == 5:
+                            data =self.pts2render1(data, bg_color=self.bg_color)
+                            render_mask_novel = data['novel_view']['embed_pred'].permute(0, 2, 3, 1) 
+                            print("1 render_mask_novel = ",render_mask_novel.shape, render_mask_novel)
+                            render_mask_novel = render_mask_novel*(self.num_classes-1)
+                            print("2 render_mask_novel = ",render_mask_novel.shape, render_mask_novel)
+                            next_render_mask_right = self.vis_labelsL1(render_mask_novel) # debug 的时候用一下
+
+                            render_mask_novel = self.generate_final_class_labels_L1(render_mask_novel)
+
+                            # 可视化gt left 但是
+                            next_render_mask = self.vis_labelsL1(gt_mask_label)
+                            next_render_rgb_right  = self.generate_final_class_labels_L1(gt_mask_label)
+                            next_render_rgb_right = gt_rgb * next_render_rgb_right
+                            
+                            render_mask_gtrgb = gt_rgb * render_mask_novel
+
+                            render_mask_novel = render_novel * render_mask_novel    
+                        elif self.use_CEloss == 6:
+                            print("only embed")                          
 
                         if self.use_dynamic_field:
                             # # 1 当前场景的mask 训练  loss_dyna_mask_novel
@@ -1263,6 +1466,31 @@ class NeuralRenderer(nn.Module):
 
         # 渲染返回字典  render应该是用来渲染的  from agents.manigaussian_bc2.gaussian_renderer import render
         render_return_dict = render(
+            data, i, xyz_i, rot_i, scale_i, opacity_i, 
+            bg_color=bg_color, pts_rgb=None, features_color=feature_i, features_language=feature_language_i
+            )
+
+        # .unsqueeze(0): 这是PyTorch张量的一个操作，用于在张量的第0个维度（即最前面）增加一个维度。如果原始张量是一维的，这个操作会将其变成二维的，其中新加的维度大小为1。
+        # data['novel_view']['img_pred']: 这是在 data 字典中的 'novel_view' 键下创建或更新一个子键 'img_pred'。这个子键被赋值为 render_return_dict['render'] 张量增加一个新维度后的结果。
+        data['novel_view']['img_pred'] = render_return_dict['render'].unsqueeze(0)
+        data['novel_view']['embed_pred'] = render_return_dict['render_embed'].unsqueeze(0)
+        return data
+
+    def pts2render1(self, data: dict, bg_color=[0,0,0]):
+        '''feature_language_i用mask赋值'''
+        bs = data['intr'].shape[0]
+        assert bs == 1, "batch size should be 1"
+        # 公式2中 时刻i 的状态（θ 多了f 高级语义特征）
+        i = 0
+        xyz_i = data['xyz_maps'][i, :, :].detach()
+        feature_i = data['sh_maps'][i, :, :, :].detach() # [16384, 4, 3]
+        rot_i = data['rot_maps'][i, :, :].detach()
+        scale_i = data['scale_maps'][i, :, :].detach()
+        opacity_i = data['opacity_maps'][i, :, :].detach()
+        feature_language_i = data['mask_maps'][i, :, :]  # [B, N, 3]   [1, 65536, 3]  
+
+        # 渲染返回字典  render应该是用来渲染的  from agents.manigaussian_bc2.gaussian_renderer import render
+        render_return_dict = render1(
             data, i, xyz_i, rot_i, scale_i, opacity_i, 
             bg_color=bg_color, pts_rgb=None, features_color=feature_i, features_language=feature_language_i
             )
@@ -1552,15 +1780,15 @@ class NeuralRenderer(nn.Module):
         return gt_mask_label
 
     def mask_label(self,gt_mask):
-        """[1 128 128 1] -> [1 128 128 3]"""
+        """[1 128 128 1] -> [1 128 128 3] [000 / 111 / 222]"""
         right_min, right_max, left_min, left_max = 53, 73, 94, 114
 
         # Tensor写法（mask标签归类 0：bg    1:ritght    2:left）
         # gt_mask_label = torch.zeros_like(gt_mask, dtype=torch.uint8)
         gt_mask = gt_mask.squeeze(-1)
         gt_mask_label = torch.zeros_like(gt_mask, dtype=torch.float32)
-        gt_mask_label[(gt_mask > right_min-1) & (gt_mask < right_max+1)] = 100.0
-        gt_mask_label[(gt_mask > left_min-1) & (gt_mask < left_max+1)] = 200.0
+        gt_mask_label[(gt_mask > right_min-1) & (gt_mask < right_max+1)] =1.0
+        gt_mask_label[(gt_mask > left_min-1) & (gt_mask < left_max+1)] = 2.0
         gt_mask_label = gt_mask_label.unsqueeze(-1).repeat(1,1,1,3)         
         return gt_mask_label
 
@@ -1594,17 +1822,19 @@ class NeuralRenderer(nn.Module):
         """
         vis [1 128 128 3] - > rgb
         """
-        mask_mean = mask.mean(dim=-1)
+        mask_mean = mask.mean(dim=-1) 
+        print("vis_labelsL1 mask_mean =",mask_mean.shape,mask_mean)
         mask_rgb = torch.zeros((mask.shape[0], mask.shape[1], mask.shape[2], 3), dtype=torch.uint8)
         # 设置颜色范围
-        mask_rgb[(mask_mean >= 0) & (mask_mean < 0.5)] = torch.tensor([0, 0, 0], dtype=torch.uint8)    # 黑色
-        mask_rgb[(mask_mean >= 0.5) & (mask_mean < 1.5)] = torch.tensor([0, 255, 0], dtype=torch.uint8) # 绿色
-        mask_rgb[mask_mean >= 1.5] = torch.tensor([255, 0, 0], dtype=torch.uint8)   
-
+        # mask_rgb[(mask_mean >= 0) & (mask_mean < 0.5)] = torch.tensor([0, 0, 0], dtype=torch.uint8)    # 黑色
+        # mask_rgb[(mask_mean >= 0.5) & (mask_mean < 1.5)] = torch.tensor([0, 255, 0], dtype=torch.uint8) # 绿色
+        # mask_rgb[mask_mean >= 1.5] = torch.tensor([255, 0, 0], dtype=torch.uint8)   
+        mask_rgb[(mask_mean >= 0.5) & (mask_mean < 1.5)] = torch.tensor([255, 0, 0], dtype=torch.uint8) # 红色
+        mask_rgb[mask_mean >= 1.5] = torch.tensor([0, 255, 0], dtype=torch.uint8)                       # Green
         return mask_rgb
 
     def one_hot_encode(self,mask, num_classes):
-        "b h w -> b c h w"
+        "b h w -> b c h w c=(100 010 001)"
         # mask 的形状为 (batch_size, height, width)，数值为类别
         # 转换为 One-Hot 编码，结果形状为 (batch_size, num_classes, height, width)
         one_hot_mask = torch.nn.functional.one_hot(mask, num_classes=num_classes)

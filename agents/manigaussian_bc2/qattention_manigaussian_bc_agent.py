@@ -1456,7 +1456,43 @@ class QAttentionPerActBCAgent(Agent):
                     next_camera_extrinsics=next_extrinsics,
                     # nerf[3]---------------------
                 )
+            else:
+                q, voxel_grid, rendering_loss_dict = self._q(
+                    obs,
+                    depth, # nerf new
+                    proprio,
+                    pcd,
+                    extrinsics, # nerf new although augmented, not used
+                    intrinsics, # nerf new
+                    lang_goal_emb,
+                    lang_token_embs,
+                    bounds,
+                    prev_layer_bounds,
+                    prev_layer_voxel_grid,
+                    # nerf[3]---------------------
+                    use_neural_rendering=self.use_neural_rendering,
+                    # nerf_target_rgb=nerf_target_rgb,
+                    # nerf_target_depth=nerf_target_depth,
+                    # nerf_target_pose=nerf_target_camera_extrinsic,
+                    # nerf_target_camera_intrinsic=nerf_target_camera_intrinsic,
+                    lang_goal=lang_goal,
+                    # nerf_next_target_rgb=nerf_next_target_rgb,
+                    # nerf_next_target_depth=nerf_next_target_depth,
+                    # nerf_next_target_pose=nerf_next_target_camera_extrinsic,
+                    # nerf_next_target_camera_intrinsic=nerf_next_target_camera_intrinsic,
+                    step=step,
+                    action=action_gt,
+                    # gt_mask=gt_mask,
+                    # next_gt_mask =next_gt_mask,
+                    # next_depth=next_depth,
+                    #    下面这些写在上面的target里了 
+                    # next_obs_rgb = next_obs_rgb,
+                    # next_camera_intrinsics = next_intrinsics,
+                    # next_camera_extrinsics=next_extrinsics,
+                    # nerf[3]---------------------
+                )
         else:
+            # print("1")
             q, voxel_grid, rendering_loss_dict = self._q(
                 obs,depth, proprio,pcd,extrinsics,intrinsics, lang_goal_emb,lang_token_embs,bounds,prev_layer_bounds, 
                 prev_layer_voxel_grid,use_neural_rendering=self.use_neural_rendering, # 没变的参数
@@ -2055,8 +2091,8 @@ class QAttentionPerActBCAgent(Agent):
                     #     # print("14")
                         # axs[1, 4].imshow(next_gt_rgbmask.cpu().numpy())
                         # axs[1, 4].title.set_text('exclude_left_mask * render_left')
-                        axs[1, 2].imshow(next_gt_rgbmask.cpu().numpy())
-                        axs[1, 2].title.set_text('vis gt')
+                        axs[1, 3].imshow(next_gt_rgbmask.cpu().numpy())
+                        axs[1, 3].title.set_text('vis gt')
                     if next_render_mask_right is not None:
                         axs[1, 4].imshow(next_render_mask_right.cpu().numpy())
                         axs[1, 4].title.set_text('vis gen mask')
