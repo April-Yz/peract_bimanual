@@ -52,7 +52,14 @@ render_freq=100 #2000
 replay_path="/data1/zjyang/program/peract_bimanual/replay/debug/all"
 lambda_nerf=1.0 # 0.01 # 0.01
 mask_gt_rgb=True
-warm_up=200 #0
+lambda_dyna_leader=0.3  
+lambda_mask=0.5            
+lambda_mask_right=0.4 
+lambda_next_loss_mask=0.4
+
+
+warm_up=300 #0
+mask_warm_up=1000 #0
 lambda_embed=0.0
 use_neural_rendering=True #False
 mask_gen='pre' #'bimanual' # 'pre' # 'nonerf' #'gt' # 'pre' 'None'
@@ -98,7 +105,12 @@ CUDA_VISIBLE_DEVICES=${train_gpu}  QT_AUTO_SCREEN_SCALE_FACTOR=0 TORCH_DISTRIBUT
         method.neural_renderer.field_type=${field_type} \
         method.neural_renderer.mask_gen=${mask_gen} \
         method.neural_renderer.dataset.mask_gt_rgb=${mask_gt_rgb} \
-        method.neural_renderer.next_mlp.warm_up=${warm_up} 
+        method.neural_renderer.lambda_dyna_leader=${lambda_dyna_leader} \
+        method.neural_renderer.lambda_mask=${lambda_mask} \
+        method.neural_renderer.lambda_mask_right=${lambda_mask_right} \
+        method.neural_renderer.lambda_next_loss_mask=${lambda_next_loss_mask} \
+        method.neural_renderer.next_mlp.warm_up=${warm_up} \
+        method.neural_renderer.mask_warm_up=${mask_warm_up} 
 
 "
 # remove 0.ckpt diffusion

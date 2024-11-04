@@ -1024,7 +1024,10 @@ class NeuralRenderer(nn.Module):
                         # RGB pre = leader( right ) + follower
                         loss_LF = loss_dyna_leader * self.cfg.lambda_dyna_leader + loss_dyna_follower * (1-self.cfg.lambda_dyna_leader)
                         # print('loss_LF = ', loss_LF, loss_dyna_leader, loss_dyna_follower)
-                        loss_dyna = loss_LF * (1-self.cfg.lambda_mask) + loss_dyna_mask * self.cfg.lambda_mask 
+
+                        lambda_mask = self.cfg.lambda_mask if step >= self.cfg.mask_warm_up else 0.
+                        loss_dyna = loss_LF * (1 - lambda_mask) + loss_dyna_mask * lambda_mask
+
                         # print('loss_dyna = ', loss_dyna,loss_LF,loss_dyna_mask)
                         # 预热步数（3000步以后算上了）
                         lambda_dyna = self.cfg.lambda_dyna if step >= self.cfg.next_mlp.warm_up else 0.                    
