@@ -16,14 +16,15 @@ train_gpu_list=(${train_gpu//,/ })
 port=${3:-"12345"}
 # you could enable/disable wandb by this.
 # use_wandb=True
-use_wandb=False
+use_wandb=True
 
 train_demo_path="/data1/zjyang/program/peract_bimanual/data2/train_data"
 
 # we set experiment name as method+date. you could specify it as you like.
 addition_info="$(date +%Y%m%d)"
 # exp_name=${4:-"${method}_${addition_info}"}
-exp_name="debug"
+# exp_name="debug"
+exp_name=${4:- "debug"}
 logdir="/data1/zjyang/program/peract_bimanual/log-mani/${exp_name}"
 
 # create a tmux window for training
@@ -38,7 +39,7 @@ batch_size=1 # 1 #4 # 2
 tasks=[dual_push_buttons] # dual_push_buttons bimanual_pick_plate
 num_view_for_nerf=21 #1 #21
 # for debug
-use_dynamic_field=False # True #False
+use_dynamic_field=True # True #False
 demo=1 # 100
 episode_length=2 #25 # 20 # 4
 save_freq=10000
@@ -51,7 +52,7 @@ render_freq=100 #2000
 replay_path="/data1/zjyang/program/peract_bimanual/replay/debug/all"
 lambda_nerf=1.0 # 0.01 # 0.01
 mask_gt_rgb=True
-warm_up=0
+warm_up=200 #0
 lambda_embed=0.0
 use_neural_rendering=True #False
 mask_gen='pre' #'bimanual' # 'pre' # 'nonerf' #'gt' # 'pre' 'None'
@@ -74,7 +75,6 @@ CUDA_VISIBLE_DEVICES=${train_gpu}  QT_AUTO_SCREEN_SCALE_FACTOR=0 TORCH_DISTRIBUT
         framework.save_freq=${save_freq} \
         framework.start_seed=${seed} \
         framework.use_wandb=${use_wandb} \
-        method.use_wandb=${use_wandb} \
         framework.wandb_group=${exp_name} \
         framework.wandb_name=${exp_name} \
         framework.training_iterations=${training_iterations} \
