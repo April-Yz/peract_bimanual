@@ -615,7 +615,8 @@ class NeuralRenderer(nn.Module):
         next_render_mask_right = None
         next_render_mask = None
         next_render_rgb_right = None
-        next_left_mask_gen = None
+        next_left_mask_gen, exclude_left_mask = None, None
+        gt_mask_vis,next_gt_mask_vis = None, None
 
         # create gt feature from foundation models 从基础模型创建 gt特征
         # 用于暂时禁用PyTorch中的梯度计算
@@ -1271,9 +1272,9 @@ class NeuralRenderer(nn.Module):
                             render_mask_novel = self.vis_labels(render_mask_novel)
                             
                             gt_mask1 = self.mask_onehot(gt_mask) # 1 128 128 1[1,200] -> 1 128 128 3[100 010 001] 
-                            ## !! next_render_rgb_right =  self.vis_labels(gt_mask1)
+                            gt_mask_vis =  self.vis_labels(gt_mask1)
                             # vis rgb render in mask camera 可视化mask相机的rgb  
-                            data =self.pts2render_rgb(data, bg_color=self.bg_color)
+                            # data =self.pts2render_rgb(data, bg_color=self.bg_color)
                             ## !! next_render_mask = data['mask_view']['rgb_pred'].permute(0, 2, 3, 1)
 
                         if self.use_CEloss==2: # 未改
@@ -1302,7 +1303,7 @@ class NeuralRenderer(nn.Module):
 
                             # vis gt left 
                             ## !! 
-                            next_render_mask = self.vis_labelsL1(gt_mask_label)
+                            gt_mask_vis = self.vis_labelsL1(gt_mask_label)
                             ## 
                             next_render_rgb_right  = self.generate_final_class_labels_L1(gt_mask_label)
                             ## 
@@ -1370,13 +1371,17 @@ class NeuralRenderer(nn.Module):
                                 next_left_mask_gen = data['left_next']['novel_view']['mask_gen'].permute(0, 2, 3, 1)  # 1 128 128 3   
                                 exclude_left_mask = self.generate_final_class_labels(next_left_mask_gen).unsqueeze(3).repeat(1, 1, 1, 3)
                                 next_left_mask_gen = self.vis_labels(next_left_mask_gen)
+                                next_gt_mask1 = self.mask_onehot(next_gt_mask) # 1 128 128 1[1,200] -> 1 128 128 3[100 010 001] 
+                                next_gt_mask_vis =  self.vis_labels(next_gt_mask1)
                             elif self.use_CEloss == 0:     # Ll1
                                 next_render_mask = data['left_next']['novel_view']['mask_pred'].permute(0, 2, 3, 1) # 1 128 128 3(rgb label mean-> 0 1 2)
+                                next_render_mask = (next_render_mask / 2 + 0.5  )*(self.num_classes-1)    
                                 next_render_mask = self.vis_labelsL1(next_render_mask)
                                 next_left_mask_gen = data['left_next']['novel_view']['mask_gen'].permute(0, 2, 3, 1) # 1 128 128 3
                                 next_left_mask_gen = (next_left_mask_gen / 2 + 0.5  )*(self.num_classes-1)           # 1 128 128 3 [0,2]
                                 exclude_left_mask = self.generate_final_class_labels_L1(next_left_mask_gen)
                                 next_left_mask_gen = self.vis_labelsL1(next_left_mask_gen)
+                                next_gt_mask_vis = self.vis_labelsL1(next_gt_mask_label)
                             exclude_left_mask = exclude_left_mask * next_render_novel
 
 
@@ -1399,6 +1404,7 @@ class NeuralRenderer(nn.Module):
                             if self.use_CEloss==1 or self.use_CEloss == 7 or self.use_CEloss == 21:
                                 next_render_mask_right = self.vis_labels(next_render_mask_right)
                             elif self.use_CEloss == 0:     # Ll1
+                                next_render_mask_right = (next_render_mask_right / 2 + 0.5  )*(self.num_classes-1) 
                                 next_render_mask_right = self.vis_labelsL1(next_render_mask_right)
 
                             ## test
@@ -1508,7 +1514,9 @@ class NeuralRenderer(nn.Module):
                         next_render_mask = next_render_mask,               # 左臂mask * next_render_novel
                         next_render_mask_right = next_render_mask_right,   # 无用 右臂mask 
                         next_render_rgb_right = next_render_rgb_right,            # 右臂next rgb
-                        next_left_mask_gen = next_left_mask_gen                       # 生成的左臂当时视角的mask
+                        next_left_mask_gen = next_left_mask_gen,                       # 生成的左臂当时视角的mask
+                        gt_mask_vis =gt_mask_vis,
+                        next_gt_mask_vis =next_gt_mask_vis,
                         )             
         # print("render_mask_novel = ",render_mask_novel.shape, render_mask_novel)
 
@@ -1946,15 +1954,15 @@ class NeuralRenderer(nn.Module):
         """
         vis [1 128 128 3] - > rgb
         """
-        mask_mean = mask.mean(dim=-1) 
+        mask_mean = mask.mean(dim=-1)
         print("vis_labelsL1 mask_mean =",mask_mean.shape,mask_mean)
         mask_rgb = torch.zeros((mask.shape[0], mask.shape[1], mask.shape[2], 3), dtype=torch.uint8)
         # 设置颜色范围
         # mask_rgb[(mask_mean >= 0) & (mask_mean < 0.5)] = torch.tensor([0, 0, 0], dtype=torch.uint8)    # 黑色
-        # mask_rgb[(mask_mean >= 0.5) & (mask_mean < 1.5)] = torch.tensor([0, 255, 0], dtype=torch.uint8) # 绿色
-        # mask_rgb[mask_mean >= 1.5] = torch.tensor([255, 0, 0], dtype=torch.uint8)   
-        mask_rgb[(mask_mean >= 0.5) & (mask_mean < 1.5)] = torch.tensor([255, 0, 0], dtype=torch.uint8) # 红色
-        mask_rgb[mask_mean >= 1.5] = torch.tensor([0, 255, 0], dtype=torch.uint8)                       # Green
+        mask_rgb[(mask_mean >= 0.7) & (mask_mean < 1.3)] = torch.tensor([255, 0, 0], dtype=torch.uint8) # 红色
+        mask_rgb[mask_mean >= 1.3] = torch.tensor([0, 0, 255], dtype=torch.uint8)                       # Green 
+        # mask_rgb[(mask_mean >= 0.5) & (mask_mean < 1.5)] = torch.tensor([255, 0, 0], dtype=torch.uint8) # 红色
+        # mask_rgb[mask_mean >= 1.5] = torch.tensor([0, 0, 255], dtype=torch.uint8)                       # Green
         return mask_rgb
 
     def one_hot_encode(self,mask, num_classes):

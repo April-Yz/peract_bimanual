@@ -18,11 +18,12 @@ port=${3:-"12345"}
 use_wandb=True
 
 train_demo_path="/data1/zjyang/program/peract_bimanual/data2/train_data"
+logdir="/data1/zjyang/program/peract_bimanual/log-mani/${exp_name}"
+replay_path="/data1/zjyang/program/peract_bimanual/replay/all"
 
 # we set experiment name as method+date. you could specify it as you like.
 addition_info="$(date +%Y%m%d)"
 exp_name=${4:-"${method}_${addition_info}"}
-logdir="/data1/zjyang/program/peract_bimanual/log-mani/${exp_name}"
 
 # create a tmux window for training
 echo "I am going to kill the session ${exp_name}, are you sure? (5s)"
@@ -41,17 +42,22 @@ num_view_for_nerf=21 #1 #21
 use_dynamic_field=True # True #False
 demo=100
 episode_length=25 #25 # 20 # 4
-save_freq=10000
+save_freq=2500
 camera_resolution="[256,256]"
-training_iterations=1 # 100001
+training_iterations=100001 # 100001
 field_type='LF' # 'LF' # 'BIMANUAL' 'bimanual' 'LF'
 lambda_dyna=0.1 #0.1
 lambda_reg=0.0
-render_freq=100 #2000
-replay_path="/data1/zjyang/program/peract_bimanual/replay/all"
+render_freq=500 #2000
 lambda_nerf=0.1 #1.0 # 0.01 # 0.01
 mask_gt_rgb=True
-warm_up=0
+warm_up=2000
+mask_warm_up=3000 #0
+
+lambda_dyna_leader=0.6  
+lambda_mask=0.5            
+lambda_mask_right=0.4 
+lambda_next_loss_mask=0.5
 
 mask_gen='pre' # 'nonerf' #'gt' # 'pre' 'None'
 use_nerf_picture=True #False
@@ -86,7 +92,7 @@ CUDA_VISIBLE_DEVICES=${train_gpu}  QT_AUTO_SCREEN_SCALE_FACTOR=0 TORCH_DISTRIBUT
         method.neural_renderer.render_freq=${render_freq} \
         method.neural_renderer.image_width=${image_width} \
         method.neural_renderer.image_height=${image_height} \
-        method.neural_renderer.lambda_embed=0.0 \
+        method.neural_renderer.lambda_embed=${lambda_embed} \
         method.neural_renderer.lambda_dyna=${lambda_dyna} \
         method.neural_renderer.lambda_reg=${lambda_reg} \
         method.neural_renderer.foundation_model_name=null \
@@ -94,7 +100,12 @@ CUDA_VISIBLE_DEVICES=${train_gpu}  QT_AUTO_SCREEN_SCALE_FACTOR=0 TORCH_DISTRIBUT
         method.neural_renderer.field_type=${field_type} \
         method.neural_renderer.mask_gen=${mask_gen} \
         method.neural_renderer.dataset.mask_gt_rgb=${mask_gt_rgb} \
-        method.neural_renderer.next_mlp.warm_up=${warm_up} 
+        method.neural_renderer.lambda_dyna_leader=${lambda_dyna_leader} \
+        method.neural_renderer.lambda_mask=${lambda_mask} \
+        method.neural_renderer.lambda_mask_right=${lambda_mask_right} \
+        method.neural_renderer.lambda_next_loss_mask=${lambda_next_loss_mask} \
+        method.neural_renderer.next_mlp.warm_up=${warm_up} \
+        method.neural_renderer.mask_warm_up=${mask_warm_up} 
 
 "
 # remove 0.ckpt

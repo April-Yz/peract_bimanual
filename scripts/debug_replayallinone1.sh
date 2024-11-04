@@ -52,14 +52,14 @@ render_freq=100 #2000
 replay_path="/data1/zjyang/program/peract_bimanual/replay/debug/all"
 lambda_nerf=1.0 # 0.01 # 0.01
 mask_gt_rgb=True
-lambda_dyna_leader=0.3  
-lambda_mask=0.5            
+lambda_dyna_leader=0.6  
+lambda_mask=0.4            
 lambda_mask_right=0.4 
-lambda_next_loss_mask=0.4
+lambda_next_loss_mask=0.5
 
 
 warm_up=300 #0
-mask_warm_up=1000 #0
+mask_warm_up=1500 #0
 lambda_embed=0.0
 use_neural_rendering=True #False
 mask_gen='pre' #'bimanual' # 'pre' # 'nonerf' #'gt' # 'pre' 'None'

@@ -223,7 +223,7 @@ class QFunction(nn.Module):
                 gt_embed=None, step=None, action=None,
                 gt_mask=None, next_gt_mask = None,
                 next_depth=None, # 仅计算next三维凸包（前一步映射坐标点）有用
-                next_obs_rgb=None,next_camera_intrinsics=None,next_camera_extrinsics=None,
+                next_obs_rgb=None,next_camera_intrinsics=None,next_camera_extrinsics=None, camera_random_int=None,
                 ):
         '''
         Return Q-functions and neural rendering loss
@@ -347,7 +347,7 @@ class QFunction(nn.Module):
                         # todo 加一个radom i 随机相机
                         # import random
                         # random_int = random.randint(0, 5)
-                        random_int = 5
+                        random_int = camera_random_int
                         # selected_indices = [5, 2] # 5:front 2:overhead
                         gt_mask1 = gt_mask[random_int]
                         gt_maskdepth = depth[random_int] #？有用吗
@@ -523,7 +523,7 @@ class QFunction(nn.Module):
                 gt_mask=None, next_gt_mask = None, 
                 # gt_mask_camera_extrinsic=None, gt_mask_camera_intrinsic=None,
                 gt_maskdepth = None, next_gt_maskdepth = None,
-                next_obs_rgb=None,
+                next_obs_rgb=None, camera_random_int = None,
                 ):
         """
         Render the novel view and the next novel view during the training process
@@ -623,9 +623,9 @@ class QFunction(nn.Module):
                     next_gt_pose=nerf_next_target_pose, next_gt_intrinsic=nerf_next_target_camera_intrinsic,        # 下一个目标相机的内在参数。
                     step=step,action=action, 
                     training=False,
-                    gt_mask=gt_mask[5], next_gt_mask = next_gt_mask[5],
-                    gt_mask_camera_extrinsic=camera_extrinsics[5], gt_mask_camera_intrinsic= camera_intrinsics[5],
-                    next_gt_mask_camera_extrinsic=next_camera_extrinsics[5], next_gt_mask_camera_intrinsic=next_camera_intrinsics[5],
+                    gt_mask=gt_mask[camera_random_int], next_gt_mask = next_gt_mask[camera_random_int],
+                    gt_mask_camera_extrinsic=camera_extrinsics[camera_random_int], gt_mask_camera_intrinsic= camera_intrinsics[camera_random_int],
+                    next_gt_mask_camera_extrinsic=next_camera_extrinsics[camera_random_int], next_gt_mask_camera_intrinsic=next_camera_intrinsics[camera_random_int],
 
                     gt_maskdepth = gt_maskdepth, next_gt_maskdepth = next_gt_maskdepth,
                     )
@@ -695,7 +695,8 @@ class QFunction(nn.Module):
         # ----------------------------------------------------------------------    
         return ret_dict.render_novel, ret_dict.next_render_novel, ret_dict.render_embed, ret_dict.gt_embed, \
             ret_dict.render_mask_novel, ret_dict.render_mask_gtrgb, ret_dict.next_render_mask, ret_dict.next_render_mask_right, \
-                ret_dict.next_render_rgb_right, ret_dict.next_left_mask_gen
+                ret_dict.next_render_rgb_right, ret_dict.next_left_mask_gen, ret_dict.exclude_left_mask,\
+                ret_dict.gt_mask_vis, ret_dict.next_gt_mask_vis
 
 
 class QAttentionPerActBCAgent(Agent):
@@ -1218,7 +1219,7 @@ class QAttentionPerActBCAgent(Agent):
                 # sample one target img
                 # 一个目标图像样本 !! 
                 view_dix = np.random.randint(0, num_view_by_user)
-                view_dix = 10
+                # view_dix = 10
                 # !! [:, view_dix]：这是NumPy的切片语法，用于从数组中选择一个子集。冒号:表示选择所有行，而view_dix是一个索引，指定了要选择的列（或视角）。
                 # !! nerf_multi_view_rgb_path[:, view_dix]：这行代码的结果是一个新数组，只包含原始数组中第view_dix列的数据，即特定视角的所有图像路径。
                 nerf_multi_view_rgb_path = nerf_multi_view_rgb_path[:, view_dix]
@@ -1254,6 +1255,21 @@ class QAttentionPerActBCAgent(Agent):
                     nerf_next_target_camera_extrinsic, nerf_next_target_camera_intrinsic, nerf_next_target_focal = parse_camera_file(nerf_next_multi_view_camera_path[i])
                     nerf_next_target_camera_extrinsics.append(nerf_next_target_camera_extrinsic)
                     nerf_next_target_camera_intrinsics.append(nerf_next_target_camera_intrinsic)
+
+                # mask---需要bs吗---------------------------------------------------------------------------------
+                # random_int = 5
+                camera_random_int = random.randint(0, 5)
+                    # gt_mask = gt_mask[random_int]
+                    # print(f"gt_mask = {gt_mask} shape = {gt_mask.shape}")
+                    # depth = depth[random_int] #？有用吗
+                    # intrinsics = intrinsics[random_int]
+                    # extrinsics = extrinsics[random_int]
+                    
+                    # next_gt_mask = next_gt_mask[random_int]
+                    # next_depth = next_depth[random_int]
+                    # next_intrinsics = next_intrinsics[random_int]
+                    # next_extrinsics = next_extrinsics[random_int]
+                # mask----------------------------------------------------------------------------
 
                 # 转换为张量： 使用 numpy 的 stack 函数将 nerf_target_rgbs 列表中的所有图像堆叠成一个数组，然后转换为PyTorch张量，并将其移动到指定的设备（如GPU）上。
                 nerf_target_rgb = torch.from_numpy(np.stack(nerf_target_rgbs)).float().to(device) # [bs, H, W, 3], [0,1]
@@ -1456,6 +1472,7 @@ class QAttentionPerActBCAgent(Agent):
                     next_depth=next_depth,
                     next_camera_intrinsics=next_intrinsics,
                     next_camera_extrinsics=next_extrinsics,
+                    camera_random_int = camera_random_int,
                     # nerf[3]---------------------
                 )
             else:
@@ -1951,7 +1968,8 @@ class QAttentionPerActBCAgent(Agent):
                     if self.cfg.neural_renderer.use_dynamic_field: 
                         rgb_render, next_rgb_render, embed_render, gt_embed_render, \
                             render_mask_novel,render_mask_gtrgb, next_render_mask, next_render_mask_right,\
-                            next_rgb_render_right, next_left_mask_gen,= self._q.render(
+                            next_rgb_render_right, next_left_mask_gen, exclude_left_mask,\
+                            gt_mask_vis,next_gt_mask_vis= self._q.render(
                             rgb_pcd=obs,proprio=proprio,pcd=pcd,camera_extrinsics=extrinsics, camera_intrinsics=intrinsics,
                             lang_goal_emb=lang_goal_emb,lang_token_embs=lang_token_embs,bounds=bounds,
                             prev_bounds=prev_layer_bounds,
@@ -1970,6 +1988,7 @@ class QAttentionPerActBCAgent(Agent):
                             next_camera_extrinsics=next_extrinsics,
                             # gt_mask_camera_extrinsic=camera_extrinsics, gt_mask_camera_intrinsic=camera_intrinsics,
                             gt_maskdepth=depth,next_gt_maskdepth=next_depth,
+                            camera_random_int = camera_random_int,
                             )
                         # NOTE: [1, h, w, 3]  # 均为图片质量
                         rgb_gt = nerf_target_rgb[0]
@@ -1997,12 +2016,18 @@ class QAttentionPerActBCAgent(Agent):
                             next_left_mask_gen = next_left_mask_gen[0]           # next gen mask
                         if next_render_mask_right is not None:                     # next right mask 
                             next_render_mask_right = next_render_mask_right[0]
+                        if exclude_left_mask is not None:
+                            exclude_left_mask =exclude_left_mask[0]
+
+                        
 
                         # 创建目录 'recon' 用于保存可视化结果。 
                         os.makedirs('recon', exist_ok=True)
                         import matplotlib.pyplot as plt
                         rgb_src =  obs[5][0].squeeze(0).permute(1, 2, 0)  / 2 + 0.5
-                        mask_tgt = gt_mask[5].squeeze(0).permute(1, 2, 0) / 2 + 0.5
+                        # mask_tgt = gt_mask[5].squeeze(0).permute(1, 2, 0) / 2 + 0.5
+                        mask_tgt = gt_mask[camera_random_int].squeeze(0).permute(1, 2, 0)
+                        next_mask_tgt = next_gt_mask[camera_random_int].squeeze(0).permute(1, 2, 0)
                         fig, axs = plt.subplots(3, 6, figsize=(15, 3))   # 使用 matplotlib 创建一个包含1行7->8列子图的图形
                         # src
                         axs[0, 0].imshow(rgb_src.cpu().numpy())    # 在子图 axs[0] 上显示名为 rgb_src 的图像数
@@ -2023,18 +2048,30 @@ class QAttentionPerActBCAgent(Agent):
                             gt_embed_render = visualize_feature_map_by_normalization(gt_embed_render)    # range from -1 to 1
                             axs[0, 4].imshow(gt_embed_render)
                             axs[0, 4].title.set_text('gt embed seg')
-                            
+                        if gt_mask_vis is not None:
+                            gt_mask_vis = gt_mask_vis[0]
+                            axs[0, 5].imshow(gt_mask_vis)
+                            axs[0, 5].title.set_text('gt_mask_vis')
+                        if next_gt_mask_vis is not None:
+                            next_gt_mask_vis = next_gt_mask_vis[0]
+                            axs[0, 5].imshow(next_gt_mask_vis)
+                            axs[0, 5].title.set_text('next_gt_mask_vis')
+
                         if next_rgb_render is not None:
                             axs[1, 0].imshow(next_rgb_gt.cpu().numpy())
                             axs[1, 0].title.set_text('next tgt')
-                            axs[1, 4].imshow(next_rgb_render.cpu().numpy())
-                            axs[1, 4].title.set_text('next psnr={:.2f}'.format(psnr_dyna))
+                            axs[1, 2].imshow(next_rgb_render.cpu().numpy())
+                            axs[1, 2].title.set_text('next psnr={:.2f}'.format(psnr_dyna))
                         if next_rgb_render_right is not None: # 右臂动作后的rgb
-                            axs[1, 5].imshow(next_rgb_render_right.cpu().numpy())
-                            axs[1, 5].title.set_text('next right psnr={:.2f}'.format(psnr_dyna_right))
+                            axs[1, 1].imshow(next_rgb_render_right.cpu().numpy())
+                            axs[1, 1].title.set_text('next right psnr={:.2f}'.format(psnr_dyna_right))
                         # mask
                         axs[2, 0].imshow(mask_tgt.cpu().numpy()) 
                         axs[2, 0].title.set_text('mask_tgt')
+                        axs[1, 3].imshow(next_mask_tgt.cpu().numpy()) 
+                        axs[1, 3].title.set_text('next_mask_tgt')   
+                        axs[1, 4].imshow(exclude_left_mask.cpu().numpy()) 
+                        axs[1, 4].title.set_text('exclude_left_mask(gen)')              
                         if render_mask_novel is not None:
                             axs[2, 1].imshow(render_mask_novel.cpu().numpy()) 
                             axs[2, 1].title.set_text('mask now')
@@ -2055,10 +2092,11 @@ class QAttentionPerActBCAgent(Agent):
                         for ax in axs.flat:
                             ax.axis('off')
                         plt.tight_layout()
-                    else:
+                    else: # 好吧其实可以用前面那个就够了
                         rgb_render, next_rgb_render, embed_render, gt_embed_render, \
                             render_mask_novel,render_mask_gtrgb, next_render_mask, next_render_mask_right,\
-                            next_rgb_render_right, next_left_mask_gen,= self._q.render(
+                            next_rgb_render_right, next_left_mask_gen, exclude_left_mask,\
+                            gt_mask_vis,next_gt_mask_vis= self._q.render(
                             rgb_pcd=obs,proprio=proprio,pcd=pcd,camera_extrinsics=extrinsics, camera_intrinsics=intrinsics,
                             lang_goal_emb=lang_goal_emb,lang_token_embs=lang_token_embs,bounds=bounds,
                             prev_bounds=prev_layer_bounds,
