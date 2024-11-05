@@ -53,6 +53,7 @@ lambda_nerf=0.001 #1.0 # 0.01 # 0.01
 mask_gt_rgb=True
 warm_up=2000
 mask_warm_up=3000 #0
+lambda_embed=0.0
 
 lambda_dyna_leader=0.6  
 lambda_mask=0.4            

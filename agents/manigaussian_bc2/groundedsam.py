@@ -286,14 +286,15 @@ class GroundedSAM:
         time1 = time.perf_counter()
         # time_step1 = time2 - time1
         print(f"1 ### time1 = {time1}")   
-        output_dir = "/data1/zjyang/program/peract_bimanual/scripts/test_demo/4/2"
+        output_dir = "/data1/zjyang/program/peract_bimanual/scripts/test_demo/4/10"
         # device = args.device
         # Source image path
         task_name='handover_item_easy' # 'handover_item' #'dual_push_buttons' #'coordinated_take_tray_out_of_oven'
         eposide_id='episode0'
         camera_id='overhead_rgb' # 'overhead_mask' #'over_shoulder_left_mask' #'front_mask'
         rgb_id='0000'
-        image_path = f"/data1/zjyang/program/peract_bimanual/data2/train_data/{task_name}/all_variations/episodes/{eposide_id}/{camera_id}/rgb_{rgb_id}.png"
+        # image_path = f"/data1/zjyang/program/peract_bimanual/data2/train_data/{task_name}/all_variations/episodes/{eposide_id}/{camera_id}/rgb_{rgb_id}.png"
+        image_path="/data1/zjyang/program/peract_bimanual/scripts/test_demo/real_1.png"
 
         # sam_model = GroundedSAM()
         # make dir
@@ -563,10 +564,10 @@ if __name__ == "__main__":
     time_step1 = time2 - time1
     print(f"time2 = {time2} step1 = {time_step1:.2f}s 模型创建时间") # 10.84s
 
-    # sam_model.test()
-    # time3 = time.perf_counter()
-    # time_step2 = time3 - time2
-    # print(f"time3 = {time3} step2 = {time_step2:.2f}s 运行时间") # 4.03s /13s
+    sam_model.test()
+    time3 = time.perf_counter()
+    time_step2 = time3 - time2
+    print(f"time3 = {time3} step2 = {time_step2:.2f}s 运行时间") # 4.03s /13s
     # sam_model.test()
     # time4 = time.perf_counter()
     # time_step3 = time4 - time3
@@ -585,22 +586,23 @@ if __name__ == "__main__":
     # Source image path
     # task_name = #'bimanual_sweep_to_dustpan' #'bimanual_straighten_rope' # 'bimanual_pick_plate' # 'bimanual_pick_laptop'
     # task_name = #'coordinated_put_item_in_drawer' #'coordinated_put_bottle_in_fridge' # 'coordinated_push_box' #'coordinated_lift_tray'
-    task_name= 'coordinated_take_tray_out_of_oven' # 'handover_item_easy' # 'handover_item' #'dual_push_buttons' #'coordinated_take_tray_out_of_oven'
-    eposide_id='episode0'
-    camera_id='nerf_data' #'overhead_rgb' # 'overhead_mask' #'over_shoulder_left_mask' #'front_mask'
-    rgb_id='0000'
-    # lunshu='0'
-    for lunshu in range(0,319,60):
-        output_dir = f"/data1/zjyang/program/peract_bimanual/scripts/test_demo/yulan/{task_name}/{lunshu}"
-        # output_dir= f"/data1/zjyang/program/peract_bimanual/data2\
-                # /train_data/{task_name}/all_variations/episodes/{eposide_id}/{camera_id}/{lunshu}/masks/" #{nerf_id}.png"
-        # make dir
-        os.makedirs(output_dir, exist_ok=True)
+    # for
+        # task_name= 'coordinated_take_tray_out_of_oven' # 'handover_item_easy' # 'handover_item' #'dual_push_buttons' #'coordinated_take_tray_out_of_oven'
+        # eposide_id='episode0'
+        # camera_id='nerf_data' #'overhead_rgb' # 'overhead_mask' #'over_shoulder_left_mask' #'front_mask'
+        # rgb_id='0000'
+        # # lunshu='0'
+        # for lunshu in range(0,319,60):
+        #     output_dir = f"/data1/zjyang/program/peract_bimanual/scripts/test_demo/yulan/{task_name}/{lunshu}"
+        #     # output_dir= f"/data1/zjyang/program/peract_bimanual/data2\
+        #             # /train_data/{task_name}/all_variations/episodes/{eposide_id}/{camera_id}/{lunshu}/masks/" #{nerf_id}.png"
+        #     # make dir
+        #     os.makedirs(output_dir, exist_ok=True)
 
-        for nerf_id in range(0, 21):
-            image_path = f"/data1/zjyang/program/peract_bimanual/data2/train_data/{task_name}/all_variations/episodes/{eposide_id}/{camera_id}/{lunshu}/images/{nerf_id}.png"
-            sam_model.gen_mask(image_path, output_dir, nerf_id)
+        #     for nerf_id in range(0, 21):
+        #         image_path = f"/data1/zjyang/program/peract_bimanual/data2/train_data/{task_name}/all_variations/episodes/{eposide_id}/{camera_id}/{lunshu}/images/{nerf_id}.png"
+        #         sam_model.gen_mask(image_path, output_dir, nerf_id)
 
-    time10 = time.perf_counter()
-    time_step10 = time10 - time1
-    print(f"总时间= {time_step10:.2f}s") # 10.84s
+        # time10 = time.perf_counter()
+        # time_step10 = time10 - time1
+        # print(f"总时间= {time_step10:.2f}s") # 10.84s

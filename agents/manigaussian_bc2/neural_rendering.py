@@ -666,11 +666,9 @@ class NeuralRenderer(nn.Module):
                 elif self.use_CEloss == 5: # 用render的language
                     next_gt_mask_label = self.mask_label(next_gt_mask)    # [1 128 128 1] -> [1 128 128 3] [000 / 111 / 222]
 
-        # print("training=",training)
         # if gt_rgb is not None:
         if training:
-            # Gaussian Generator 高斯生成器
-            # gs regress (g) 应该也不用改
+            # Gaussian Generator 高斯生成器 gs regress (g) 应该也不用改
             data = self.gs_model(data) # GeneralizableGSEmbedNet(cfg, with_gs_render=True)
 
             # Gaussian Render
@@ -851,7 +849,6 @@ class NeuralRenderer(nn.Module):
                         # time_step3 = time4 - time3
                         # print(f"4 ### time4 = {time4} step3 = {time_step3:.2f}s 2D->2D mask(求凸包)")   
 
-
                         # print(f"exclude_left_mask.shape = {exclude_left_mask.shape}\n {exclude_left_mask}") # [1,256,256,3]
                         device = next_gt_rgb.device  # 获取 next_gt_rgb 的设备
                         # 确保 exclude_left_mask 在同一个设备上
@@ -878,11 +875,7 @@ class NeuralRenderer(nn.Module):
                             # with torch.no_grad():  原来为了有的Loss没计算报无回传错误而写的
                             data['right_next'] = self.pts2render(data['right_next'], bg_color=self.bg_color)
                             next_render_rgb_right = data['right_next']['novel_view']['img_pred'].permute(0, 2, 3, 1) # [1,128, 128, 3]
-                            # if self.cfg.mask_type=='exclude':   # 将预测图片根据mask裁剪
-                            
                             next_render_novel_mask = next_render_rgb_right * exclude_left_mask  # 原来用错了...  next_gt_rgb -> next_render_rgb_right
-                            # else:
-                            #     next_render_novel_mask = next_gt_rgb * (~exclude_right_mask_expanded)
                             loss_dyna_leader = l2_loss(next_render_novel_mask, result_right_image)
                             # print('loss_dyna_leader = ', loss_dyna_leader)
 

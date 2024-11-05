@@ -570,7 +570,7 @@ class QFunction(nn.Module):
         # We only use the front camera      我们只使用前置摄像头
         # if self.cfg.neural_renderer.use_nerf_picture:
         if self.cfg.neural_renderer.mask_gen =='gt': # 需要多传输两个视角的gt_mask 其实pre也要这边？
-            print("带mask的可视化")
+            print("gt mask的可视化")
             gt_mask = [gt_mask[5],gt_mask[2]]
             # print("gt_mask",gt_mask,gt_mask[0].shape)
             gt_mask_camera_extrinsic = [camera_extrinsics[5], camera_extrinsics[2]]
@@ -1832,8 +1832,11 @@ class QAttentionPerActBCAgent(Agent):
             # print("\033[0;33;40maction_gt\033[0m",action_gt)
             if self.cfg.neural_renderer.use_nerf_picture:
                 if self.cfg.neural_renderer.mask_gen =='gt':
+                    # 13个参数
                     rgb_render, next_rgb_render, embed_render, gt_embed_render, \
-                        render_mask_novel, next_render_mask, next_render_mask_right, next_rgb_render_right, next_left_mask_gen= self._q.render(
+                        render_mask_novel, render_mask_gtrgb, next_render_mask, next_render_mask_right,\
+                        next_rgb_render_right, next_left_mask_gen, exclude_left_mask,\
+                        gt_mask_vis,next_gt_mask_vis= self._q.render(
                         rgb_pcd=obs,
                         proprio=proprio,
                         pcd=pcd,

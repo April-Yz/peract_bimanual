@@ -39,7 +39,7 @@ batch_size=1 # 1 #4 # 2
 tasks=[dual_push_buttons] # dual_push_buttons bimanual_pick_plate
 num_view_for_nerf=21 #1 #21
 # for debug
-use_dynamic_field=False # True #False
+use_dynamic_field=True # True #False
 demo=1 # 100
 episode_length=2 #25 # 20 # 4
 save_freq=10000
