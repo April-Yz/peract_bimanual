@@ -16,7 +16,7 @@ train_gpu_list=(${train_gpu//,/ })
 port=${3:-"12345"}
 # you could enable/disable wandb by this.
 # use_wandb=True
-use_wandb=True
+use_wandb=False
 
 train_demo_path="/data1/zjyang/program/peract_bimanual/data2/train_data"
 
@@ -58,7 +58,7 @@ lambda_mask_right=0.4
 lambda_next_loss_mask=0.5
 
 
-warm_up=400 #0
+warm_up=0 #400 #0
 mask_warm_up=3000 #0
 
 lambda_embed=0.0
@@ -83,6 +83,7 @@ CUDA_VISIBLE_DEVICES=${train_gpu}  QT_AUTO_SCREEN_SCALE_FACTOR=0 TORCH_DISTRIBUT
         framework.save_freq=${save_freq} \
         framework.start_seed=${seed} \
         framework.use_wandb=${use_wandb} \
+        method.use_wandb=${use_wandb} \
         framework.wandb_group=${exp_name} \
         framework.wandb_name=${exp_name} \
         framework.training_iterations=${training_iterations} \

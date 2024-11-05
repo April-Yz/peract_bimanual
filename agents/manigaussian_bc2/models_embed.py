@@ -115,13 +115,10 @@ class GeneralizableGSEmbedNet(nn.Module):
                 cprint(f"[GeneralizableGSEmbedNet] Using action input: {self.use_action}", "red")
                 cprint(f"[GeneralizableGSEmbedNet] Using semantic feature: {self.use_semantic_feature}", "red")
                 # if self.leader:
-                next_d_in = self.d_out + self.d_in      # (26 + 3(mask) ) + 39 = (65 + 3) = 68
-                # cprint(f"65 next_d_in = self.d_out + self.d_in: {next_d_in}", "green") 
-                next_d_in = next_d_in + 16 if self.use_action else next_d_in  # 73 -> 81 +3(mask) -> 84  action: 8->16 dim # new theta_right=8(还是16呢)
-                # cprint(f"73 next_d_in = next_d_in + 8 if self.use_action else next_d_in {next_d_in}", "green")
+                next_d_in = self.d_out + self.d_in      # (26 + 3(mask) ) + 39 = (65 + 3) = 68      # cprint(f"65 next_d_in = self.d_out + self.d_in: {next_d_in}", "green") 
+                next_d_in = next_d_in + 16 if self.use_action else next_d_in  # 73 -> 81 +3(mask) -> 84  action: 8->16 dim # new theta_right=8(还是16呢)      # cprint(f"73 next_d_in = next_d_in + 8 if self.use_action else next_d_in {next_d_in}", "green")
                 next_d_in = next_d_in if self.use_semantic_feature else next_d_in - 3   # 70->78
-                next_d_in = next_d_in if self.use_mask  else next_d_in - 3      # (-mask)如果双手一起预测   减3
-                # cprint(f"70 next_d_in = next_d_in if self.use_semantic_feature else next_d_in - 3 {next_d_in}", "green")
+                next_d_in = next_d_in if self.use_mask  else next_d_in - 3      # (-mask)如果双手一起预测   减3      # cprint(f"70 next_d_in = next_d_in if self.use_semantic_feature else next_d_in - 3 {next_d_in}", "green")
                 self.gs_deformation_field = ResnetFC(
                         d_in=next_d_in, # all things despite volumetric representation (26 + 39 + 8 -3 = 70) 尽管有体积表示
                         d_latent=self.d_latent,
@@ -143,8 +140,8 @@ class GeneralizableGSEmbedNet(nn.Module):
                 next_d_in = self.d_out + self.d_in      # 26( +3 mask ) + 39 = 65 + 3 = 68   
                 next_d_in = next_d_in + 8 if self.use_action else next_d_in  # 73 +3(mask) = 76 action: 8 dim # new theta_right=8(还是16呢)
                 next_d_in = next_d_in if self.use_semantic_feature else next_d_in - 3   # 73-3 -> 70 +3(mask) = 73
-                next_d_in = next_d_in if self.use_mask else next_d_in - 3      # mask
-                # cprint(f"70 next_d_in = next_d_in if self.use_semantic_feature else next_d_in - 3 {next_d_in}", "green")
+                next_d_in = next_d_in if self.use_mask else next_d_in - 3      # mask    # cprint(f"70 next_d_in = next_d_in if self.use_semantic_feature else next_d_in - 3 {next_d_in}", "green")
+                # 超显存
                 # with torch.no_grad():
                 # self.gs_deformation_field_leader = ResnetFC(
                 #         d_in=next_d_in, # all things despite volumetric representation (26 + 39 + 8 -3 = 70) 尽管有体积表示

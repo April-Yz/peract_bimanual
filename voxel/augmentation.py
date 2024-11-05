@@ -515,144 +515,8 @@ def perturb_se3_camera_pose(camera_pose,        # 原始的相机姿态矩阵列
     # 返回包含所有扰动后相机姿态的列表。
     return perturbed_camera_pose
 
-def apply_se3_augmentation_with_camera_pose(pcd,
-                            camera_pose,
-                           action_gripper_pose,
-                           action_trans,
-                           action_rot_grip,
-                           bounds,
-                           layer,
-                           trans_aug_range,
-                           rot_aug_range,
-                           rot_aug_resolution,
-                           voxel_size,
-                           rot_resolution,
-                           device):
-    """
-    接收点云数据、相机姿态、动作抓取姿态、平移和旋转抓取动作、场景边界、体素化层、平移和旋转增强范围、旋转增强分辨率、体素大小、旋转分辨率和设备等参数。
-    与 apply_se3_augmentation 类似，但同时对相机姿态进行扰动处理。
-    Apply SE3 augmentation to a point clouds and actions.
-    :param pcd: list of point clouds [[bs, 3, H, W], ...] for N cameras
-    :param action_gripper_pose: 6-DoF pose of keyframe action [bs, 7]
-    :param action_trans: discretized translation action [bs, 3]
-    :param action_rot_grip: discretized rotation and gripper action [bs, 4]
-    :param bounds: metric scene bounds of voxel grid [bs, 6]
-    :param layer: voxelization layer (always 1 for PerAct)
-    :param trans_aug_range: range of translation augmentation [x_range, y_range, z_range]
-    :param rot_aug_range: range of rotation augmentation [x_range, y_range, z_range]
-    :param rot_aug_resolution: degree increments for discretized augmentation rotations
-    :param voxel_size: voxelization resoltion
-    :param rot_resolution: degree increments for discretized rotations
-    :param device: torch device
-    :return: perturbed action_trans, action_rot_grip, pcd
-    """
 
-    # batch size
-    bs = pcd[0].shape[0]
-
-    # identity matrix 单位矩阵：创建一个批量大小为 bs 的4x4单位矩阵，并将其移动到指定的设备上。
-    identity_4x4 = torch.eye(4).unsqueeze(0).repeat(bs, 1, 1).to(device=device)
-
-    # 4x4 matrix of keyframe action gripper pose 关键帧动作抓取姿态矩阵：从 action_gripper_pose 中提取平移和四元数，并将四元数转换为旋转矩阵。
-    action_gripper_trans = action_gripper_pose[:, :3]
-    action_gripper_quat_wxyz = torch.cat((action_gripper_pose[:, 6].unsqueeze(1),
-                                          action_gripper_pose[:, 3:6]), dim=1)
-    action_gripper_rot = torch3d_tf.quaternion_to_matrix(action_gripper_quat_wxyz)
-    action_gripper_4x4 = identity_4x4.detach().clone()
-    action_gripper_4x4[:, :3, :3] = action_gripper_rot
-    action_gripper_4x4[:, 0:3, 3] = action_gripper_trans
-
-    # 初始化扰动平移和旋转抓取：初始化扰动后的平移 perturbed_trans 和旋转抓取 perturbed_rot_grip。
-    perturbed_trans = torch.full_like(action_trans, -1.)
-    perturbed_rot_grip = torch.full_like(action_rot_grip, -1.)
-
-    # perturb the action, check if it is within bounds, if not, try another perturbation
-    # 扰动动作，检查是否在界限之内，如果不在，则尝试另一次扰动
-    perturb_attempts = 0
-    while torch.any(perturbed_trans < 0):
-        # might take some repeated attempts to find a perturbation that doesn't go out of bounds
-        perturb_attempts += 1
-        # 在超过10次尝试后，如果找不到使动作保持在边界内的扰动，则输出错误信息并返回原始动作。
-        if perturb_attempts > 10:
-            # raise Exception('Failing to perturb action and keep it within bounds.')
-            cprint('Failing to perturb action and keep it within bounds. use non-perturbed value.', 'red')
-            # return original action
-            return action_trans, action_rot_grip, pcd, camera_pose
-
-        # sample translation perturbation with specified range 指定范围的平移扰动样本
-        # 计算平移扰动的范围，通过从边界的最大值 bounds[:, 3:] 减去边界的最小值 bounds[:, :3] 来得到每个维度的平移范围。 平移增强的相对范围比例，用于调整平移扰动的大小。
-        trans_range = (bounds[:, 3:] - bounds[:, :3]) * trans_aug_range.to(device=device)
-        # 平移增强的相对范围比例，用于调整平移扰动的大小。
-        trans_shift = trans_range * utils.rand_dist((bs, 3)).to(device=device)
-        # 创建一个与单位矩阵 identity_4x4 相同形状的矩阵，用于存储最终的平移扰动。
-        trans_shift_4x4 = identity_4x4.detach().clone()
-        # 将计算出的平移扰动向量赋值到 trans_shift_4x4 矩阵的平移部分。
-        trans_shift_4x4[:, 0:3, 3] = trans_shift
-
-        # sample rotation perturbation at specified resolution and range 
-        # roll_aug_steps、pitch_aug_steps、yaw_aug_steps：分别计算绕X、Y、Z轴的旋转扰动步数。
-        # 这里使用整除 // 运算符和 rot_aug_range 来确定每个轴的旋转范围，然后除以 rot_aug_resolution 来得到步数。
-        roll_aug_steps = int(rot_aug_range[0] // rot_aug_resolution)
-        pitch_aug_steps = int(rot_aug_range[1] // rot_aug_resolution)
-        yaw_aug_steps = int(rot_aug_range[2] // rot_aug_resolution)
-
-        roll = utils.rand_discrete((bs, 1),
-                                   min=-roll_aug_steps,
-                                   max=roll_aug_steps) * np.deg2rad(rot_aug_resolution)
-        pitch = utils.rand_discrete((bs, 1),
-                                    min=-pitch_aug_steps,
-                                    max=pitch_aug_steps) * np.deg2rad(rot_aug_resolution)
-        yaw = utils.rand_discrete((bs, 1),
-                                  min=-yaw_aug_steps,
-                                  max=yaw_aug_steps) * np.deg2rad(rot_aug_resolution)
-        rot_shift_3x3 = torch3d_tf.euler_angles_to_matrix(torch.cat((roll, pitch, yaw), dim=1), "XYZ")
-        rot_shift_4x4 = identity_4x4.detach().clone()
-        rot_shift_4x4[:, :3, :3] = rot_shift_3x3
-
-        # rotate then translate the 4x4 keyframe action
-        perturbed_action_gripper_4x4 = torch.bmm(action_gripper_4x4, rot_shift_4x4)
-        perturbed_action_gripper_4x4[:, 0:3, 3] += trans_shift
-
-        # convert transformation matrix to translation + quaternion
-        perturbed_action_trans = perturbed_action_gripper_4x4[:, 0:3, 3].cpu().numpy()
-        perturbed_action_quat_wxyz = torch3d_tf.matrix_to_quaternion(perturbed_action_gripper_4x4[:, :3, :3])
-        perturbed_action_quat_xyzw = torch.cat([perturbed_action_quat_wxyz[:, 1:],
-                                                perturbed_action_quat_wxyz[:, 0].unsqueeze(1)],
-                                               dim=1).cpu().numpy()
-
-        # discretize perturbed translation and rotation
-        # TODO(mohit): do this in torch without any numpy.
-        trans_indicies, rot_grip_indicies = [], []
-        for b in range(bs):
-            bounds_idx = b if layer > 0 else 0
-            bounds_np = bounds[bounds_idx].cpu().numpy()
-
-            trans_idx = utils.point_to_voxel_index(perturbed_action_trans[b], voxel_size, bounds_np)
-            trans_indicies.append(trans_idx.tolist())
-
-            quat = perturbed_action_quat_xyzw[b]
-            quat = utils.normalize_quaternion(perturbed_action_quat_xyzw[b])
-            if quat[-1] < 0:
-                quat = -quat
-            disc_rot = utils.quaternion_to_discrete_euler(quat, rot_resolution)
-            rot_grip_indicies.append(disc_rot.tolist() + [int(action_rot_grip[b, 3].cpu().numpy())])
-
-        # if the perturbed action is out of bounds,
-        # the discretized perturb_trans should have invalid indicies
-        perturbed_trans = torch.from_numpy(np.array(trans_indicies)).to(device=device)
-        perturbed_rot_grip = torch.from_numpy(np.array(rot_grip_indicies)).to(device=device)
-
-    action_trans = perturbed_trans
-    action_rot_grip = perturbed_rot_grip
-
-    # apply perturbation to pointclouds
-    pcd = perturb_se3(pcd, trans_shift_4x4, rot_shift_4x4, action_gripper_4x4, bounds)
-    camera_pose = perturb_se3_camera_pose(camera_pose, trans_shift_4x4, rot_shift_4x4, action_gripper_4x4, bounds)
-    return action_trans, action_rot_grip, pcd, camera_pose
-
-# Mani-------------------------------------------------------
-
-# Mani2 nerf[5]-------------------------------------------------------
+#### new
 def bimanual_apply_se3_augmentation_with_camera_pose(
     pcd,
     camera_pose,
@@ -671,46 +535,18 @@ def bimanual_apply_se3_augmentation_with_camera_pose(
     rot_resolution,
     device,
     ):
-    """
-    接收点云数据、相机姿态、动作抓取姿态、平移和旋转抓取动作、场景边界、体素化层、平移和旋转增强范围、旋转增强分辨率、体素大小、旋转分辨率和设备等参数。
-    与 apply_se3_augmentation 类似，但同时对相机姿态进行扰动处理。
-    Apply SE3 augmentation to a point clouds and actions.
-    :param pcd: list of point clouds [[bs, 3, H, W], ...] for N cameras
-    :param action_gripper_pose: 6-DoF pose of keyframe action [bs, 7]
-    :param action_trans: discretized translation action [bs, 3]
-    :param action_rot_grip: discretized rotation and gripper action [bs, 4]
-    :param bounds: metric scene bounds of voxel grid [bs, 6]
-    :param layer: voxelization layer (always 1 for PerAct)
-    :param trans_aug_range: range of translation augmentation [x_range, y_range, z_range]
-    :param rot_aug_range: range of rotation augmentation [x_range, y_range, z_range]
-    :param rot_aug_resolution: degree increments for discretized augmentation rotations
-    :param voxel_size: voxelization resoltion
-    :param rot_resolution: degree increments for discretized rotations
-    :param device: torch device
-    :return: perturbed action_trans, action_rot_grip, pcd
-    """
-
     # batch size
     bs = pcd[0].shape[0]
 
-    # identity matrix 单位矩阵：创建一个批量大小为 bs 的4x4单位矩阵，并将其移动到指定的设备上。
+    # identity matrix
     identity_4x4 = torch.eye(4).unsqueeze(0).repeat(bs, 1, 1).to(device=device)
-    
-    # Mani used------
-    # # 4x4 matrix of keyframe action gripper pose 关键帧动作抓取姿态矩阵：从 action_gripper_pose 中提取平移和四元数，并将四元数转换为旋转矩阵。
-    # action_gripper_trans = action_gripper_pose[:, :3]
-    # action_gripper_quat_wxyz = torch.cat((action_gripper_pose[:, 6].unsqueeze(1),
-    #                                       action_gripper_pose[:, 3:6]), dim=1)
-    # action_gripper_rot = torch3d_tf.quaternion_to_matrix(action_gripper_quat_wxyz)
-    # action_gripper_4x4 = identity_4x4.detach().clone()
-    # action_gripper_4x4[:, :3, :3] = action_gripper_rot
-    # action_gripper_4x4[:, 0:3, 3] = action_gripper_trans
 
-    # # 初始化扰动平移和旋转抓取：初始化扰动后的平移 perturbed_trans 和旋转抓取 perturbed_rot_grip。
-    # perturbed_trans = torch.full_like(action_trans, -1.)
-    # perturbed_rot_grip = torch.full_like(action_rot_grip, -1.)
-        # 4x4 matrix of keyframe action gripper pose
-    # Mani used------
+    # 4x4 matrix of keyframe action gripper pose
+
+    # center_action = (right_action_gripper_pose[:, :3] + left_action_gripper_pose[:, :3]) / 2
+    center_action = right_action_gripper_pose[:, :3]
+    # center_action = left_action_gripper_pose[:, :3]
+    # center_action = torch.tensor([[0.0, 0.0, 0.0]]).to(device=device)
 
     right_action_gripper_trans = right_action_gripper_pose[:, :3]
     right_action_gripper_quat_wxyz = torch.cat(
@@ -747,100 +583,24 @@ def bimanual_apply_se3_augmentation_with_camera_pose(
     left_perturbed_trans = torch.full_like(left_action_trans, -1.0)
     left_perturbed_rot_grip = torch.full_like(left_action_rot_grip, -1.0)
 
-    # bimanual 以上代码用双臂代替了单臂写法
-
-
     # perturb the action, check if it is within bounds, if not, try another perturbation
-    # 扰动动作，检查是否在界限之内，如果不在，则尝试另一次扰动
     perturb_attempts = 0
-    # while torch.any(perturbed_trans < 0):
-    #     # might take some repeated attempts to find a perturbation that doesn't go out of bounds
-    #     perturb_attempts += 1
-    #     # 在超过10次尝试后，如果找不到使动作保持在边界内的扰动，则输出错误信息并返回原始动作。
-    #     if perturb_attempts > 10:
-    #         # raise Exception('Failing to perturb action and keep it within bounds.')
-    #         cprint('Failing to perturb action and keep it within bounds. use non-perturbed value.', 'red')
-    #         # return original action
-    #         return action_trans, action_rot_grip, pcd, camera_pose
-
-    #     # sample translation perturbation with specified range 指定范围的平移扰动样本
-    #     # 计算平移扰动的范围，通过从边界的最大值 bounds[:, 3:] 减去边界的最小值 bounds[:, :3] 来得到每个维度的平移范围。 平移增强的相对范围比例，用于调整平移扰动的大小。
-    #     trans_range = (bounds[:, 3:] - bounds[:, :3]) * trans_aug_range.to(device=device)
-    #     # 平移增强的相对范围比例，用于调整平移扰动的大小。
-    #     trans_shift = trans_range * utils.rand_dist((bs, 3)).to(device=device)
-    #     # 创建一个与单位矩阵 identity_4x4 相同形状的矩阵，用于存储最终的平移扰动。
-    #     trans_shift_4x4 = identity_4x4.detach().clone()
-    #     # 将计算出的平移扰动向量赋值到 trans_shift_4x4 矩阵的平移部分。
-    #     trans_shift_4x4[:, 0:3, 3] = trans_shift
-
-    #     # sample rotation perturbation at specified resolution and range 
-    #     # roll_aug_steps、pitch_aug_steps、yaw_aug_steps：分别计算绕X、Y、Z轴的旋转扰动步数。
-    #     # 这里使用整除 // 运算符和 rot_aug_range 来确定每个轴的旋转范围，然后除以 rot_aug_resolution 来得到步数。
-    #     roll_aug_steps = int(rot_aug_range[0] // rot_aug_resolution)
-    #     pitch_aug_steps = int(rot_aug_range[1] // rot_aug_resolution)
-    #     yaw_aug_steps = int(rot_aug_range[2] // rot_aug_resolution)
-
-    #     roll = utils.rand_discrete((bs, 1),
-    #                                min=-roll_aug_steps,
-    #                                max=roll_aug_steps) * np.deg2rad(rot_aug_resolution)
-    #     pitch = utils.rand_discrete((bs, 1),
-    #                                 min=-pitch_aug_steps,
-    #                                 max=pitch_aug_steps) * np.deg2rad(rot_aug_resolution)
-    #     yaw = utils.rand_discrete((bs, 1),
-    #                               min=-yaw_aug_steps,
-    #                               max=yaw_aug_steps) * np.deg2rad(rot_aug_resolution)
-    #     rot_shift_3x3 = torch3d_tf.euler_angles_to_matrix(torch.cat((roll, pitch, yaw), dim=1), "XYZ")
-    #     rot_shift_4x4 = identity_4x4.detach().clone()
-    #     rot_shift_4x4[:, :3, :3] = rot_shift_3x3
-
-    #     # rotate then translate the 4x4 keyframe action
-    #     perturbed_action_gripper_4x4 = torch.bmm(action_gripper_4x4, rot_shift_4x4)
-    #     perturbed_action_gripper_4x4[:, 0:3, 3] += trans_shift
-
-    #     # convert transformation matrix to translation + quaternion
-    #     perturbed_action_trans = perturbed_action_gripper_4x4[:, 0:3, 3].cpu().numpy()
-    #     perturbed_action_quat_wxyz = torch3d_tf.matrix_to_quaternion(perturbed_action_gripper_4x4[:, :3, :3])
-    #     perturbed_action_quat_xyzw = torch.cat([perturbed_action_quat_wxyz[:, 1:],
-    #                                             perturbed_action_quat_wxyz[:, 0].unsqueeze(1)],
-    #                                            dim=1).cpu().numpy()
-
-    #     # discretize perturbed translation and rotation
-    #     # TODO(mohit): do this in torch without any numpy.
-    #     trans_indicies, rot_grip_indicies = [], []
-    #     for b in range(bs):
-    #         bounds_idx = b if layer > 0 else 0
-    #         bounds_np = bounds[bounds_idx].cpu().numpy()
-
-    #         trans_idx = utils.point_to_voxel_index(perturbed_action_trans[b], voxel_size, bounds_np)
-    #         trans_indicies.append(trans_idx.tolist())
-
-    #         quat = perturbed_action_quat_xyzw[b]
-    #         quat = utils.normalize_quaternion(perturbed_action_quat_xyzw[b])
-    #         if quat[-1] < 0:
-    #             quat = -quat
-    #         disc_rot = utils.quaternion_to_discrete_euler(quat, rot_resolution)
-    #         rot_grip_indicies.append(disc_rot.tolist() + [int(action_rot_grip[b, 3].cpu().numpy())])
-
-    #     # if the perturbed action is out of bounds,
-    #     # the discretized perturb_trans should have invalid indicies
-    #     perturbed_trans = torch.from_numpy(np.array(trans_indicies)).to(device=device)
-    #     perturbed_rot_grip = torch.from_numpy(np.array(rot_grip_indicies)).to(device=device)
-
-    while torch.any(right_perturbed_trans < 0) and torch.any(left_perturbed_trans < 0):
+    # while torch.any(right_perturbed_trans < 0) and torch.any(left_perturbed_trans < 0):
+    while torch.any(right_perturbed_trans < 0) or torch.any(left_perturbed_trans < 0):
         # might take some repeated attempts to find a perturbation that doesn't go out of bounds
         perturb_attempts += 1
         if perturb_attempts > 100:
-            # nerf 改成Mani写法
-            # raise Exception("Failing to perturb action and keep it within bounds.")
-            cprint('Failing to perturb action and keep it within bounds. use non-perturbed value.', 'red')
-            # return original action
-            return right_action_trans, right_action_rot_grip, left_action_trans, left_action_rot_grip, pcd, camera_pose
-        
+            raise Exception("Failing to perturb action and keep it within bounds.")
+
         # sample translation perturbation with specified range
         trans_range = (bounds[:, 3:] - bounds[:, :3]) * trans_aug_range.to(
             device=device
         )
         trans_shift = trans_range * utils.rand_dist((bs, 3)).to(device=device)
+        # for debugging
+        # trans_shift = torch.tensor([[0.125, 0.125, 0.125]]).to(device=device)
+        # trans_shift = torch.tensor([[0.0, 0.0, 0.0]]).to(device=device)
+
         trans_shift_4x4 = identity_4x4.detach().clone()
         trans_shift_4x4[:, 0:3, 3] = trans_shift
 
@@ -858,11 +618,38 @@ def bimanual_apply_se3_augmentation_with_camera_pose(
         yaw = utils.rand_discrete(
             (bs, 1), min=-yaw_aug_steps, max=yaw_aug_steps
         ) * np.deg2rad(rot_aug_resolution)
+        # for debugging
+        # yaw = torch.tensor([[45.0]]).to(device=device)
+        # yaw = torch.tensor([[0.0]]).to(device=device)
+
         rot_shift_3x3 = torch3d_tf.euler_angles_to_matrix(
             torch.cat((roll, pitch, yaw), dim=1), "XYZ"
-        )
+        ).to(device=device)
         rot_shift_4x4 = identity_4x4.detach().clone()
         rot_shift_4x4[:, :3, :3] = rot_shift_3x3
+
+        def transform(matrix, C, translation, rotation_matrix):
+            """
+            Rotate and translate a 4x4 gripper pose matrix around the center C.
+            TBD.
+
+            Args:
+                matrix: 4x4 matrix to be transformed. tensor.
+                C: 3 Center of rotation. tensor.
+                translation: 3 Translation vector. tensor.
+                rotation_matrix: 3x3 rotation matrix. tensor.
+            """
+            # print(matrix.shape)
+            # print(C.shape)
+            matrix[:, 0:3, 3] -= C
+            matrix[:, 0:3, 3] = torch.matmul(matrix[:, 0:3, 3].unsqueeze(1), rotation_matrix).squeeze(1)
+            matrix[:, 0:3, 3] += C
+            matrix[:, 0:3, 3] += translation
+
+            matrix[:, :3, :3] = torch.matmul(matrix[:, :3, :3], rotation_matrix)
+
+            # print(matrix.shape)
+            return matrix
 
         # rotate then translate the 4x4 keyframe action
         right_perturbed_action_gripper_4x4 = torch.bmm(
@@ -889,16 +676,21 @@ def bimanual_apply_se3_augmentation_with_camera_pose(
             .numpy()
         )
 
-        # rotate then translate the 4x4 keyframe action
-        left_perturbed_action_gripper_4x4 = torch.bmm(
-            left_action_gripper_4x4, rot_shift_4x4
+        left_perturbed_action_gripper_4x4 = left_action_gripper_4x4.detach().clone()  # [4, 4]
+        left_perturbed_action_gripper_4x4 = transform(
+            left_perturbed_action_gripper_4x4,
+            center_action,
+            trans_shift,
+            rot_shift_3x3
         )
-        left_perturbed_action_gripper_4x4[:, 0:3, 3] += trans_shift
 
         # convert transformation matrix to translation + quaternion
+        # print(left_perturbed_action_gripper_4x4.shape)
         left_perturbed_action_trans = (
             left_perturbed_action_gripper_4x4[:, 0:3, 3].cpu().numpy()
         )
+
+        # print(left_perturbed_action_gripper_4x4.shape)
         left_perturbed_action_quat_wxyz = torch3d_tf.matrix_to_quaternion(
             left_perturbed_action_gripper_4x4[:, :3, :3]
         )
@@ -971,25 +763,20 @@ def bimanual_apply_se3_augmentation_with_camera_pose(
             device=device
         )
 
-
-    # action_trans = perturbed_trans
-    # action_rot_grip = perturbed_rot_grip
-
     right_action_trans = right_perturbed_trans
     right_action_rot_grip = right_perturbed_rot_grip
 
     left_action_trans = left_perturbed_trans
     left_action_rot_grip = left_perturbed_rot_grip
 
-
-    # apply perturbation to pointclouds 对点云应用扰动
-    # pcd = perturb_se3(pcd, trans_shift_4x4, rot_shift_4x4, action_gripper_4x4, bounds)
-    # only right hand?
+    center_action_gripper_4x4 = identity_4x4.detach().clone()
+    # center_action_gripper_4x4 = torch.bmm(center_action_gripper_4x4, rot_shift_4x4)
+    # center_action_gripper_4x4 = rot_shift_4x4
+    center_action_gripper_4x4[:, 0:3, 3] += center_action
     pcd = perturb_se3(
-        pcd, trans_shift_4x4, rot_shift_4x4, right_action_gripper_4x4, bounds
+        pcd, trans_shift_4x4, rot_shift_4x4, center_action_gripper_4x4, bounds
     )
     camera_pose = perturb_se3_camera_pose(camera_pose, trans_shift_4x4, rot_shift_4x4, right_action_gripper_4x4, bounds)
-    # return action_trans, action_rot_grip, pcd, camera_pose
     return (
         right_action_trans,
         right_action_rot_grip,
@@ -998,4 +785,3 @@ def bimanual_apply_se3_augmentation_with_camera_pose(
         pcd,
         camera_pose,
     )
-# Mani2 nerf[5]-------------------------------------------------------

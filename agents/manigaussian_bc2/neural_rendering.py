@@ -794,11 +794,8 @@ class NeuralRenderer(nn.Module):
                 if self.use_dynamic_field and (next_gt_rgb is not None) and ('xyz_maps' in data['next']):
                     data['next'] = self.pts2render(data['next'], bg_color=self.bg_color)
                     next_render_novel = data['next']['novel_view']['img_pred'].permute(0, 2, 3, 1)
-                    # loss_dyna = l1_loss(next_render_novel, next_gt_rgb)
                     loss_dyna = l2_loss(next_render_novel, next_gt_rgb)
-                    # 预热步数（3000步以后算上了）
                     lambda_dyna = self.cfg.lambda_dyna if step >= self.cfg.next_mlp.warm_up else 0.
-                    # Step 3 Loss(LGeo? + L embed/L sem + L dyna) = loss_rgb + self.cfg.lambda_embed * loss_embed + lambda_dyna * loss_dyna
                     loss += lambda_dyna * loss_dyna
 
                     loss_reg = torch.tensor(0.)
@@ -810,6 +807,8 @@ class NeuralRenderer(nn.Module):
                     #     loss += lambda_reg * loss_reg
 
                     # TODO: local rigid loss 局部刚性损失
+                    loss_LF = torch.tensor(0.)
+                    loss_dyna_mask = torch.tensor(0.)
                 else:
                     loss_dyna = torch.tensor(0.)
                     loss_LF = torch.tensor(0.)
@@ -1221,9 +1220,10 @@ class NeuralRenderer(nn.Module):
                             # start_time = time.perf_counter()
                             # print("#0 time1: ", start_time)
                             # 左手的点云
-                            mask_3d, next_mask_3d = self.createby_gt_mask(data=data, gt_mask=gt_mask, 
+                            mask_3d, next_mask_3d = self.createby_gt_mask(data=data, 
+                                gt_mask=gt_mask,next_gt_mask=next_gt_mask, 
                                 gt_mask_camera_extrinsic=gt_mask_camera_extrinsic, gt_mask_camera_intrinsic=gt_mask_camera_intrinsic,  
-                                next_gt_mask=next_gt_mask,gt_maskdepth=gt_maskdepth, next_gt_maskdepth=next_gt_maskdepth)
+                                gt_maskdepth=gt_maskdepth, next_gt_maskdepth=next_gt_maskdepth)
                             # start_time = time.perf_counter()
                             # print("#0 time2: ", start_time)                            
                             # 投影到二维

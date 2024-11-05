@@ -13,7 +13,7 @@ import io
 
 from helpers.utils import visualise_voxel
 from voxel.voxel_grid import VoxelGrid
-from voxel.augmentation import apply_se3_augmentation_with_camera_pose
+from voxel import augmentation
 from helpers.clip.core.clip import build_model, load_clip
 import PIL.Image as Image
 import transformers
@@ -291,7 +291,7 @@ class QFunction(nn.Module):
                     gt_pose = nerf_target_pose @ self._coord_trans # remember to do this # 将目标的世界坐标系转换为相机坐标系
                     gt_depth = nerf_target_depth
                     if self.cfg.neural_renderer.mask_gen =='gt': # 需要两个mask+depth视角
-                        # todo 加一个radom i 随机相机
+                        """ # todo 加一个radom i 随机相机
                         # import random
                         # random_int = random.randint(0, 5)
                         # selected_indices = [5, 2] # 5:front 2:overhead
@@ -301,17 +301,17 @@ class QFunction(nn.Module):
                         # next_gt_mask = next_gt_mask[selected_indices]
                         # gt_maskdepth = depth[selected_indices]
                         # next_gt_maskdepth = next_depth[selected_indices]
-                        # 创建空列表用于存储选定索引对应的值
-                        gt_mask_camera_intrinsic = []
-                        gt_mask_camera_extrinsic = []
+                        # 创建空列表用于存储选定索引对应的值 """
+                        next_gt_mask_camera_intrinsic = []
+                        next_gt_mask_camera_extrinsic = []
                         gt_mask1 = []  # 为了避免和原始变量名冲突，重命名为 gt_mask_list
                         next_gt_mask1 = []
                         gt_maskdepth =[]
                         next_gt_maskdepth = []
                         # 使用 append 方法添加索引 2 和 5 对应的值
                         for idx in [5,2]:
-                            gt_mask_camera_intrinsic.append(camera_intrinsics[idx])
-                            gt_mask_camera_extrinsic.append(camera_extrinsics[idx])
+                            next_gt_mask_camera_intrinsic.append(next_camera_intrinsics[idx])
+                            next_gt_mask_camera_extrinsic.append(next_camera_extrinsics[idx])
                             gt_mask1.append(gt_mask[idx])
                             next_gt_mask1.append(next_gt_mask[idx])
                             gt_maskdepth.append(depth[idx])
@@ -323,9 +323,8 @@ class QFunction(nn.Module):
                         # mask_0 = mask[0]   # print(mask_0.shape) torch.Size([1, 1, 256, 256])
 
                         # render loss（改变）神经渲染 后面是一些相关数据字典通过dotmap处理后的数据，可用.访问，但是无用
-                        # 所以就是在这里加入grounded sam结果了
-                        # print("\033[0;32;40maction in bc agent.py\033[0m",action) [1,16]
-                        # print(action.shape) # torch.Size([1, 16])
+                        # 所以就是在这里加入groundedsam结果了
+                        # print("\033[0;32;40maction in bc agent.py\033[0m",action) [1,16]  print(action.shape) # torch.Size([1, 16])
 
                         rendering_loss_dict, _ = self._neural_renderer(
                             rgb=rgb_0, pcd=pcd_0, depth=depth_0, # 第一个视角下的颜色 点云数据 深度
@@ -339,7 +338,7 @@ class QFunction(nn.Module):
                             next_gt_rgb=nerf_next_target_rgb, step=step, action=action,
                             training=True, 
                             gt_mask=gt_mask1, 
-                            gt_mask_camera_extrinsic=gt_mask_camera_extrinsic, gt_mask_camera_intrinsic=gt_mask_camera_intrinsic, next_gt_mask = next_gt_mask1,
+                            gt_mask_camera_extrinsic=next_gt_mask_camera_extrinsic, gt_mask_camera_intrinsic=next_gt_mask_camera_intrinsic, next_gt_mask = next_gt_mask1,
                             gt_maskdepth = gt_maskdepth, next_gt_maskdepth = next_gt_maskdepth,
                             )
                     elif self.cfg.neural_renderer.mask_gen =='pre': # 需要一个mask视角（target）
@@ -573,8 +572,8 @@ class QFunction(nn.Module):
             print("gt mask的可视化")
             gt_mask = [gt_mask[5],gt_mask[2]]
             # print("gt_mask",gt_mask,gt_mask[0].shape)
-            gt_mask_camera_extrinsic = [camera_extrinsics[5], camera_extrinsics[2]]
-            gt_mask_camera_intrinsic= [camera_intrinsics[5],camera_intrinsics[2]]
+            next_gt_mask_camera_extrinsic = [next_camera_extrinsics[5], next_camera_extrinsics[2]]
+            next_gt_mask_camera_intrinsic= [next_camera_intrinsics[5], next_camera_intrinsics[2]]
             gt_maskdepth = [gt_maskdepth[5],gt_maskdepth[2]]
             next_gt_mask = [next_gt_mask[5],next_gt_mask[2]]
             next_gt_maskdepth = [next_gt_maskdepth[5],next_gt_maskdepth[2]]
@@ -594,10 +593,9 @@ class QFunction(nn.Module):
                     step=step,
                     action=action,                          # 当前执行的动作。
                     training=False,
-                    gt_mask=gt_mask,
-                    gt_mask_camera_extrinsic=gt_mask_camera_extrinsic, 
-                    gt_mask_camera_intrinsic= gt_mask_camera_intrinsic,
-                    next_gt_mask = next_gt_mask,
+                    gt_mask=gt_mask,next_gt_mask = next_gt_mask,
+                    gt_mask_camera_extrinsic=next_gt_mask_camera_extrinsic, 
+                    gt_mask_camera_intrinsic= next_gt_mask_camera_intrinsic,
                     gt_maskdepth = gt_maskdepth, 
                     next_gt_maskdepth = next_gt_maskdepth,
                     )
@@ -648,7 +646,7 @@ class QFunction(nn.Module):
                     action=action,                          # 当前执行的动作。
                     training=False,
                     )
-        # else:
+        """ # else:
         #     # random_int = random.randint(0, 4)
         #     random_int = 0 # target
         #     gt_rgb = rgb[random_int]
@@ -692,7 +690,7 @@ class QFunction(nn.Module):
         #             )
 
 
-        # ----------------------------------------------------------------------    
+        # ----------------------------------------------------------------------     """
         return ret_dict.render_novel, ret_dict.next_render_novel, ret_dict.render_embed, ret_dict.gt_embed, \
             ret_dict.render_mask_novel, ret_dict.render_mask_gtrgb, ret_dict.next_render_mask, ret_dict.next_render_mask_right, \
                 ret_dict.next_render_rgb_right, ret_dict.next_left_mask_gen, ret_dict.exclude_left_mask,\
@@ -792,9 +790,7 @@ class QAttentionPerActBCAgent(Agent):
 
         print(f"device: {device}")
 
-        # print("qattention_peract_bc_agent max_num_coords",np.prod(self._image_resolution) * self._num_cameras)  # 98304 (在mani里39316)
-        # print("np.prod(self._image_resolution)",np.prod(self._image_resolution)) # 16384 （65536）
-        # print("self._num_cameras",self._num_cameras) # 6 （6）
+        # print("qattention_peract_bc_agent max_num_coords",np.prod(self._image_resolution) * self._num_cameras)  # 98304 (在mani里39316)print("np.prod(self._image_resolution)",np.prod(self._image_resolution)) # 16384 （65536）print("self._num_cameras",self._num_cameras) # 6 （6）
 
         self._voxelizer = VoxelGrid(
             coord_bounds=self._coordinate_bounds.cpu() if isinstance(self._coordinate_bounds, torch.Tensor) else self._coordinate_bounds,
@@ -805,9 +801,7 @@ class QAttentionPerActBCAgent(Agent):
             max_num_coords=np.prod(self._image_resolution) * self._num_cameras,
         )
 
-        # 有些不同
-        # print(f"qatten mani bc agent build self._perceiver_encoder: {self._perceiver_encoder.shape}")
-        # print("type(self._perceiver_encoder)",type(self._perceiver_encoder))
+        # 有些不同print(f"qatten mani bc agent build self._perceiver_encoder: {self._perceiver_encoder.shape}")print("type(self._perceiver_encoder)",type(self._perceiver_encoder))
         self._q = QFunction(self._perceiver_encoder,
                             self._voxelizer,
                             self._bounds_offset,
@@ -1174,7 +1168,7 @@ class QAttentionPerActBCAgent(Agent):
         # 整体上移后
         # obs, pcd = self._preprocess_inputs(replay_sample)
         # 其实不用带Mani的也一样，都是5个返回值
-        if not self.cfg.neural_renderer.use_nerf_picture or self.cfg.neural_renderer.mask_gen =='pre':
+        if not self.cfg.neural_renderer.use_nerf_picture or self.cfg.neural_renderer.mask_gen =='pre' or self.cfg.neural_renderer.mask_gen =='gt':
             obs, next_obs_rgb, depth, next_depth, pcd, extrinsics, next_extrinsics, intrinsics, next_intrinsics, gt_mask, next_gt_mask = self._mani_preprocess_inputs(replay_sample)
         elif self.cfg.neural_renderer.use_nerf_picture:
             obs, depth, next_depth, pcd, extrinsics, intrinsics, gt_mask, next_gt_mask = self._nerf_preprocess_inputs(replay_sample)        
@@ -1357,7 +1351,6 @@ class QAttentionPerActBCAgent(Agent):
         if self._transform_augmentation:
             cprint("Applying SE(3) augmentation!!!", "red")
 
-            from voxel import augmentation
             # nerf[4]---得新写一个函数-------------
             (
                 right_action_trans,
@@ -1416,8 +1409,7 @@ class QAttentionPerActBCAgent(Agent):
         if self.cfg.neural_renderer.use_nerf_picture:
             if self.cfg.neural_renderer.mask_gen =='gt':
                 q, voxel_grid, rendering_loss_dict = self._q(
-                # (right_q_trans,right_q_rot_grip,right_q_collision,left_q_trans,left_q_rot_grip,left_q_collision,voxel_grid, rendering_loss_dict)
-                #  = self._q(
+                # (right_q_trans,right_q_rot_grip,right_q_collision,left_q_trans,left_q_rot_grip,left_q_collision,voxel_grid, rendering_loss_dict)= self._q(
                     obs,
                     depth, # nerf new
                     proprio,
@@ -1445,6 +1437,9 @@ class QAttentionPerActBCAgent(Agent):
                     gt_mask=gt_mask,
                     next_gt_mask =next_gt_mask,
                     next_depth=next_depth,
+                    # gt去除的是next的
+                    next_camera_intrinsics=next_intrinsics,next_camera_extrinsics=next_extrinsics,
+
                     # gt_mask_camera_extrinsic= camera_extrinsics, 
                     # gt_mask_camera_intrinsic= camera_intrinsics,
                     # nerf[3]---------------------
@@ -1817,6 +1812,71 @@ class QAttentionPerActBCAgent(Agent):
         fabric.backward(total_loss)
         self._optimizer.step()
 
+        # TODO: _summaries内容不同相关的肯定要改
+        # torch.cuda.empty_cache() # Mani中的没有，在bimanual中出现的
+        self._summaries = {
+            "losses/total_loss": total_loss,
+            "losses/trans_loss": q_trans_loss.mean(),
+            "losses/rot_loss": q_rot_loss.mean() if with_rot_and_grip else 0.0,
+            "losses/grip_loss": q_grip_loss.mean() if with_rot_and_grip else 0.0,
+
+            "losses/right/trans_loss": q_trans_loss.mean(),
+            "losses/right/rot_loss": q_rot_loss.mean() if with_rot_and_grip else 0.0,
+            "losses/right/grip_loss": q_grip_loss.mean() if with_rot_and_grip else 0.0,
+            "losses/right/collision_loss": q_collision_loss.mean() if with_rot_and_grip else 0.0,
+
+            "losses/left/trans_loss": q_trans_loss.mean(),
+            "losses/left/rot_loss": q_rot_loss.mean() if with_rot_and_grip else 0.0,
+            "losses/left/grip_loss": q_grip_loss.mean() if with_rot_and_grip else 0.0,
+            "losses/left/collision_loss": q_collision_loss.mean() if with_rot_and_grip else 0.0,
+
+            "losses/collision_loss": q_collision_loss.mean()
+            if with_rot_and_grip
+            else 0.0,
+        }
+
+        self._wandb_summaries = {
+            'losses/total_loss': total_loss,
+            'losses/trans_loss': q_trans_loss.mean(),
+            'losses/rot_loss': q_rot_loss.mean() if with_rot_and_grip else 0.,
+            'losses/grip_loss': q_grip_loss.mean() if with_rot_and_grip else 0.,
+            'losses/collision_loss': q_collision_loss.mean() if with_rot_and_grip else 0.,
+        
+            # for visualization new form mani nerf
+            'point_cloud': None,
+            'left_coord_pred': left_coords,
+            'right_coord_pred': right_coords,
+            'right_coord_gt': right_gt_coord,
+            'left_coord_gt': left_gt_coord,
+        }
+
+        if self._lr_scheduler:
+            self._scheduler.step()
+            # 记录最新学习率
+            self._summaries["learning_rate"] = self._scheduler.get_last_lr()[0]
+
+        self._vis_voxel_grid = voxel_grid[0]
+        self._right_vis_translation_qvalue = self._softmax_q_trans(right_q_trans[0])
+        self._right_vis_max_coordinate = right_coords[0]
+        self._right_vis_gt_coordinate = right_action_trans[0]
+
+        self._left_vis_translation_qvalue = self._softmax_q_trans(left_q_trans[0])
+        self._left_vis_max_coordinate = left_coords[0]
+        self._left_vis_gt_coordinate = left_action_trans[0]
+
+        # Note: PerAct doesn't use multi-layer voxel grids like C2FARM
+        # stack prev_layer_voxel_grid(s) from previous layers into a list
+        if prev_layer_voxel_grid is None:
+            prev_layer_voxel_grid = [voxel_grid]
+        else:
+            prev_layer_voxel_grid = prev_layer_voxel_grid + [voxel_grid]
+
+        # stack prev_layer_bound(s) from previous layers into a list
+        if prev_layer_bounds is None:
+            prev_layer_bounds = [self._coordinate_bounds.repeat(bs, 1)]
+        else:
+            prev_layer_bounds = prev_layer_bounds + [bounds]
+
         # new rendering---
         ############### Render in training process #################
 
@@ -1830,6 +1890,31 @@ class QAttentionPerActBCAgent(Agent):
         if to_render:
             # print("to_render start")
             # print("\033[0;33;40maction_gt\033[0m",action_gt)
+
+            # render the voxel for visualization
+            rendered_img_right = visualise_voxel(
+                voxel_grid[0].cpu().detach().numpy(),    # [10, 100, 100, 100]
+                None,
+                self._right_vis_max_coordinate.detach().cpu().numpy(),
+                self._right_vis_gt_coordinate.detach().cpu().numpy(),
+                voxel_size=0.045,
+                # voxel_size=0.1,   # more focus ??
+                rotation_amount=np.deg2rad(-90),
+                highlight_alpha=1.0,
+                alpha=0.4,
+            )
+            rendered_img_left = visualise_voxel(
+                voxel_grid[0].cpu().detach().numpy(),    # [10, 100, 100, 100]
+                None,
+                self._left_vis_max_coordinate.detach().cpu().numpy(),
+                self._left_vis_gt_coordinate.detach().cpu().numpy(),
+                voxel_size=0.045,
+                # voxel_size=0.1,   # more focus ??
+                rotation_amount=np.deg2rad(-90),
+                highlight_alpha=1.0,
+                alpha=0.4,
+            )
+
             if self.cfg.neural_renderer.use_nerf_picture:
                 if self.cfg.neural_renderer.mask_gen =='gt':
                     # 13个参数
@@ -1857,11 +1942,10 @@ class QAttentionPerActBCAgent(Agent):
                         nerf_next_target_camera_intrinsic=nerf_next_target_camera_intrinsic,
                         step=step,
                         action=action_gt,
-                        gt_mask=gt_mask,
-                        next_gt_mask =next_gt_mask,
-                        # gt_mask_camera_extrinsic=camera_extrinsics, gt_mask_camera_intrinsic=camera_intrinsics,
-                        gt_maskdepth=depth,
-                        next_gt_maskdepth=next_depth,
+                        # 用于凸包
+                        gt_mask=gt_mask,next_gt_mask =next_gt_mask,
+                        next_camera_intrinsics=next_intrinsics,next_camera_extrinsics=next_extrinsics,
+                        gt_maskdepth=depth,next_gt_maskdepth=next_depth,
                         )
                     # NOTE: [1, h, w, 3]  # 均为图片质量
                     rgb_gt = nerf_target_rgb[0]
@@ -1926,20 +2010,26 @@ class QAttentionPerActBCAgent(Agent):
                         gt_embed_render = visualize_feature_map_by_normalization(gt_embed_render)    # range from -1 to 1
                         axs[0, 4].imshow(gt_embed_render)
                         axs[0, 4].title.set_text('gt embed seg')
-                        
+
+                    # voxel
+                    axs[0, 5].imshow(rendered_img_right)       
+                    axs[0, 5].text(0, 40, 'predicted', color='blue')
+                    axs[0, 5].text(0, 80, 'gt', color='red')
+                    axs[0, 6].imshow(rendered_img_left)
+                    axs[0, 6].text(0, 40, 'predicted', color='blue')
+                    axs[0, 6].text(0, 80, 'gt', color='red')                    
+
                     if next_rgb_render is not None:
                         # gt next rgb frame
-                        axs[0, 6].imshow(next_rgb_gt.cpu().numpy())
-                        # print("06") # 和10之间有时候出现
-                        axs[0, 6].title.set_text('next tgt')
-                        # Ours
-                        # print("05") # 
-                        axs[0, 5].imshow(next_rgb_render.cpu().numpy())
-                        axs[0, 5].title.set_text('next psnr={:.2f}'.format(psnr_dyna))
+                        axs[1, 4].imshow(next_rgb_gt.cpu().numpy())
+                        axs[1, 4].title.set_text('next tgt')
                     if next_rgb_render_right is not None: # 右臂动作后的rgb
-                        # print("15") # 
                         axs[1, 5].imshow(next_rgb_render_right.cpu().numpy())
                         axs[1, 5].title.set_text('next right psnr={:.2f}'.format(psnr_dyna_right))
+                    if next_rgb_render is not None:
+                        axs[1, 6].imshow(next_rgb_render.cpu().numpy())
+                        axs[1, 6].title.set_text('next psnr={:.2f}'.format(psnr_dyna))
+
 
                     if render_mask_novel is not None:
                         # print("10")
@@ -1960,8 +2050,8 @@ class QAttentionPerActBCAgent(Agent):
                         axs[1, 3].title.set_text('exclude_left_mask')
                     if next_gt_rgbmask is not None: # gt 中去除左臂mask后的mask # 去除右臂后的左臂mask
                     #     # print("14")
-                        axs[1, 4].imshow(next_gt_rgbmask.cpu().numpy())
-                        axs[1, 4].title.set_text('exclude_gt_left_mask')
+                        axs[1, 1].imshow(next_gt_rgbmask.cpu().numpy())
+                        axs[1, 1].title.set_text('exclude_gt_left_mask')
 
                     # remove axis
                     for ax in axs.flat:
@@ -2022,8 +2112,6 @@ class QAttentionPerActBCAgent(Agent):
                     if exclude_left_mask is not None:
                         exclude_left_mask =exclude_left_mask[0]
 
-                    
-
                     # 创建目录 'recon' 用于保存可视化结果。 
                     os.makedirs('recon', exist_ok=True)
                     import matplotlib.pyplot as plt
@@ -2031,7 +2119,7 @@ class QAttentionPerActBCAgent(Agent):
                     # mask_tgt = gt_mask[5].squeeze(0).permute(1, 2, 0) / 2 + 0.5
                     mask_tgt = gt_mask[camera_random_int].squeeze(0).permute(1, 2, 0)
                     next_mask_tgt = next_gt_mask[camera_random_int].squeeze(0).permute(1, 2, 0)
-                    fig, axs = plt.subplots(3, 6, figsize=(15, 3))   # 使用 matplotlib 创建一个包含1行7->8列子图的图形
+                    fig, axs = plt.subplots(3, 7, figsize=(15, 3))   # 使用 matplotlib 创建一个包含1行7->8列子图的图形
                     # src
                     axs[0, 0].imshow(rgb_src.cpu().numpy())    # 在子图 axs[0] 上显示名为 rgb_src 的图像数
                     axs[0, 0].title.set_text('src')            # 设置子图 axs[0] 的标题为 'src'，这可能代表“源图像”（source image）
@@ -2051,14 +2139,22 @@ class QAttentionPerActBCAgent(Agent):
                         gt_embed_render = visualize_feature_map_by_normalization(gt_embed_render)    # range from -1 to 1
                         axs[0, 4].imshow(gt_embed_render)
                         axs[0, 4].title.set_text('gt embed seg')
+                    # voxel
+                    axs[0, 5].imshow(rendered_img_right)       
+                    axs[0, 5].text(0, 40, 'predicted', color='blue')
+                    axs[0, 5].text(0, 80, 'gt', color='red')
+                    axs[0, 6].imshow(rendered_img_left)
+                    axs[0, 6].text(0, 40, 'predicted', color='blue')
+                    axs[0, 6].text(0, 80, 'gt', color='red')     
+                    
                     if gt_mask_vis is not None:
                         gt_mask_vis = gt_mask_vis[0]
-                        axs[0, 5].imshow(gt_mask_vis)
-                        axs[0, 5].title.set_text('gt_mask_vis')
+                        axs[1, 5].imshow(gt_mask_vis)
+                        axs[1, 5].title.set_text('gt_mask_vis')
                     if next_gt_mask_vis is not None:
                         next_gt_mask_vis = next_gt_mask_vis[0]
-                        axs[0, 5].imshow(next_gt_mask_vis)
-                        axs[0, 5].title.set_text('next_gt_mask_vis')
+                        axs[1, 6].imshow(next_gt_mask_vis)
+                        axs[1, 6].title.set_text('next_gt_mask_vis')
 
                     if next_rgb_render is not None:
                         axs[1, 0].imshow(next_rgb_gt.cpu().numpy())
@@ -2426,78 +2522,14 @@ class QAttentionPerActBCAgent(Agent):
                     plt.savefig(f'recon/{step}_rgb.png')
                     workdir = os.getcwd()
                     cprint(f'Saved {workdir}/recon/{step}_rgb.png locally', 'cyan')
-
         # new rendering---
-        # TODO: _summaries内容不同相关的肯定要改
-        # torch.cuda.empty_cache() # Mani中的没有，在bimanual中出现的
-        self._summaries = {
-            "losses/total_loss": total_loss,
-            "losses/trans_loss": q_trans_loss.mean(),
-            "losses/rot_loss": q_rot_loss.mean() if with_rot_and_grip else 0.0,
-            "losses/grip_loss": q_grip_loss.mean() if with_rot_and_grip else 0.0,
-
-            "losses/right/trans_loss": q_trans_loss.mean(),
-            "losses/right/rot_loss": q_rot_loss.mean() if with_rot_and_grip else 0.0,
-            "losses/right/grip_loss": q_grip_loss.mean() if with_rot_and_grip else 0.0,
-            "losses/right/collision_loss": q_collision_loss.mean() if with_rot_and_grip else 0.0,
-
-            "losses/left/trans_loss": q_trans_loss.mean(),
-            "losses/left/rot_loss": q_rot_loss.mean() if with_rot_and_grip else 0.0,
-            "losses/left/grip_loss": q_grip_loss.mean() if with_rot_and_grip else 0.0,
-            "losses/left/collision_loss": q_collision_loss.mean() if with_rot_and_grip else 0.0,
-
-            "losses/collision_loss": q_collision_loss.mean()
-            if with_rot_and_grip
-            else 0.0,
-        }
-
-        self._wandb_summaries = {
-            'losses/total_loss': total_loss,
-            'losses/trans_loss': q_trans_loss.mean(),
-            'losses/rot_loss': q_rot_loss.mean() if with_rot_and_grip else 0.,
-            'losses/grip_loss': q_grip_loss.mean() if with_rot_and_grip else 0.,
-            'losses/collision_loss': q_collision_loss.mean() if with_rot_and_grip else 0.,
-        
-            # for visualization new form mani nerf
-            'point_cloud': None,
-            'left_coord_pred': left_coords,
-            'right_coord_pred': right_coords,
-            'right_coord_gt': right_gt_coord,
-            'left_coord_gt': left_gt_coord,
-        }
-
-        if self._lr_scheduler:
-            self._scheduler.step()
-            # 记录最新学习率
-            self._summaries["learning_rate"] = self._scheduler.get_last_lr()[0]
-
-        self._vis_voxel_grid = voxel_grid[0]
-        self._right_vis_translation_qvalue = self._softmax_q_trans(right_q_trans[0])
-        self._right_vis_max_coordinate = right_coords[0]
-        self._right_vis_gt_coordinate = right_action_trans[0]
-
-        self._left_vis_translation_qvalue = self._softmax_q_trans(left_q_trans[0])
-        self._left_vis_max_coordinate = left_coords[0]
-        self._left_vis_gt_coordinate = left_action_trans[0]
-
-        # Note: PerAct doesn't use multi-layer voxel grids like C2FARM
-        # stack prev_layer_voxel_grid(s) from previous layers into a list
-        if prev_layer_voxel_grid is None:
-            prev_layer_voxel_grid = [voxel_grid]
-        else:
-            prev_layer_voxel_grid = prev_layer_voxel_grid + [voxel_grid]
-
-        # stack prev_layer_bound(s) from previous layers into a list
-        if prev_layer_bounds is None:
-            prev_layer_bounds = [self._coordinate_bounds.repeat(bs, 1)]
-        else:
-            prev_layer_bounds = prev_layer_bounds + [bounds]
 
         return {
             "total_loss": total_loss,
             "prev_layer_voxel_grid": prev_layer_voxel_grid,
             "prev_layer_bounds": prev_layer_bounds,
         }
+    
     # 基于bimanual照着Mani中的改写
     # new86--- bimanual中的新增的
 
