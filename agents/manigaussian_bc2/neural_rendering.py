@@ -786,7 +786,9 @@ class NeuralRenderer(nn.Module):
                     lambda_mask =1   if step >= 1000 else 0
                     loss += loss_dyna_mask * lambda_mask # * 0.001
                 elif self.use_CEloss != 6:
-                    loss_dyna_mask = loss_dyna_mask_novel * (1 - self.cfg.lambda_next_loss_mask)
+                    # loss_dyna_mask = loss_dyna_mask_novel * (1 - self.cfg.lambda_next_loss_mask)
+                    lambda_mask = self.cfg.lambda_mask if step >= self.cfg.mask_warm_up else 0. # 0.4 2000
+                    loss += loss_dyna_mask_novel * lambda_mask # * 0.001
 
 
             # next frame prediction 下一帧预测 Ldyna(optional)
@@ -1015,18 +1017,20 @@ class NeuralRenderer(nn.Module):
                             next_render_mask = next_render_mask.permute(0, 2, 3, 1)
                         # -------------------------------------------------------------------------------------------------------------------
 
-                        # pre mask = right +left    
+                        # next mask = right +left    
                         next_loss_dyna_mask = next_loss_dyna_mask_left * ( 1 - self.cfg.lambda_mask_right ) + next_loss_dyna_mask_right * self.cfg.lambda_mask_right  # 右臂权重小一点
                         
                         # MASK = now +pre
                         # loss_dyna_mask = loss_dyna_mask_novel * (1 - self.cfg.lambda_next_loss_mask)  + next_loss_dyna_mask * self.cfg.lambda_next_loss_mask
-                        loss_dyna_mask += next_loss_dyna_mask * self.cfg.lambda_next_loss_mask
+                        # loss_dyna_mask += next_loss_dyna_mask * self.cfg.lambda_next_loss_mask
+                        loss_dyna_mask = next_loss_dyna_mask
+
 
                         # RGB pre = leader( right ) + follower
                         loss_LF = loss_dyna_leader * self.cfg.lambda_dyna_leader + loss_dyna_follower * (1-self.cfg.lambda_dyna_leader)
                         # print('loss_LF = ', loss_LF, loss_dyna_leader, loss_dyna_follower)
 
-                        lambda_mask = self.cfg.lambda_mask if step >= self.cfg.mask_warm_up else 0.
+                        lambda_mask = self.cfg.lambda_mask if step >= self.cfg.next_mlp.warm_up + self.cfg.mask_warm_up else 0. # 5000
                         loss_dyna = loss_LF * (1 - lambda_mask) + loss_dyna_mask * lambda_mask
 
                         # print('loss_dyna = ', loss_dyna,loss_LF,loss_dyna_mask)
@@ -1274,8 +1278,9 @@ class NeuralRenderer(nn.Module):
                             gt_mask1 = self.mask_onehot(gt_mask) # 1 128 128 1[1,200] -> 1 128 128 3[100 010 001] 
                             gt_mask_vis =  self.vis_labels(gt_mask1)
                             # vis rgb render in mask camera 可视化mask相机的rgb  
-                            # data =self.pts2render_rgb(data, bg_color=self.bg_color)
-                            ## !! next_render_mask = data['mask_view']['rgb_pred'].permute(0, 2, 3, 1)
+                            data =self.pts2render_rgb(data, bg_color=self.bg_color)
+                            ## !! 
+                            next_render_mask = data['mask_view']['rgb_pred'].permute(0, 2, 3, 1)
 
                         if self.use_CEloss==2: # 未改
                             render_mask_novel = data['novel_view']['mask_pred'].permute(0, 2, 3, 1)  # 1 128 128 3
@@ -1514,7 +1519,8 @@ class NeuralRenderer(nn.Module):
                         next_render_mask = next_render_mask,               # 左臂mask * next_render_novel
                         next_render_mask_right = next_render_mask_right,   # 无用 右臂mask 
                         next_render_rgb_right = next_render_rgb_right,            # 右臂next rgb
-                        next_left_mask_gen = next_left_mask_gen,                       # 生成的左臂当时视角的mask
+                        next_left_mask_gen = next_left_mask_gen, 
+                        exclude_left_mask =exclude_left_mask,                      # 生成的左臂当时视角的mask
                         gt_mask_vis =gt_mask_vis,
                         next_gt_mask_vis =next_gt_mask_vis,
                         )             

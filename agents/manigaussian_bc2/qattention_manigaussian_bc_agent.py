@@ -1965,134 +1965,135 @@ class QAttentionPerActBCAgent(Agent):
                         ax.axis('off')
                     plt.tight_layout()
                 elif self.cfg.neural_renderer.mask_gen =='pre':
-                    if self.cfg.neural_renderer.use_dynamic_field: 
-                        rgb_render, next_rgb_render, embed_render, gt_embed_render, \
-                            render_mask_novel,render_mask_gtrgb, next_render_mask, next_render_mask_right,\
-                            next_rgb_render_right, next_left_mask_gen, exclude_left_mask,\
-                            gt_mask_vis,next_gt_mask_vis= self._q.render(
-                            rgb_pcd=obs,proprio=proprio,pcd=pcd,camera_extrinsics=extrinsics, camera_intrinsics=intrinsics,
-                            lang_goal_emb=lang_goal_emb,lang_token_embs=lang_token_embs,bounds=bounds,
-                            prev_bounds=prev_layer_bounds,
-                            prev_layer_voxel_grid=prev_layer_voxel_grid,
-                            tgt_pose=nerf_target_camera_extrinsic, # target
-                            tgt_intrinsic=nerf_target_camera_intrinsic,
-                            nerf_target_rgb=nerf_target_rgb,
-                            lang_goal=lang_goal,
-                            nerf_next_target_rgb=nerf_next_target_rgb,
-                            nerf_next_target_depth=nerf_next_target_depth,
-                            nerf_next_target_pose=nerf_next_target_camera_extrinsic,
-                            nerf_next_target_camera_intrinsic=nerf_next_target_camera_intrinsic,
-                            step=step,action=action_gt,
-                            gt_mask=gt_mask,next_gt_mask =next_gt_mask,
-                            next_camera_intrinsics=next_intrinsics, # 在可视化中直接用的5
-                            next_camera_extrinsics=next_extrinsics,
-                            # gt_mask_camera_extrinsic=camera_extrinsics, gt_mask_camera_intrinsic=camera_intrinsics,
-                            gt_maskdepth=depth,next_gt_maskdepth=next_depth,
-                            camera_random_int = camera_random_int,
-                            )
-                        # NOTE: [1, h, w, 3]  # 均为图片质量
-                        rgb_gt = nerf_target_rgb[0]
-                        rgb_render = rgb_render[0]
-                        psnr = PSNR_torch(rgb_render, rgb_gt) 
-                        # now mask
-                        if render_mask_novel is not None:
-                            render_mask_novel = render_mask_novel[0]  # render * mask^
-                        if render_mask_gtrgb is not None:
-                            render_mask_gtrgb = render_mask_gtrgb[0]  # gt rgb * mask^
+                    # if self.cfg.neural_renderer.use_dynamic_field: 
+                    rgb_render, next_rgb_render, embed_render, gt_embed_render, \
+                        render_mask_novel,render_mask_gtrgb, next_render_mask, next_render_mask_right,\
+                        next_rgb_render_right, next_left_mask_gen, exclude_left_mask,\
+                        gt_mask_vis,next_gt_mask_vis= self._q.render(
+                        rgb_pcd=obs,proprio=proprio,pcd=pcd,camera_extrinsics=extrinsics, camera_intrinsics=intrinsics,
+                        lang_goal_emb=lang_goal_emb,lang_token_embs=lang_token_embs,bounds=bounds,
+                        prev_bounds=prev_layer_bounds,
+                        prev_layer_voxel_grid=prev_layer_voxel_grid,
+                        tgt_pose=nerf_target_camera_extrinsic, # target
+                        tgt_intrinsic=nerf_target_camera_intrinsic,
+                        nerf_target_rgb=nerf_target_rgb,
+                        lang_goal=lang_goal,
+                        nerf_next_target_rgb=nerf_next_target_rgb,
+                        nerf_next_target_depth=nerf_next_target_depth,
+                        nerf_next_target_pose=nerf_next_target_camera_extrinsic,
+                        nerf_next_target_camera_intrinsic=nerf_next_target_camera_intrinsic,
+                        step=step,action=action_gt,
+                        gt_mask=gt_mask,next_gt_mask =next_gt_mask,
+                        next_camera_intrinsics=next_intrinsics, # 在可视化中直接用的5
+                        next_camera_extrinsics=next_extrinsics,
+                        # gt_mask_camera_extrinsic=camera_extrinsics, gt_mask_camera_intrinsic=camera_intrinsics,
+                        gt_maskdepth=depth,next_gt_maskdepth=next_depth,
+                        camera_random_int = camera_random_int,
+                        )
+                    # NOTE: [1, h, w, 3]  # 均为图片质量
+                    rgb_gt = nerf_target_rgb[0]
+                    rgb_render = rgb_render[0]
+                    psnr = PSNR_torch(rgb_render, rgb_gt) 
+                    # now mask
+                    if render_mask_novel is not None:
+                        render_mask_novel = render_mask_novel[0]  # render * mask^
+                    if render_mask_gtrgb is not None:
+                        render_mask_gtrgb = render_mask_gtrgb[0]  # gt rgb * mask^
 
-                        # next rgb                                                   # next
-                        if next_rgb_render is not None:                              # left rgb^
-                            next_rgb_gt = nerf_next_target_rgb[0]
-                            next_rgb_render = next_rgb_render[0]                
-                            psnr_dyna = PSNR_torch(next_rgb_render, next_rgb_gt)
-                        if next_rgb_render_right is not None:                        # right rgb^
-                            next_rgb_render_right = next_rgb_render_right[0]
-                            # 但是缺少左臂，无参考意义
-                            psnr_dyna_right = PSNR_torch(next_rgb_render_right, next_rgb_gt)
+                    # next rgb                                                   # next
+                    if next_rgb_render is not None:                              # left rgb^
+                        next_rgb_gt = nerf_next_target_rgb[0]
+                        next_rgb_render = next_rgb_render[0]                
+                        psnr_dyna = PSNR_torch(next_rgb_render, next_rgb_gt)
+                    if next_rgb_render_right is not None:                        # right rgb^
+                        next_rgb_render_right = next_rgb_render_right[0]
+                        # 但是缺少左臂，无参考意义
+                        psnr_dyna_right = PSNR_torch(next_rgb_render_right, next_rgb_gt)
 
-                        if next_render_mask is not None:                            # next mask
-                            next_render_mask = next_render_mask[0]                   # next mask*
-                        if next_left_mask_gen is not None:
-                            next_left_mask_gen = next_left_mask_gen[0]           # next gen mask
-                        if next_render_mask_right is not None:                     # next right mask 
-                            next_render_mask_right = next_render_mask_right[0]
-                        if exclude_left_mask is not None:
-                            exclude_left_mask =exclude_left_mask[0]
+                    if next_render_mask is not None:                            # next mask
+                        next_render_mask = next_render_mask[0]                   # next mask*
+                    if next_left_mask_gen is not None:
+                        next_left_mask_gen = next_left_mask_gen[0]           # next gen mask
+                    if next_render_mask_right is not None:                     # next right mask 
+                        next_render_mask_right = next_render_mask_right[0]
+                    if exclude_left_mask is not None:
+                        exclude_left_mask =exclude_left_mask[0]
 
-                        
+                    
 
-                        # 创建目录 'recon' 用于保存可视化结果。 
-                        os.makedirs('recon', exist_ok=True)
-                        import matplotlib.pyplot as plt
-                        rgb_src =  obs[5][0].squeeze(0).permute(1, 2, 0)  / 2 + 0.5
-                        # mask_tgt = gt_mask[5].squeeze(0).permute(1, 2, 0) / 2 + 0.5
-                        mask_tgt = gt_mask[camera_random_int].squeeze(0).permute(1, 2, 0)
-                        next_mask_tgt = next_gt_mask[camera_random_int].squeeze(0).permute(1, 2, 0)
-                        fig, axs = plt.subplots(3, 6, figsize=(15, 3))   # 使用 matplotlib 创建一个包含1行7->8列子图的图形
-                        # src
-                        axs[0, 0].imshow(rgb_src.cpu().numpy())    # 在子图 axs[0] 上显示名为 rgb_src 的图像数
-                        axs[0, 0].title.set_text('src')            # 设置子图 axs[0] 的标题为 'src'，这可能代表“源图像”（source image）
-                        # tgt
-                        axs[0, 1].imshow(rgb_gt.cpu().numpy())
-                        axs[0, 1].title.set_text('tgt')
-                        # pred rgb
-                        axs[0, 2].imshow(rgb_render.cpu().numpy())
-                        axs[0, 2].title.set_text('psnr={:.2f}'.format(psnr))
-                        # pred embed
-                        # embed_render = visualize_feature_map_by_clustering(embed_render.permute(0,3,1,2), num_cluster=4)
-                        embed_render = visualize_feature_map_by_normalization(embed_render.permute(0,3,1,2))    # range from -1 to 1
-                        axs[0, 3].imshow(embed_render)
-                        axs[0, 3].title.set_text('embed seg')
-                        if gt_embed_render is not None:
-                            # gt_embed_render = visualize_feature_map_by_clustering(gt_embed_render, num_cluster=4)
-                            gt_embed_render = visualize_feature_map_by_normalization(gt_embed_render)    # range from -1 to 1
-                            axs[0, 4].imshow(gt_embed_render)
-                            axs[0, 4].title.set_text('gt embed seg')
-                        if gt_mask_vis is not None:
-                            gt_mask_vis = gt_mask_vis[0]
-                            axs[0, 5].imshow(gt_mask_vis)
-                            axs[0, 5].title.set_text('gt_mask_vis')
-                        if next_gt_mask_vis is not None:
-                            next_gt_mask_vis = next_gt_mask_vis[0]
-                            axs[0, 5].imshow(next_gt_mask_vis)
-                            axs[0, 5].title.set_text('next_gt_mask_vis')
+                    # 创建目录 'recon' 用于保存可视化结果。 
+                    os.makedirs('recon', exist_ok=True)
+                    import matplotlib.pyplot as plt
+                    rgb_src =  obs[5][0].squeeze(0).permute(1, 2, 0)  / 2 + 0.5
+                    # mask_tgt = gt_mask[5].squeeze(0).permute(1, 2, 0) / 2 + 0.5
+                    mask_tgt = gt_mask[camera_random_int].squeeze(0).permute(1, 2, 0)
+                    next_mask_tgt = next_gt_mask[camera_random_int].squeeze(0).permute(1, 2, 0)
+                    fig, axs = plt.subplots(3, 6, figsize=(15, 3))   # 使用 matplotlib 创建一个包含1行7->8列子图的图形
+                    # src
+                    axs[0, 0].imshow(rgb_src.cpu().numpy())    # 在子图 axs[0] 上显示名为 rgb_src 的图像数
+                    axs[0, 0].title.set_text('src')            # 设置子图 axs[0] 的标题为 'src'，这可能代表“源图像”（source image）
+                    # tgt
+                    axs[0, 1].imshow(rgb_gt.cpu().numpy())
+                    axs[0, 1].title.set_text('tgt')
+                    # pred rgb
+                    axs[0, 2].imshow(rgb_render.cpu().numpy())
+                    axs[0, 2].title.set_text('psnr={:.2f}'.format(psnr))
+                    # pred embed
+                    # embed_render = visualize_feature_map_by_clustering(embed_render.permute(0,3,1,2), num_cluster=4)
+                    embed_render = visualize_feature_map_by_normalization(embed_render.permute(0,3,1,2))    # range from -1 to 1
+                    axs[0, 3].imshow(embed_render)
+                    axs[0, 3].title.set_text('embed seg')
+                    if gt_embed_render is not None:
+                        # gt_embed_render = visualize_feature_map_by_clustering(gt_embed_render, num_cluster=4)
+                        gt_embed_render = visualize_feature_map_by_normalization(gt_embed_render)    # range from -1 to 1
+                        axs[0, 4].imshow(gt_embed_render)
+                        axs[0, 4].title.set_text('gt embed seg')
+                    if gt_mask_vis is not None:
+                        gt_mask_vis = gt_mask_vis[0]
+                        axs[0, 5].imshow(gt_mask_vis)
+                        axs[0, 5].title.set_text('gt_mask_vis')
+                    if next_gt_mask_vis is not None:
+                        next_gt_mask_vis = next_gt_mask_vis[0]
+                        axs[0, 5].imshow(next_gt_mask_vis)
+                        axs[0, 5].title.set_text('next_gt_mask_vis')
 
-                        if next_rgb_render is not None:
-                            axs[1, 0].imshow(next_rgb_gt.cpu().numpy())
-                            axs[1, 0].title.set_text('next tgt')
-                            axs[1, 2].imshow(next_rgb_render.cpu().numpy())
-                            axs[1, 2].title.set_text('next psnr={:.2f}'.format(psnr_dyna))
-                        if next_rgb_render_right is not None: # 右臂动作后的rgb
-                            axs[1, 1].imshow(next_rgb_render_right.cpu().numpy())
-                            axs[1, 1].title.set_text('next right psnr={:.2f}'.format(psnr_dyna_right))
-                        # mask
-                        axs[2, 0].imshow(mask_tgt.cpu().numpy()) 
-                        axs[2, 0].title.set_text('mask_tgt')
-                        axs[1, 3].imshow(next_mask_tgt.cpu().numpy()) 
-                        axs[1, 3].title.set_text('next_mask_tgt')   
+                    if next_rgb_render is not None:
+                        axs[1, 0].imshow(next_rgb_gt.cpu().numpy())
+                        axs[1, 0].title.set_text('next tgt')
+                        axs[1, 2].imshow(next_rgb_render.cpu().numpy())
+                        axs[1, 2].title.set_text('next psnr={:.2f}'.format(psnr_dyna))
+                    if next_rgb_render_right is not None: # 右臂动作后的rgb
+                        axs[1, 1].imshow(next_rgb_render_right.cpu().numpy())
+                        axs[1, 1].title.set_text('next right psnr={:.2f}'.format(psnr_dyna_right))
+                    # mask
+                    axs[2, 0].imshow(mask_tgt.cpu().numpy()) 
+                    axs[2, 0].title.set_text('mask_tgt')
+                    axs[1, 3].imshow(next_mask_tgt.cpu().numpy()) 
+                    axs[1, 3].title.set_text('next_mask_tgt')   
+                    if exclude_left_mask is not None:
                         axs[1, 4].imshow(exclude_left_mask.cpu().numpy()) 
                         axs[1, 4].title.set_text('exclude_left_mask(gen)')              
-                        if render_mask_novel is not None:
-                            axs[2, 1].imshow(render_mask_novel.cpu().numpy()) 
-                            axs[2, 1].title.set_text('mask now')
-                        if render_mask_gtrgb is not None:
-                            axs[2, 2].imshow(render_mask_gtrgb.cpu().numpy()) 
-                            axs[2, 2].title.set_text('gt * mask')
-                        if next_render_mask is not None:
-                            axs[2, 3].imshow(next_render_mask.cpu().numpy())
-                            axs[2, 3].title.set_text('next mask')
-                        if next_left_mask_gen is not None:   # gen left mask
-                            axs[2, 4].imshow(next_left_mask_gen.cpu().numpy()) 
-                            axs[2, 4].title.set_text('next_mask gen')
-                        if next_render_mask_right is not None:
-                            axs[2, 5].imshow(next_render_mask_right.cpu().numpy())
-                            axs[2, 5].title.set_text('next mask right')
+                    if render_mask_novel is not None:
+                        axs[2, 1].imshow(render_mask_novel.cpu().numpy()) 
+                        axs[2, 1].title.set_text('mask now')
+                    if render_mask_gtrgb is not None:
+                        axs[2, 2].imshow(render_mask_gtrgb.cpu().numpy()) 
+                        axs[2, 2].title.set_text('gt * mask')
+                    if next_render_mask is not None:
+                        axs[2, 3].imshow(next_render_mask.cpu().numpy())
+                        axs[2, 3].title.set_text('next mask')
+                    if next_left_mask_gen is not None:   # gen left mask
+                        axs[2, 4].imshow(next_left_mask_gen.cpu().numpy()) 
+                        axs[2, 4].title.set_text('next_mask gen')
+                    if next_render_mask_right is not None:
+                        axs[2, 5].imshow(next_render_mask_right.cpu().numpy())
+                        axs[2, 5].title.set_text('next mask right')
 
-                        # remove axis
-                        for ax in axs.flat:
-                            ax.axis('off')
-                        plt.tight_layout()
-                    else: # 好吧其实可以用前面那个就够了
+                    # remove axis
+                    for ax in axs.flat:
+                        ax.axis('off')
+                    plt.tight_layout()
+                    """ else: # 好吧其实可以用前面那个就够了
                         rgb_render, next_rgb_render, embed_render, gt_embed_render, \
                             render_mask_novel,render_mask_gtrgb, next_render_mask, next_render_mask_right,\
                             next_rgb_render_right, next_left_mask_gen, exclude_left_mask,\
@@ -2151,14 +2152,6 @@ class QAttentionPerActBCAgent(Agent):
                         exclude_left_mask1 = None
                         if next_left_mask_gen is not None:
                             next_render_mask_left = next_left_mask_gen[0]
-                            # # exclude_left_mask = ((next_render_mask_left > 2.5) | (next_render_mask_left < 1.5)) # (next_render_mask_left != 2)
-                            # class_indices = torch.argmax(next_left_mask_gen, dim=-1)
-                            # exclude_left_mask = class_indices != 2
-                            # next_rgb_render_right_result = next_rgb_render_right * exclude_left_mask
-                            # print("next_render_mask_left",next_render_mask_left,next_render_mask_left.shape)
-                            # exclude_left_mask1 =  torch.full((exclude_left_mask.shape[0], exclude_left_mask.shape[1], 3), 255, dtype=torch.uint8,device='cpu')
-                            # exclude_left_mask1 = exclude_left_mask1 * exclude_left_mask.cpu()
-                            # next_render_mask_left = next_render_mask_left # *127    
                         if next_render_mask_right is not None:
                             next_render_mask_right = next_render_mask_right[0]
 
@@ -2190,66 +2183,46 @@ class QAttentionPerActBCAgent(Agent):
                             gt_embed_render = visualize_feature_map_by_normalization(gt_embed_render)    # range from -1 to 1
                             axs[0, 4].imshow(gt_embed_render)
                             axs[0, 4].title.set_text('gt embed seg')
-                            
                         if next_rgb_render is not None:
-                            # gt next rgb frame
                             axs[0, 6].imshow(next_rgb_gt.cpu().numpy())
                             # print("06") # 和10之间有时候出现
                             axs[0, 6].title.set_text('next tgt')
-                            # Ours
-                            # print("05") # 
                             axs[0, 5].imshow(next_rgb_render.cpu().numpy())
                             axs[0, 5].title.set_text('next psnr={:.2f}'.format(psnr_dyna))
                         if next_rgb_render_right is not None: # 右臂动作后的rgb
-                            # print("15") # 
                             axs[1, 5].imshow(next_rgb_render_right.cpu().numpy())
                             axs[1, 5].title.set_text('gt mask')
                             # axs[1, 5].title.set_text('next right psnr={:.2f}'.format(psnr_dyna_right))
-
                         axs[1, 0].imshow(mask_src.cpu().numpy()) 
                         axs[1, 0].title.set_text('mask_src')
-
                         if render_mask_novel is not None:
-                            # print("10")
                             axs[1, 1].imshow(render_mask_novel.cpu().numpy()) # 训练得到的当前mask
                             axs[1, 1].title.set_text('mask*renderrgb now')
                         if render_mask_gtrgb is not None:
                             axs[1, 2].imshow(render_mask_gtrgb.cpu().numpy()) # 训练得到的当前mask
                             axs[1, 2].title.set_text('mask*gtrgb now')
-
                         if next_render_mask_left is not None:   # gen left mask
-                            # print("11")
                             axs[1, 1].imshow(next_render_mask_left.cpu().numpy()) # 训练得到的next 整体 mask
                             axs[1, 1].title.set_text('target_render_left_rgb * next_mask')
-
                         if next_rgb_render_right_result is not None: # 去除右臂后的左臂mask
-                            # print("12")
                             # 如果无next则是train mask的结果
                             axs[1, 2].imshow(next_rgb_render_right_result.cpu().numpy())
-                            # if
                             axs[1, 2].title.set_text('next exclude_left_rgb')
-                        
-
-
                         if exclude_left_mask1 is not None: # 去除右臂后的左臂mask [1,1]的可视化
-                            # print("13")
                             axs[1, 3].imshow(exclude_left_mask1.cpu().numpy())
                             axs[1, 3].title.set_text('exclude_left_mask')
                         if next_gt_rgbmask is not None: # gt 中去除左臂mask后的mask # 去除右臂后的左臂mask
-                        #     # print("14")
-                            # axs[1, 4].imshow(next_gt_rgbmask.cpu().numpy())
-                            # axs[1, 4].title.set_text('exclude_left_mask * render_left')
                             axs[1, 3].imshow(next_gt_rgbmask.cpu().numpy())
-                            axs[1, 3].title.set_text('vis gt')
-                        if next_render_mask_right is not None:
-                            axs[1, 4].imshow(next_render_mask_right.cpu().numpy())
-                            axs[1, 4].title.set_text('vis gen mask')
-                            # axs[1, 4].title.set_text('exclude_right * render_right')
-
+                            axs[1, 3].title.set_text('vis mtgt rgb')
+                        if gt_mask_vis is not None:
+                            gt_mask_vis = gt_mask_vis[0]
+                            axs[1, 4].imshow(gt_mask_vis.cpu().numpy())
+                            axs[1, 4].title.set_text('vis mtgt rgb')
+                            # axs[1, 4].title.set_text('exclude_right * render_right') 
                         # remove axis
                         for ax in axs.flat:
                             ax.axis('off')
-                        plt.tight_layout()
+                        plt.tight_layout()"""
             else:
                 rgb_render, next_rgb_render, embed_render, gt_embed_render, \
                     render_mask_novel, next_render_mask, next_render_mask_right, next_rgb_render_right, next_left_mask_gen= self._q.render(

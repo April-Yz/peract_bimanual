@@ -397,7 +397,7 @@ def render_mask_gen(data, idx, pts_xyz, rotations, scales, opacity, bg_color, pt
 
     mask = mask.reshape(256,256,3)
     # mask =mask.unsqueeze(1)
-    print("in gen mask.shape",mask.shape)
+    # print("in gen mask.shape",mask.shape)
     # mask = mask.reshape(128,128,3)
     # print("in gen mask.shape",mask.shape)
 

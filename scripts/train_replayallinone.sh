@@ -49,15 +49,15 @@ field_type='LF' # 'LF' # 'BIMANUAL' 'bimanual' 'LF'
 lambda_dyna=0.1 #0.1
 lambda_reg=0.0
 render_freq=500 #2000
-lambda_nerf=0.1 #1.0 # 0.01 # 0.01
+lambda_nerf=0.001 #1.0 # 0.01 # 0.01
 mask_gt_rgb=True
 warm_up=2000
 mask_warm_up=3000 #0
 
 lambda_dyna_leader=0.6  
-lambda_mask=0.5            
-lambda_mask_right=0.4 
-lambda_next_loss_mask=0.5
+lambda_mask=0.4            
+lambda_mask_right=0.5 
+lambda_next_loss_mask=0.5 # 无用
 
 mask_gen='pre' # 'nonerf' #'gt' # 'pre' 'None'
 use_nerf_picture=True #False
