@@ -337,6 +337,65 @@ def run_seed(
             keypoint_method=cfg.method.keypoint_method,
             fabric=fabric,  # 暂时不用分布式 
         )
+
+    elif cfg.method.name.startswith("TEST_AGENT"):
+        from agents import test_agent
+        replay_path = replay_path.replace("TEST_AGENT", "ManiGasuasian_BC2")
+        print(replay_path)
+        if os.path.exists(replay_path) and os.listdir(replay_path):
+            print("Replay files found. Loading...")
+
+            replay_buffer = test_agent.launch_utils.create_replay(
+                cfg.replay.batch_size,
+                cfg.replay.timesteps,
+                cfg.replay.prioritisation,
+                cfg.replay.task_uniform,
+                replay_path if cfg.replay.use_disk else None,
+                cams, cfg.method.voxel_sizes,
+                cfg.rlbench.camera_resolution,
+                cfg=cfg)
+        #     # ####################################################################
+        #     # 加载所有的 Replay 文件
+            replay_files = [os.path.join(replay_path, f) for f in os.listdir(replay_path) if f.endswith('.replay')]
+            for replay_file in tqdm(replay_files, desc="Processing files"):
+                with open(replay_file, 'rb') as f:
+                    try:
+                        replay_data = pickle.load(f)
+                        replay_buffer.load_add(replay_data)
+                    except pickle.UnpicklingError as e:
+                        print(f"Error unpickling file {replay_file}: {e}")
+        else:
+            print("No replay files found. Creating replay...")
+            # replay_buffer = replay_utils.create_replay(cfg, replay_path)
+            replay_buffer = test_agent.launch_utils.create_replay(
+                cfg.replay.batch_size,
+                cfg.replay.timesteps,
+                cfg.replay.prioritisation,
+                cfg.replay.task_uniform,
+                replay_path if cfg.replay.use_disk else None,
+                cams, cfg.method.voxel_sizes,
+                cfg.rlbench.camera_resolution,
+                cfg=cfg)
+            # replay_utils.fill_multi_task_replay(cfg,obs_config,rank,replay_buffer,tasks)
+            test_agent.launch_utils.fill_multi_task_replay(
+                cfg, 
+                obs_config, 
+                0,  # 双臂是rank
+                replay_buffer, 
+                tasks, 
+                cfg.rlbench.demos,
+                cfg.method.demo_augmentation, 
+                cfg.method.demo_augmentation_every_n,
+                cams, 
+                cfg.rlbench.scene_bounds,
+                cfg.method.voxel_sizes, 
+                cfg.method.bounds_offset,
+                cfg.method.rotation_resolution, 
+                cfg.method.crop_augmentation,
+                keypoint_method=cfg.method.keypoint_method,
+                fabric=fabric,  # 暂时不用分布式 
+            )
+        agent = test_agent.launch_utils.create_agent(cfg)
     # --------------------------------传参改动结束----------------------------------------------
     
     else:

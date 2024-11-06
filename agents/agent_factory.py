@@ -11,7 +11,7 @@ from yarr.agents.agent import Agent
 
 supported_agents = {"leader_follower": ("PERACT_BC", "RVT", "ManiGaussian2_BC"), 
                     "independent" : ("PERACT_BC", "RVT"),
-                    "bimanual": ("BIMANUAL_PERACT", "ACT_BC_LANG","ManiGaussian_BC2"),
+                    "bimanual": ("BIMANUAL_PERACT", "ACT_BC_LANG","ManiGaussian_BC2", "TEST_AGENT"),
                     "unimanual": ()}
 
 
@@ -105,6 +105,10 @@ def agent_fn_by_name(method_name: str) -> Agent:
     
     elif method_name.startswith("ManiGaussian2_BC"):
         from agents import manigaussian2_bc
-        return manigaussian2_bc.launch_utils.create_agent        
+        return manigaussian2_bc.launch_utils.create_agent     
+
+    elif method_name.startswith("TEST_AGENT"):
+        from agents import test_agent
+        return test_agent.launch_utils.create_agent     
     else:
         raise ValueError("Method %s does not exists." % method_name)

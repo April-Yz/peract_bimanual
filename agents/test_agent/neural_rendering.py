@@ -677,7 +677,7 @@ class NeuralRenderer(nn.Module):
             # Loss L(GEO) 当前场景一致性损失 Current Scence Consistency Loss
             # permute置换  将张量的维度从原来的顺序重新排列为新的顺序 
             render_novel = data['novel_view']['img_pred'].permute(0, 2, 3, 1)   # [1, 128, 128, 3]            
-            # render_novel_grad = render_novel.register_hook(self._save_gradient('render_novel')) 
+
             # visdom 视界(可视化数据用的) Manigaussian2 中是False bash中好像也没有指定
             if self.cfg.visdom: # False
                 vis = visdom.Visdom()

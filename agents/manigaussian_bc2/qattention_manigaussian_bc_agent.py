@@ -1349,7 +1349,7 @@ class QAttentionPerActBCAgent(Agent):
         # similar to apply_se3_augmentation
         # SE(3) augmentation of point clouds and actions   SE(3) 增强点云和action
         if self._transform_augmentation:
-            cprint("Applying SE(3) augmentation!!!", "red")
+            # cprint("Applying SE(3) augmentation!!!", "red")
 
             # nerf[4]---得新写一个函数-------------
             (

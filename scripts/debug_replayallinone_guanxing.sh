@@ -5,7 +5,8 @@
 #       bash scripts/train.sh ManiGaussian_BC2 0,1,2,3 12345 mani
 # 
 # set the method name
-method=${1} # PERACT_BC / BIMANUAL_PERACT  / ManiGaussian_BC2
+method=${1} # TEST_AGENT
+# loop over the dataset
 
 # set the seed number
 seed="0"
@@ -37,13 +38,14 @@ tmux new-session -d -s ${exp_name}
 batch_size=1 # 1 #4 # 2
 
 # tasks=[dual_push_buttons] # dual_push_buttons bimanual_pick_plate
-tasks=[bimanual_pick_laptop,bimanual_straighten_rope,coordinated_lift_tray,coordinated_push_box,coordinated_put_bottle_in_fridge,dual_push_buttons,handover_item,bimanual_sweep_to_dustpan,coordinated_take_tray_out_of_oven,handover_item_easy]
+# tasks=[bimanual_pick_laptop,bimanual_straighten_rope,coordinated_lift_tray,coordinated_push_box,coordinated_put_bottle_in_fridge,dual_push_buttons,handover_item,bimanual_sweep_to_dustpan,coordinated_take_tray_out_of_oven,handover_item_easy]
+tasks=[bimanual_sweep_to_dustpan]
 
 num_view_for_nerf=21 #1 #21
 # for debug
 use_dynamic_field=True # True #False
 demo=1 # 100
-episode_length=2 #25 # 20 # 4
+episode_length=25 #25 # 20 # 4
 save_freq=10000
 camera_resolution="[256,256]"
 training_iterations=100001

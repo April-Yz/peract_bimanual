@@ -1,0 +1,212 @@
+# @package _group_
+# 具体可以看隔壁GNFACTOR_BC
+
+name: 'TEST_AGENT'
+
+# ---------------bimanual新加的-----------
+# Agent
+agent_type: 'bimanual'
+robot_name: 'bimanual'
+# ---------------bimanual新加的-----------
+
+
+use_fabric: True # False #
+
+use_depth: True
+use_neural_rendering: True #  False # 
+num_view_for_nerf: 20
+
+# choices: T5 (768), CLIP (512)
+# we use CLIP as language model. Users could explore more about other language models such as T5.
+language_model: 'CLIP'
+language_model_dim: 512
+
+# Voxelization
+# 体素化未变
+image_crop_size: 64
+bounds_offset: [0.15]
+voxel_sizes: [100]
+include_prev_layer: False
+
+# Perceiver
+# 深度学习架构未变
+num_latents: 2048
+latent_dim: 512
+transformer_depth: 6  # default: 6
+transformer_iterations: 1
+cross_heads: 1
+cross_dim_head: 64
+latent_heads: 8
+latent_dim_head: 64
+pos_encoding_with_lang: True
+conv_downsample: True
+lang_fusion_type: 'seq' # or 'concat'
+voxel_patch_size: 5
+voxel_patch_stride: 5
+final_dim: 128 #8 # 128 bimanual 64 manigaussian 128 其他全是64（包括peract bimanual）
+low_dim_size: 8 # bimanual 的in_features （peract1:4   peract2:8）
+
+# Training
+# 训练变了一些，已加注释
+input_dropout: 0.1
+attn_dropout: 0.1
+decoder_dropout: 0.0
+
+lr: 0.0005  # GNFactor
+lr_scheduler: False
+num_warmup_steps: 3000
+optimizer: 'lamb' # or 'adam'
+# 新增的 L2正则化（也称为权重衰减）的权重参数。
+# L2正则化是一种常用的正则化技术，用于防止模型过拟合，通过在损失函数中添加一个额外的项来惩罚模型参数的绝对值的平方和。
+lambda_weight_l2: 0.000001  # weight_decay
+
+# BC loss coeffs 
+# 少了几行 克隆（Behavioral Cloning)损失行数
+# lambda_weight_l2: 0.000001 # mibanual特有（在上面写了一遍了...）
+trans_loss_weight: 1.0
+rot_loss_weight: 1.0
+grip_loss_weight: 1.0
+collision_loss_weight: 1.0
+rotation_resolution: 5
+
+# Network
+activation: lrelu
+norm: None
+
+# Augmentation 裁剪增强
+crop_augmentation: True
+transform_augmentation:
+  apply_se3: True
+  # apply_se3: False
+  aug_xyz: [0.125, 0.125, 0.125]
+  aug_rpy: [0.0, 0.0, 45.0]
+  aug_rot_resolution: ${method.rotation_resolution}
+
+demo_augmentation: True
+demo_augmentation_every_n: 10
+
+# Ablations 消融研究
+no_skip_connection: False
+no_perceiver: False
+no_language: False
+keypoint_method: 'heuristic'
+
+# wandb logger
+use_wandb: True # covered in bash file包含在 bash 文件中
+
+lambda_bc: 1.0
+
+# Auxiliary Loss 辅助损失
+# 在深度学习中，辅助损失是一种额外的损失函数，它与主损失函数一起用于训练模型
+neural_renderer:
+  # Gaussian Splatting (GS)
+  visdom: False
+  render_freq: 2000000 # 暂时处理这个报错#2000 #1000
+
+  use_clip: False
+  field_type: 'bimanual' #'LF'
+  mask_gen: 'gt' # 'pre'
+  mask_warm_up: 4000
+  use_dynamic_field: False  # please set use_neural_rendering true first
+  use_nerf_picture: True
+
+  # weight for all auxiliary losses
+  lambda_nerf: 0.01
+
+  # ManiGaussian loss weight. 
+  lambda_embed: 0.01 # Semantic Feature Consistency Loss.
+  lambda_rgb: 1.0 # Current Scene Consistency Loss.
+  lambda_l1: 1.0 # L1 loss for Gaussian Splatting
+  lambda_ssim: 0.0 # SSIM loss for Gaussian Splatting
+
+  lambda_dyna: 0.01
+  lambda_dyna_leader: 0.4
+  lambda_mask: 1.0
+  lambda_mask_right: 0.1
+  lambda_reg: 0.0 # not used
+  mask_type: 'exclude' # 'include'
+  lambda_next_loss_mask: 0.6
+
+  dataset:
+    use_processed_data: True
+    bg_color: [0, 0, 0]
+    # bg_color: [0, 0.196, 0.220] # teal (deep green) color for RLBench background
+    # 深绿色是用于RLBench（一个机器人学习的基准测试平台）的背景颜色。
+    zfar: 4.0
+    znear: 0.1
+    trans: [0.0, 0.0, 0.0]
+    scale: 1.0
+    mask_gt_rgb: False
+
+  foundation_model_name: null # or 'diffusion' or 'dinov2'
+  d_embed: 3
+  loss_embed_fn: cosine
+  
+  d_latent: 128
+  
+  d_lang: 128
+  
+  voxel_shape: 100
+  image_width: 128
+  image_height: 128
+  coordinate_bounds: [-0.3, -0.5, 0.6, 0.7, 0.5, 1.6]
+
+  use_code: True
+  use_code_viewdirs: False
+  use_xyz: True
+
+# 多了一些
+  mlp:
+    n_blocks: 5       # 表示MLP中包含的层块（或称为层）的数量，这里是5个。
+    d_hidden: 512     # 每个层块中隐藏单元（神经元）的维度，这里是512。
+    combine_layer: 3  # 指定在哪个层块进行组合操作，这里是第3层。
+    combine_type: average   # 指定组合操作的类型，这里是取平均值。
+    beta: 0.0               # 可能用于控制某些类型层的激活函数的参数，这里设置为0.0。
+    use_spade: False        # 表示是否使用SPADE（Spatially Adaptive Normalization）技术，这里设置为不使用。
+
+    opacity_scale: 1.0      # 用于调整不透明度（opacity）的尺度和偏差。
+    opacity_bias: -2.0
+    scale_bias: 0.02        # 能用于调整尺度（scale）的偏差和尺度
+    scale_scale: 0.003
+    xyz_scale: 0.1          # 调整XYZ坐标的尺度和偏差
+    xyz_bias: 0.0
+    max_sh_degree: 1        # 球谐函数（Spherical Harmonics，简称SH）中使用的最高阶数，这里是1。
+
+# 多的
+  next_mlp:
+    d_in: 3       # 输入层的维度，这里是3
+    d_lang: 128   # 语言模型的维度，这里是128
+    d_out: 3      # 输出层的维度，这里是3
+    n_blocks: 5   # MLP中的隐藏层块数量
+    d_hidden: 512 # 每个隐藏层块中的隐藏单元（神经元）数量
+    combine_layer: 3      # 指定在第3个隐藏层块进行某种形式的组合操作。
+    combine_type: average # 指定组合操作的类型为平均值（average），可能是指合并不同层的输出。
+    beta: 0.0             # 可能用于控制某些层激活函数的参数，
+    use_spade: False      # 表示是否使用SPADE技术，这里设置为不使用。
+    warm_up: 3000         # 预热步数，可能用于学习率调度，表示在训练开始时逐步增加学习率到设定值的步数。
+    use_action: True      # 一个布尔值，表示是否使用动作信息，这里设置为使用。
+  
+  next_mlp_small:
+    d_in: 3       # 输入层的维度，这里是3
+    d_lang: 128   # 语言模型的维度，这里是128
+    d_out: 3      # 输出层的维度，这里是3
+    n_blocks: 5 # 4 #4   # 试着减少一点看看# MLP中的隐藏层块数量
+    d_hidden: 256 # 384 #256 # 每个隐藏层块中的隐藏单元（神经元）数量
+    combine_layer: 3      # 指定在第3个隐藏层块进行某种形式的组合操作。
+    combine_type: average # 指定组合操作的类型为平均值（average），可能是指合并不同层的输出。
+    beta: 0.0             # 可能用于控制某些层激活函数的参数，
+    use_spade: False      # 表示是否使用SPADE技术，这里设置为不使用。
+    warm_up: 3000         # 预热步数，可能用于学习率调度，表示在训练开始时逐步增加学习率到设定值的步数。
+    use_action: True      # 一个布尔值，表示是否使用动作信息，这里设置为使用。
+
+  code:
+    num_freqs: 6
+    freq_factor: 1.5
+    include_input: True
+
+
+
+
+
+
+
