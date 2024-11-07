@@ -1,0 +1,431 @@
+# 新加的
+replay/
+third_part/RLBench.zip
+third_part/YARR.zip
+third_part/CoppeliaSim_Edu_V4_1_0_Ubuntu20_04
+# third_part/RLBench
+# third_part/pyrep
+# third_part/YARR
+scripts/test_demo
+# third_part/RLBench/rlbench/assets
+.ttm
+# third_part/RLBench/rlbench/robot_ttms
+# third_part/RLBench/rlbench/task_ttms
+# third_part/RLBench/tests/unit/assets/
+# third_part/RLBench/urdfs/panda/meshes/
+# third_part/RLBench/tutorials/tutorial_images/
+third_part/GroundingDINO/weights/
+log-mani/
+third_party/
+third_part/
+outputs/
+log/
+log1/
+log2/
+log/
+log3/
+data/
+data1/
+peract/
+data_ntu/
+
+wandb/
+log/
+.mp4
+.pt
+output/
+.sh
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+# .Python
+# build/
+# develop-eggs/
+# dist/
+# downloads/
+# eggs/
+# .eggs/
+# lib/
+# lib64/
+# parts/
+# sdist/
+# var/
+# wheels/
+# share/python-wheels/
+# *.egg-info/
+# .installed.cfg
+# *.egg
+# MANIFEST
+
+# # PyInstaller
+# #  Usually these files are written by a python script from a template
+# #  before PyInstaller builds the exe, so as to inject date/other infos into it.
+# *.manifest
+# *.spec
+
+# # Installer logs
+# pip-log.txt
+# pip-delete-this-directory.txt
+
+# # Unit test / coverage reports
+# htmlcov/
+# .tox/
+# .nox/
+# .coverage
+# .coverage.*
+# .cache
+# nosetests.xml
+# coverage.xml
+# *.cover
+# *.py,cover
+# .hypothesis/
+# .pytest_cache/
+# cover/
+
+# # Translations
+# *.mo
+# *.pot
+
+# # Django stuff:
+# *.log
+# local_settings.py
+# db.sqlite3
+# db.sqlite3-journal
+
+# # Flask stuff:
+# instance/
+# .webassets-cache
+
+# # Scrapy stuff:
+# .scrapy
+
+# # Sphinx documentation
+# docs/_build/
+
+# # PyBuilder
+# .pybuilder/
+# target/
+
+# # Jupyter Notebook
+# .ipynb_checkpoints
+
+# # IPython
+# profile_default/
+# ipython_config.py
+
+# # pyenv
+# #   For a library or package, you might want to ignore these files since the code is
+# #   intended to run in multiple environments; otherwise, check them in:
+# # .python-version
+
+# # pipenv
+# #   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
+# #   However, in case of collaboration, if having platform-specific dependencies or dependencies
+# #   having no cross-platform support, pipenv may install dependencies that don't work, or not
+# #   install all needed dependencies.
+# #Pipfile.lock
+
+# # poetry
+# #   Similar to Pipfile.lock, it is generally recommended to include poetry.lock in version control.
+# #   This is especially recommended for binary packages to ensure reproducibility, and is more
+# #   commonly ignored for libraries.
+# #   https://python-poetry.org/docs/basic-usage/#commit-your-poetrylock-file-to-version-control
+# #poetry.lock
+
+# # pdm
+# #   Similar to Pipfile.lock, it is generally recommended to include pdm.lock in version control.
+# #pdm.lock
+# #   pdm stores project-wide configurations in .pdm.toml, but it is recommended to not include it
+# #   in version control.
+# #   https://pdm.fming.dev/#use-with-ide
+# .pdm.toml
+
+# # PEP 582; used by e.g. github.com/David-OConnor/pyflow and github.com/pdm-project/pdm
+# __pypackages__/
+
+# # Celery stuff
+# celerybeat-schedule
+# celerybeat.pid
+
+# # SageMath parsed files
+# *.sage.py
+
+# # Environments
+# .env
+# .venv
+# env/
+# venv/
+# ENV/
+# env.bak/
+# venv.bak/
+
+# # Spyder project settings
+# .spyderproject
+# .spyproject
+
+# # Rope project settings
+# .ropeproject
+
+# # mkdocs documentation
+# /site
+
+# # mypy
+# .mypy_cache/
+# .dmypy.json
+# dmypy.json
+
+# # Pyre type checker
+# .pyre/
+
+# # pytype static type analyzer
+# .pytype/
+
+# # Cython debug symbols
+# cython_debug/
+
+# # PyCharm
+# #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
+# #  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
+# #  and can be added to the global gitignore or merged into this file.  For a more nuclear
+# #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
+# #.idea/
+
+log-mani/mani/ManiGaussian_BC2/seed0/config.yaml
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722925467.server189.1082237.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722925611.server189.1083146.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722925708.server189.1084134.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722926746.server189.1089342.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722927096.server189.1090682.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722927344.server189.1091644.0
+log-mani/mani/ManiGaussian_BC2/seed0/training.log
+log-mani/mani/ManiGaussian_BC2/seed0/weights/0/QAttentionAgent_layer0.pt
+log-mani/mani/ManiGaussian_BC2/seed0/config.yaml
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722939585.server189.1109481.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722939940.server189.1110552.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722940374.server189.1111547.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722940582.server189.1112446.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722941328.server189.1114242.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722941810.server189.1116052.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722942290.server189.1117556.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722943940.server189.1119652.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722944500.server189.1120577.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722944603.server189.1121429.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722945046.server189.1122015.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722945122.server189.1122504.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722945306.server189.1123000.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722945559.server189.1124492.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722945631.server189.1125164.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722945735.server189.1125976.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722946328.server189.1127378.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722946605.server189.1128541.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722946663.server189.1129202.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722946810.server189.1130090.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722946963.server189.1130996.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722947168.server189.1132065.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722947567.server189.1133064.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722948268.server189.1135160.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722949187.server189.1137511.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722953028.server189.1146191.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722953117.server189.1146877.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722954599.server189.1150076.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722955005.server189.1151752.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722956457.server189.1156718.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722957340.server189.1159478.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722958248.server189.1163466.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722959971.server189.1170489.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722960183.server189.1171740.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722960321.server189.1172774.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722961923.server189.1177438.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722962168.server189.1178640.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722962473.server189.1179972.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722963657.server189.1183383.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722963721.server189.1184032.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722964654.server189.1186517.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722964916.server189.1187485.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722965166.server189.1188679.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722965749.server189.1190806.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1722966556.server189.1193683.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723006216.server189.1217511.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723006626.server189.1218538.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723006870.server189.1219799.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723008280.server189.1221740.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723008476.server189.1222859.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723009886.server189.1224531.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723010075.server189.1225213.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723010274.server189.1225968.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723010492.server189.1226702.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723010794.server189.1227872.0
+log-mani/mani/ManiGaussian_BC2/seed0/training.log
+log-mani/mani/ManiGaussian_BC2/seed0/config.yaml
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723010985.server189.1228770.0
+log-mani/mani/ManiGaussian_BC2/seed0/training.log
+log-mani/mani/ManiGaussian_BC2/seed0/config.yaml
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723011296.server189.1229927.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723011601.server189.1231542.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723011856.server189.1232330.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723011991.server189.1233455.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723011996.server189.1233300.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723013190.server189.1235470.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723013196.server189.1235301.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723017510.server189.1245939.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723017515.server189.1245782.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723018543.server189.1249016.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723018548.server189.1248850.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723019750.server189.1252624.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723020449.server189.1254374.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723021062.server189.1256067.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723021382.server189.1256592.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723021623.server189.1257320.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723021627.server189.1257165.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723022043.server189.1258264.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723022162.server189.1258793.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723022297.server189.1259280.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723022589.server189.1259838.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723023239.server189.1260767.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723023562.server189.1261345.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723024198.server189.1262105.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723024205.server189.1261968.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723024655.server189.1263041.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723024660.server189.1262886.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723025394.server189.1267032.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723025398.server189.1266877.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723025913.server189.1268384.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723025917.server189.1268211.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723026775.server189.1269904.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723026785.server189.1269743.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723037669.server189.1283561.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723037676.server189.1283395.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723040426.server189.1291280.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723040430.server189.1291118.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723040586.server189.1292465.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723040591.server189.1292302.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723041064.server189.1294177.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723041070.server189.1294016.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723041292.server189.1295462.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723041297.server189.1295305.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723041517.server189.1296630.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723041522.server189.1296475.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723043936.server189.1306500.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723043945.server189.1306330.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723044583.server189.1310433.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723044588.server189.1310256.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723044651.server189.1311345.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723044656.server189.1311188.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723045361.server189.1314023.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723045410.server189.1314867.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723045414.server189.1314710.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723047038.server189.1320031.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723047042.server189.1319863.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723048835.server189.1324947.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723048840.server189.1324792.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723049278.server189.1326410.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723049282.server189.1326244.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723049459.server189.1327398.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723049464.server189.1327243.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723050280.server189.1329459.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723050284.server189.1329304.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723050473.server189.1330923.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723050478.server189.1330743.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723051084.server189.1332392.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723051089.server189.1332237.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723051221.server189.1333397.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723051225.server189.1333242.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723052134.server189.1335014.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723052138.server189.1334857.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723052881.server189.1336978.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723052887.server189.1336805.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723052999.server189.1337939.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723053003.server189.1337781.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723053274.server189.1339114.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723053279.server189.1338959.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723053638.server189.1340535.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723053643.server189.1340376.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723053964.server189.1341647.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723053969.server189.1341492.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723054757.server189.1343485.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723054762.server189.1343312.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723054944.server189.1344571.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723054948.server189.1344405.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723055160.server189.1345562.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723055164.server189.1345389.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723055261.server189.1346454.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723055368.server189.1347465.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723055373.server189.1347309.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723093281.server189.1385622.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723093286.server189.1385465.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723093678.server189.1387365.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723093683.server189.1387197.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723093885.server189.1388428.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723093890.server189.1388273.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723094026.server189.1389457.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723094538.server189.1390594.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723094778.server189.1391428.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723094854.server189.1392134.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723095457.server189.1393649.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723095630.server189.1395011.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723097200.server189.1397802.0
+log-mani/mani/ManiGaussian_BC2/seed0/training.log
+log-mani/mani/ManiGaussian_BC2/seed0/config.yaml
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723100609.server189.1402354.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723100619.server189.1402185.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723102384.server189.1405460.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723102403.server189.1405305.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723102548.server189.1406485.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723102553.server189.1406330.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723108214.server189.1414774.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723108223.server189.1414606.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723109076.server189.1417053.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723109091.server189.1416887.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723109505.server189.1420913.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723109510.server189.1420756.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723109659.server189.1422028.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723109664.server189.1421871.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723110125.server189.1424671.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723110697.server189.1427251.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723110782.server189.1428257.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723110787.server189.1428096.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723110951.server189.1429608.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723111092.server189.1430526.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723111450.server189.1432023.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723112260.server189.1435603.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723112844.server189.1438342.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723112983.server189.1439520.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723113497.server189.1441783.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723113701.server189.1443066.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723113754.server189.1443799.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723113855.server189.1444645.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723113963.server189.1445523.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723114124.server189.1446497.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723114508.server189.1447832.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723114699.server189.1449190.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723116668.server189.1453057.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723118750.server189.1455757.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723119059.server189.1456666.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723121090.server189.1460382.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723122121.server189.1461725.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723123908.server189.1463839.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723124174.server189.1464451.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723132823.server189.1473840.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723132828.server189.1473701.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723135140.server189.1475235.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723135938.server189.1476074.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723135943.server189.1475937.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723136059.server189.1476572.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723137390.server189.1478854.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723137729.server189.1479917.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723137739.server189.1479771.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723137915.server189.1480776.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723137920.server189.1480609.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723138973.server189.1482652.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723138978.server189.1482497.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723139416.server189.1483499.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723139882.server189.1484370.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723139889.server189.1484204.0
+log-mani/mani/ManiGaussian_BC2/seed0/events.out.tfevents.1723140045.server189.1485160.0
+log-mani/mani/ManiGaussian_BC2/seed0/training.log
