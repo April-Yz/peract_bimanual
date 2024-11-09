@@ -139,7 +139,7 @@ def main(cfg: DictConfig) -> None:
         # ----------------------------Mani---------------------------
         if cfg.method.use_fabric:
             # we use fabric DDP 我们使用织物 DDP
-            fabric = L.Fabric(devices=world_size, strategy='ddp')
+            fabric = L.Fabric(devices=world_size, strategy='ddp', precision = 32)
             fabric.launch()
             # print("we  are using ddp ----------问题出在run_seed-----------------")
             run_seed_fn.run_seed(

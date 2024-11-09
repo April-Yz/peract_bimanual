@@ -14,6 +14,7 @@ Q-attention及其变体的代码库   ARM 使用 YARR 框架进行训练，并�
 
 import logging
 from typing import List
+import os
 
 import numpy as np
 from rlbench.backend.observation import Observation
@@ -593,7 +594,12 @@ def fill_replay(cfg: DictConfig,
 
         # extract keypoints (a.k.a keyframes) 关键帧选取
         # episode_keypoints = demo_loading_utils.keypoint_discovery(demo, method=keypoint_method)
-        episode_keypoints = [0,1,2]
+        # full_path = os.path.join(cfg.rlbench.demo_path, task, "/all_variations/eposides/eposide0/front_depth")
+        full_path = os.path.join(cfg.rlbench.demo_path, task, "all_variations", "episodes", "episode0", "front_rgb")
+        num_files = len(os.listdir(full_path))
+        episode_keypoints = list(range(num_files))
+
+        # episode_keypoints = [0,1,2]
 
         if rank == 0:   # always 0
             logging.info(f"Loading Demo({d_idx}) - found {len(episode_keypoints)} keypoints - {task}")

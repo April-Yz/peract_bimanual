@@ -531,7 +531,7 @@ class PerceiverVoxelLangEncoder(nn.Module):
         assert len(axis) == self.input_axis, 'input must have the same number of axis as input_axis'
 
         # concat proprio 本体感知信息拼接
-        if self.low_dim_size > 0:
+        if self.low_dim_size > 0: # 5G
             p = self.proprio_preprocess(proprio)              # [B,4] -> [B,64]
             p = p.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1).repeat(1, 1, d, h, w)
             ins = torch.cat([ins, p], dim=1)                  # [B,128,20,20,20]
@@ -684,8 +684,8 @@ class PerceiverVoxelLangEncoder(nn.Module):
 
         # upsample
         # latents = self.up0(latents) # [B,256,20,20,20] -> [B,128,100,100,100]
-        u0_right = self.up0(latents_right)
-        u0_left = self.up0(latents_left)
+        u0_right = self.up0(latents_right)  # 7G 到这还是7G->9G
+        u0_left = self.up0(latents_left)  # 8左右变成12G
 
         # ablations
         # if self.no_skip_connection:
@@ -694,22 +694,22 @@ class PerceiverVoxelLangEncoder(nn.Module):
         #     latents = self.final(d0)
         # else:
         #     latents = self.final(torch.cat([d0, latents], dim=1)) # [1, 128, 100, 100, 100]
-        if self.no_skip_connection:
+        if self.no_skip_connection:         # 12G
             u_right = self.final(u0_right)
             u_left = self.final(u0_left)
         elif self.no_perceiver:
             u_right = self.final(d0)
             u_left = self.final(d0)
         else:
-            u_right = self.final(torch.cat([d0, u0_right], dim=1)) # [1, 64, 100, 100, 100]
-            u_left = self.final(torch.cat([d0, u0_left], dim=1))   # [1, 64, 100, 100, 100]
+            u_right = self.final(torch.cat([d0, u0_right], dim=1)) # [1, 64, 100, 100, 100] # 12->14.9G (3G)
+            u_left = self.final(torch.cat([d0, u0_left], dim=1))   # [1, 64, 100, 100, 100] # ->17.9G
 
         # print("u_right.shape", u_right.shape,u_left.shape)
 
         # translation decoder
         # trans = self.trans_decoder(latents) # [1, 1, 100, 100, 100]
-        right_trans = self.right_trans_decoder(u_right) # [1, 1, 100, 100, 100]
-        left_trans = self.left_trans_decoder(u_left)
+        right_trans = self.right_trans_decoder(u_right) # [1, 1, 100, 100, 100] 18.5G (+0.5)
+        left_trans = self.left_trans_decoder(u_left)    # 19G  (+0.5)
         # print("right_trans.shape left_trans.shape",right_trans.shape,left_trans.shape)
         # rotation, gripper, and collision MLPs
         # rot_and_grip_out = None
@@ -726,7 +726,7 @@ class PerceiverVoxelLangEncoder(nn.Module):
 
         rot_and_grip_out = None
         if self.num_rotation_classes > 0:
-            feats_right.extend(
+            feats_right.extend( # +0.5 ->19.5
                 [self.ss_final(u_right.contiguous()), self.global_maxp(u_right).view(b, -1)]
             )
 
@@ -743,7 +743,7 @@ class PerceiverVoxelLangEncoder(nn.Module):
                 :, -self.num_collision_classes :
             ]
 
-            feats_left.extend(
+            feats_left.extend( # +0.5 (20G)
                 [self.ss_final(u_left.contiguous()), self.global_maxp(u_left).view(b, -1)]
             )
 

@@ -16,6 +16,7 @@ train_gpu_list=(${train_gpu//,/ })
 port=${3:-"12345"}
 # you could enable/disable wandb by this.
 use_wandb=True #True
+# use_wandb=False #True
 
 # train_demo_path="/data1/zjyang/program/peract_bimanual/data2/train_data"
 train_demo_path="/data1/zjyang/program/peract_bimanual/data_ntu/zips"
@@ -40,16 +41,18 @@ batch_size=1 # 1 #4 # 2
 # tasks=[bimanual_pick_laptop,bimanual_straighten_rope,coordinated_lift_tray,coordinated_push_box,coordinated_put_bottle_in_fridge,dual_push_buttons,handover_item,bimanual_sweep_to_dustpan,coordinated_take_tray_out_of_oven,handover_item_easy]
 tasks=[handover_keyframe,lift_keyframe,pick_in_one_keyframe,pick_in_two_keyframe,press_keyframe]
 num_view_for_nerf=1 #1 #21
-use_dynamic_field=True # True #False
-demo=30 #30 # 100
-episode_length=10 #10 #25 # 20 # 4
-save_freq=2500 # 2500
+use_dynamic_field=False # True #False
+use_neural_rendering=True # True #False
+use_nerf_picture=True #False
+demo=30 #30 #30 # 100
+episode_length=10 #10 #10 #25 # 20 # 4
+save_freq=5000 # 2500
 camera_resolution="[640,480]"
 training_iterations=100001 # 100001
 field_type='bimanual' # 'LF' # 'BIMANUAL' 'bimanual' 'LF'
 mask_gen='bimanual' # 'nonerf' #'gt' # 'pre' 'None' # 这里必须改（neural判断少写了前面LF）
 lambda_dyna=0.1 #0.1
-render_freq=100 #2000
+render_freq=500 # 5 # 100 #2000
 lambda_nerf=0.01 #1.0 # 0.01 # 0.01
 mask_gt_rgb=True
 warm_up=2000
@@ -62,7 +65,6 @@ lambda_mask=0.4
 lambda_mask_right=0.5 
 lambda_next_loss_mask=0.5 # 无用
 
-use_nerf_picture=True #False
 # render输出尺寸
 image_width=640 #256
 image_height=480 #256
@@ -72,11 +74,13 @@ tmux select-pane -t 0
 # peract rlbench
 tmux send-keys "conda activate realrlbench; 
 CUDA_VISIBLE_DEVICES=${train_gpu}  QT_AUTO_SCREEN_SCALE_FACTOR=0 TORCH_DISTRIBUTED_DEBUG=DETAIL python train.py method=$method \
+        method.lambda_bc=1.0 \
         rlbench.task_name=${exp_name} \
         framework.logdir=${logdir} \
         rlbench.demo_path=${train_demo_path} \
         rlbench.num_view_for_nerf=${num_view_for_nerf}\
         method.num_view_for_nerf=${num_view_for_nerf}\
+        method.use_neural_rendering=${use_neural_rendering} \
         rlbench.cameras=${cameras}\
         method.neural_renderer.use_nerf_picture=${use_nerf_picture} \
         framework.save_freq=${save_freq} \

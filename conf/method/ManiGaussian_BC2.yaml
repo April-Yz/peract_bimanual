@@ -149,7 +149,8 @@ neural_renderer:
   voxel_shape: 100
   image_width: 128
   image_height: 128
-  coordinate_bounds: [-0.3, -0.5, 0.6, 0.7, 0.5, 1.6]
+  coordinate_bounds: [0.0,-1.0,-0.2,1.0,0.0,0.8] # 试试新的会怎么样
+  # coordinate_bounds: [-0.3, -0.5, 0.6, 0.7, 0.5, 1.6]
 
   use_code: True
   use_code_viewdirs: False
@@ -157,8 +158,8 @@ neural_renderer:
 
 # 多了一些
   mlp:
-    n_blocks: 4 # 4 #3 #4 # 5       # 表示MLP中包含的层块（或称为层）的数量，这里是5个。
-    d_hidden: 128 # 128 #256 #512     # 每个层块中隐藏单元（神经元）的维度，这里是512。
+    n_blocks: 5 #5 #4 #5 #4 # 4 #3 #4 # 5       # 表示MLP中包含的层块（或称为层）的数量，这里是5个。
+    d_hidden: 128 #128 #128 #128 # 128 # 128 #256 #512     # 每个层块中隐藏单元（神经元）的维度，这里是512。
     combine_layer: 3  # 指定在哪个层块进行组合操作，这里是第3层。
     combine_type: average   # 指定组合操作的类型，这里是取平均值。
     beta: 0.0               # 可能用于控制某些类型层的激活函数的参数，这里设置为0.0。
@@ -177,7 +178,7 @@ neural_renderer:
     d_in: 3       # 输入层的维度，这里是3
     d_lang: 128   # 语言模型的维度，这里是128
     d_out: 3      # 输出层的维度，这里是3
-    n_blocks: 3 #5   # MLP中的隐藏层块数量
+    n_blocks: 1 #3 #5   # MLP中的隐藏层块数量
     d_hidden: 32 #512 # 每个隐藏层块中的隐藏单元（神经元）数量
     combine_layer: 3      # 指定在第3个隐藏层块进行某种形式的组合操作。
     combine_type: average # 指定组合操作的类型为平均值（average），可能是指合并不同层的输出。
